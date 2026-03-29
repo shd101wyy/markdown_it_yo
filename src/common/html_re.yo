@@ -1,0 +1,50 @@
+// Ported from: lib/common/html_re.mjs (markdown-it v14.1.1)
+//
+// Regexps to match html elements
+
+open import "std/string";
+
+// HTML regex pattern components.
+// Base patterns (compile-time strings):
+attr_name :: "([a-zA-Z_:][a-zA-Z0-9:._-]*)";
+unquoted :: "([^\"'=<>`\\x00-\\x20]+)";
+single_quoted :: "('[^']*')";
+double_quoted :: "(\"[^\"]*\")";
+
+// Composite patterns built at runtime via template string interpolation.
+HtmlRegexPatterns :: struct(
+  open_tag : String,
+  close_tag : String,
+  comment : String,
+  processing : String,
+  declaration : String,
+  cdata : String,
+  HTML_TAG_RE_STR : String,
+  HTML_OPEN_CLOSE_TAG_RE_STR : String
+);
+
+html_re :: (fn() -> HtmlRegexPatterns)(
+  {
+    attr_value := `(?:${unquoted}|${single_quoted}|${double_quoted})`;
+    attribute := `(?:\\s+${attr_name}(?:\\s*=\\s*${attr_value})?)`;
+    ot := `<[A-Za-z][A-Za-z0-9\\-]*${attribute}*\\s*/?>`;
+    ct := `</[A-Za-z][A-Za-z0-9\\-]*\\s*>`;
+    cm := `<!---?>|<!--(?:[^-]|-[^-]|--[^>])*-->`;
+    pr := `<[?][\\s\\S]*?[?]>`;
+    dc := `<![A-Za-z][^>]*>`;
+    cd := `<!\\[CDATA\\[[\\s\\S]*?\\]\\]>`;
+
+    HtmlRegexPatterns(
+      open_tag: ot,
+      close_tag: ct,
+      comment: cm,
+      processing: pr,
+      declaration: dc,
+      cdata: cd,
+      HTML_TAG_RE_STR: `^(?:${ot}|${ct}|${cm}|${pr}|${dc}|${cd})`,
+      HTML_OPEN_CLOSE_TAG_RE_STR: `^(?:${ot}|${ct})`
+    )
+  }
+);
+
+export html_re, HtmlRegexPatterns;

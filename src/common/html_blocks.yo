@@ -1,0 +1,79 @@
+// Ported from: lib/common/html_blocks.mjs (markdown-it v14.1.1)
+//
+// List of valid html block names, according to commonmark spec
+// https://spec.commonmark.org/0.30/#html-blocks
+
+open import "std/string";
+{ HashSet } :: import "std/collections/hash_set";
+
+// The set of block-level HTML tag names for O(1) lookup.
+html_blocks :: (fn() -> HashSet(String))(
+  {
+    (s : HashSet(String)) = HashSet(String).new();
+    s.add(`address`);
+    s.add(`article`);
+    s.add(`aside`);
+    s.add(`base`);
+    s.add(`basefont`);
+    s.add(`blockquote`);
+    s.add(`body`);
+    s.add(`caption`);
+    s.add(`center`);
+    s.add(`col`);
+    s.add(`colgroup`);
+    s.add(`dd`);
+    s.add(`details`);
+    s.add(`dialog`);
+    s.add(`dir`);
+    s.add(`div`);
+    s.add(`dl`);
+    s.add(`dt`);
+    s.add(`fieldset`);
+    s.add(`figcaption`);
+    s.add(`figure`);
+    s.add(`footer`);
+    s.add(`form`);
+    s.add(`frame`);
+    s.add(`frameset`);
+    s.add(`h1`);
+    s.add(`h2`);
+    s.add(`h3`);
+    s.add(`h4`);
+    s.add(`h5`);
+    s.add(`h6`);
+    s.add(`head`);
+    s.add(`header`);
+    s.add(`hr`);
+    s.add(`html`);
+    s.add(`iframe`);
+    s.add(`legend`);
+    s.add(`li`);
+    s.add(`link`);
+    s.add(`main`);
+    s.add(`menu`);
+    s.add(`menuitem`);
+    s.add(`nav`);
+    s.add(`noframes`);
+    s.add(`ol`);
+    s.add(`optgroup`);
+    s.add(`option`);
+    s.add(`p`);
+    s.add(`param`);
+    s.add(`search`);
+    s.add(`section`);
+    s.add(`summary`);
+    s.add(`table`);
+    s.add(`tbody`);
+    s.add(`td`);
+    s.add(`tfoot`);
+    s.add(`th`);
+    s.add(`thead`);
+    s.add(`title`);
+    s.add(`tr`);
+    s.add(`track`);
+    s.add(`ul`);
+    s
+  }
+);
+
+export html_blocks;

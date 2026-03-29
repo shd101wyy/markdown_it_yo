@@ -458,6 +458,23 @@ The `use()` plugin API relies on JS dynamic dispatch. We'll defer the plugin sys
 
 ---
 
+## CLI Design (main.yo)
+
+`main.yo` is a CLI executable for converting markdown to HTML. Usage:
+
+```bash
+# Convert a markdown string
+./markdown-it-yo "# Hello **world**"
+
+# Convert a file
+./markdown-it-yo input.md
+
+# Read from stdin (pipe)
+cat README.md | ./markdown-it-yo
+```
+
+This enables easy manual testing during development: write markdown, see HTML output, compare against `npx markdown-it`.
+
 ## Compilation & Testing Commands
 
 ```bash

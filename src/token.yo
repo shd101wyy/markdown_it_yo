@@ -1,0 +1,179 @@
+// Ported from: lib/token.mjs (markdown-it v14.1.1)
+//
+// Token class — represents a single parsed markdown element.
+
+open import "std/string";
+{ ArrayList } :: import "std/collections/array_list";
+
+// HTML attribute pair: [name, value]
+StringPair :: struct(
+  name : String,
+  value : String
+);
+
+// Token class
+//
+// Represents a parsed markdown element (opening tag, closing tag, text, etc.)
+Token :: struct(
+  // Type of the token (string, e.g. "paragraph_open")
+  type_name : String,
+
+  // HTML tag name, e.g. "p"
+  tag : String,
+
+  // Html attributes. Format: [ [name1, value1], [name2, value2] ]
+  attrs : Option(ArrayList(StringPair)),
+
+  // Source map info. Format: [line_begin, line_end]
+  map : Option(ArrayList(i32)),
+
+  // Level change (number in {-1, 0, 1} set), where:
+  //   1 means the tag is opening
+  //   0 means the tag is self-closing
+  //  -1 means the tag is closing
+  nesting : i32,
+
+  // nesting level, the same as `state.level`
+  level : i32,
+
+  // An array of child nodes (inline and img tokens)
+  children : Option(ArrayList(Self)),
+
+  // In a case of self-closing tag (code, html, fence, etc.),
+  // it has contents of this tag.
+  content : String,
+
+  // '*' or '_' for emphasis, fence string for fence, etc.
+  markup : String,
+
+  // Additional information:
+  //  - Info string for "fence" tokens
+  //  - The value "auto" for autolink "link_open" and "link_close" tokens
+  //  - The string value of the item marker for ordered-list "list_item_open" tokens
+  info : String,
+
+  // True for block-level tokens, false for inline tokens.
+  // Used in renderer to calculate line breaks
+  block : bool,
+
+  // If it's true, ignore this element when rendering. Used for tight lists
+  // to hide paragraphs.
+  hidden : bool
+);
+
+impl(Token,
+  // Create new token and fill passed properties.
+  new : (fn(type_name: String, tag: String, nesting: i32) -> Self)(
+    Self(
+      type_name: type_name,
+      tag: tag,
+      attrs: .None,
+      map: .None,
+      nesting: nesting,
+      level: i32(0),
+      children: .None,
+      content: ``,
+      markup: ``,
+      info: ``,
+      block: false,
+      hidden: false
+    )
+  ),
+
+  // Search attribute index by name.
+  attrIndex : (fn(self: *(Self), name: String) -> i32)(
+    match(self.*.attrs,
+      .None => i32(-1),
+      .Some(attrs) => {
+        (i : i32) = i32(0);
+        (len : i32) = i32(attrs.len());
+        (result : i32) = i32(-1);
+        while ((i < len) && (result == i32(-1))), {
+          (pair : StringPair) = attrs.get(usize(i)).unwrap();
+          if((pair.name == name), {
+            result = i;
+          });
+          i = (i + i32(1));
+        };
+        result
+      }
+    )
+  ),
+
+  // Add [name, value] attribute to list. Init attrs if necessary.
+  attrPush : (fn(self: *(Self), attrData: StringPair) -> unit)({
+    match(self.*.attrs,
+      .Some(attrs) => {
+        attrs.push(attrData);
+      },
+      .None => {
+        (new_attrs : ArrayList(StringPair)) = ArrayList(StringPair).new();
+        new_attrs.push(attrData);
+        self.*.attrs = .Some(new_attrs);
+      }
+    );
+  }),
+
+  // Set `name` attribute to `value`. Override old value if exists.
+  attrSet : (fn(self: *(Self), name: String, value: String) -> unit)({
+    (idx : i32) = self.attrIndex(name);
+    (attrData : StringPair) = StringPair(name: name, value: value);
+
+    if((idx < i32(0)), {
+      self.attrPush(attrData);
+    }, {
+      match(self.*.attrs,
+        .Some(attrs) => {
+          attrs.set(usize(idx), attrData);
+        },
+        .None => ()
+      );
+    });
+  }),
+
+  // Get the value of attribute `name`, or .None if it does not exist.
+  attrGet : (fn(self: *(Self), name: String) -> Option(String))({
+    (idx : i32) = self.attrIndex(name);
+    cond(
+      (idx >= i32(0)) => match(self.*.attrs,
+        .Some(attrs) => {
+          (pair : StringPair) = attrs.get(usize(idx)).unwrap();
+          (result : Option(String)) = .Some(pair.value);
+          result
+        },
+        .None => {
+          (result : Option(String)) = .None;
+          result
+        }
+      ),
+      true => {
+        (result : Option(String)) = .None;
+        result
+      }
+    )
+  }),
+
+  // Join value to existing attribute via space. Or create a new attribute if not
+  // exists. Useful to operate with token classes.
+  attrJoin : (fn(self: *(Self), name: String, value: String) -> unit)({
+    (idx : i32) = self.attrIndex(name);
+
+    if((idx < i32(0)), {
+      self.attrPush(StringPair(name: name, value: value));
+    }, {
+      match(self.*.attrs,
+        .Some(attrs) => {
+          (existing : StringPair) = attrs.get(usize(idx)).unwrap();
+          attrs.set(usize(idx), StringPair(
+            name: name,
+            value: `${existing.value} ${value}`
+          ));
+          ();
+        },
+        .None => ()
+      );
+    });
+  })
+);
+
+export Token, StringPair;

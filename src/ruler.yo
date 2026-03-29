@@ -1,0 +1,312 @@
+// Ported from: lib/ruler.mjs (markdown-it v14.1.1)
+//
+// Helper class, used by MarkdownIt core, block and inline parsers
+// to manage sequences of functions (rules):
+//
+// - keep rules in defined order
+// - assign the name to each rule
+// - enable/disable rules
+// - add/replace rules
+// - allow assign rules to additional named chains
+// - caching lists of active rules
+
+open import "std/string";
+{ ArrayList } :: import "std/collections/array_list";
+{ HashMap } :: import "std/collections/hash_map";
+
+// A single rule entry in the Ruler.
+RuleEntry :: (fn(comptime(F) : Type) -> comptime(Type))(
+  struct(
+    name : String,
+    enabled : bool,
+    rule_fn : F,
+    alt : ArrayList(String)
+  )
+);
+
+// Ruler — manages an ordered list of named rules.
+// F is the function type for rules (e.g., fn(state: *(StateBlock), ...) -> bool)
+Ruler :: (fn(comptime(F) : Type) -> comptime(Type))(
+  struct(
+    _rules : ArrayList(RuleEntry(F)),
+    _cache : Option(HashMap(String, ArrayList(F)))
+  )
+);
+
+// Insert an element into an ArrayList at the given index by rebuilding the list.
+// ArrayList does not have a built-in insert method.
+_arrayListInsert :: (fn(forall(T : Type), list: ArrayList(T), index: usize, item: T) -> unit)({
+  (new_list : ArrayList(T)) = ArrayList(T).new();
+  (i : usize) = usize(0);
+  (len : usize) = list.len();
+  while (i < len), {
+    if((i == index), {
+      new_list.push(item);
+    });
+    new_list.push(list.get(i).unwrap());
+    i = (i + usize(1));
+  };
+  // If inserting at the end
+  if((index == len), {
+    new_list.push(item);
+  });
+  // Clear original and copy back
+  list.clear();
+  i = usize(0);
+  while (i < new_list.len()), {
+    list.push(new_list.get(i).unwrap());
+    i = (i + usize(1));
+  };
+});
+
+impl(forall(F : Type), Ruler(F),
+
+  new : (fn() -> Self)(
+    Self(
+      _rules: ArrayList(RuleEntry(F)).new(),
+      _cache: .None
+    )
+  ),
+
+  // Find rule index by name
+  _find : (fn(self: *(Self), name: String) -> i32)({
+    (i : i32) = i32(0);
+    (len : i32) = i32(self.*._rules.len());
+    while (i < len), {
+      (rule : RuleEntry(F)) = self.*._rules.get(usize(i)).unwrap();
+      if((rule.name == name), {
+        return i;
+      });
+      i = (i + i32(1));
+    };
+    i32(-1)
+  }),
+
+  // Build rules lookup cache
+  _compile : (fn(self: *(Self)) -> unit)({
+    (chains : ArrayList(String)) = ArrayList(String).new();
+    chains.push(``);
+
+    // Collect unique chain names from enabled rules
+    (i : i32) = i32(0);
+    (len : i32) = i32(self.*._rules.len());
+    while (i < len), {
+      (rule : RuleEntry(F)) = self.*._rules.get(usize(i)).unwrap();
+      if(rule.enabled, {
+        (j : i32) = i32(0);
+        (alt_len : i32) = i32(rule.alt.len());
+        while (j < alt_len), {
+          (alt_name : String) = rule.alt.get(usize(j)).unwrap();
+          (found : bool) = false;
+          (k : i32) = i32(0);
+          while (k < i32(chains.len())), {
+            if((chains.get(usize(k)).unwrap() == alt_name), {
+              found = true;
+            });
+            k = (k + i32(1));
+          };
+          if(!(found), {
+            chains.push(alt_name);
+          });
+          j = (j + i32(1));
+        };
+      });
+      i = (i + i32(1));
+    };
+
+    // Build cache for each chain
+    (cache : HashMap(String, ArrayList(F))) = HashMap(String, ArrayList(F)).new();
+
+    (ci : i32) = i32(0);
+    (chains_len : i32) = i32(chains.len());
+    while (ci < chains_len), {
+      (chain : String) = chains.get(usize(ci)).unwrap();
+      (chain_rules : ArrayList(F)) = ArrayList(F).new();
+
+      (ri : i32) = i32(0);
+      while (ri < len), {
+        (rule : RuleEntry(F)) = self.*._rules.get(usize(ri)).unwrap();
+        if(rule.enabled, {
+          if((chain.len() > usize(0)), {
+            (found_alt : bool) = false;
+            (ai : i32) = i32(0);
+            while (ai < i32(rule.alt.len())), {
+              if((rule.alt.get(usize(ai)).unwrap() == chain), {
+                found_alt = true;
+              });
+              ai = (ai + i32(1));
+            };
+            if(found_alt, {
+              chain_rules.push(rule.rule_fn);
+            });
+          }, {
+            chain_rules.push(rule.rule_fn);
+          });
+        });
+        ri = (ri + i32(1));
+      };
+
+      cache.set(chain, chain_rules);
+      ci = (ci + i32(1));
+    };
+
+    self.*._cache = .Some(cache);
+  }),
+
+  // Replace rule by name with new function & options.
+  at : (fn(self: *(Self), name: String, rule_fn: F, alt: ArrayList(String)) -> unit)({
+    (index : i32) = self._find(name);
+    assert((index != i32(-1)), "Parser rule not found");
+
+    (old_rule : RuleEntry(F)) = self.*._rules.get(usize(index)).unwrap();
+    self.*._rules.set(usize(index), RuleEntry(F)(
+      name: name,
+      enabled: old_rule.enabled,
+      rule_fn: rule_fn,
+      alt: alt
+    ));
+    self.*._cache = .None;
+  }),
+
+  // Add new rule before one with given name.
+  before : (fn(self: *(Self), beforeName: String, ruleName: String, rule_fn: F, alt: ArrayList(String)) -> unit)({
+    (index : i32) = self._find(beforeName);
+    assert((index != i32(-1)), "Parser rule not found");
+
+    _arrayListInsert(self.*._rules, usize(index), RuleEntry(F)(
+      name: ruleName,
+      enabled: true,
+      rule_fn: rule_fn,
+      alt: alt
+    ));
+    self.*._cache = .None;
+  }),
+
+  // Add new rule after one with given name.
+  after : (fn(self: *(Self), afterName: String, ruleName: String, rule_fn: F, alt: ArrayList(String)) -> unit)({
+    (index : i32) = self._find(afterName);
+    assert((index != i32(-1)), "Parser rule not found");
+
+    _arrayListInsert(self.*._rules, usize((index + i32(1))), RuleEntry(F)(
+      name: ruleName,
+      enabled: true,
+      rule_fn: rule_fn,
+      alt: alt
+    ));
+    self.*._cache = .None;
+  }),
+
+  // Push new rule to the end of chain.
+  push : (fn(self: *(Self), ruleName: String, rule_fn: F, alt: ArrayList(String)) -> unit)({
+    self.*._rules.push(RuleEntry(F)(
+      name: ruleName,
+      enabled: true,
+      rule_fn: rule_fn,
+      alt: alt
+    ));
+    self.*._cache = .None;
+  }),
+
+  // Enable rules with given names.
+  enable : (fn(self: *(Self), list: ArrayList(String), ignoreInvalid: bool) -> ArrayList(String))({
+    (result : ArrayList(String)) = ArrayList(String).new();
+
+    (i : i32) = i32(0);
+    (len : i32) = i32(list.len());
+    while (i < len), {
+      (name : String) = list.get(usize(i)).unwrap();
+      (idx : i32) = self._find(name);
+
+      if((idx < i32(0)), {
+        if(!(ignoreInvalid), {
+          assert(false, "Rules manager: invalid rule name");
+        });
+      }, {
+        (rule : RuleEntry(F)) = self.*._rules.get(usize(idx)).unwrap();
+        self.*._rules.set(usize(idx), RuleEntry(F)(
+          name: rule.name,
+          enabled: true,
+          rule_fn: rule.rule_fn,
+          alt: rule.alt
+        ));
+        result.push(name);
+      });
+
+      i = (i + i32(1));
+    };
+
+    self.*._cache = .None;
+    result
+  }),
+
+  // Enable rules with given names, and disable everything else.
+  enableOnly : (fn(self: *(Self), list: ArrayList(String), ignoreInvalid: bool) -> unit)({
+    (i : i32) = i32(0);
+    (len : i32) = i32(self.*._rules.len());
+    while (i < len), {
+      (rule : RuleEntry(F)) = self.*._rules.get(usize(i)).unwrap();
+      self.*._rules.set(usize(i), RuleEntry(F)(
+        name: rule.name,
+        enabled: false,
+        rule_fn: rule.rule_fn,
+        alt: rule.alt
+      ));
+      i = (i + i32(1));
+    };
+
+    self.enable(list, ignoreInvalid);
+    ();
+  }),
+
+  // Disable rules with given names.
+  disable : (fn(self: *(Self), list: ArrayList(String), ignoreInvalid: bool) -> ArrayList(String))({
+    (result : ArrayList(String)) = ArrayList(String).new();
+
+    (i : i32) = i32(0);
+    (len : i32) = i32(list.len());
+    while (i < len), {
+      (name : String) = list.get(usize(i)).unwrap();
+      (idx : i32) = self._find(name);
+
+      if((idx < i32(0)), {
+        if(!(ignoreInvalid), {
+          assert(false, "Rules manager: invalid rule name");
+        });
+      }, {
+        (rule : RuleEntry(F)) = self.*._rules.get(usize(idx)).unwrap();
+        self.*._rules.set(usize(idx), RuleEntry(F)(
+          name: rule.name,
+          enabled: false,
+          rule_fn: rule.rule_fn,
+          alt: rule.alt
+        ));
+        result.push(name);
+      });
+
+      i = (i + i32(1));
+    };
+
+    self.*._cache = .None;
+    result
+  }),
+
+  // Return array of active functions for given chain name.
+  getRules : (fn(self: *(Self), chainName: String) -> ArrayList(F))({
+    match(self.*._cache,
+      .None => {
+        self._compile();
+      },
+      .Some(_) => ()
+    );
+
+    match(self.*._cache,
+      .Some(cache) => match(cache.get(chainName),
+        .Some(rules) => rules,
+        .None => ArrayList(F).new()
+      ),
+      .None => ArrayList(F).new()
+    )
+  })
+);
+
+export Ruler, RuleEntry;

@@ -1,0 +1,199 @@
+// Ported from: lib/common/utils.mjs (markdown-it v14.1.1)
+//
+// Utility functions for markdown processing.
+
+open import "std/string";
+{ ArrayList } :: import "std/collections/array_list";
+{ Regex, RegexMatch } :: import "std/regex";
+
+// ============================================================================
+// isValidEntityCode
+// ============================================================================
+
+// Check if a Unicode codepoint is a valid HTML entity value.
+isValidEntityCode :: (fn(c: i32) -> bool)(
+  cond(
+    ((c >= i32(0xD800)) && (c <= i32(0xDFFF))) => false,
+    ((c >= i32(0xFDD0)) && (c <= i32(0xFDEF))) => false,
+    (((c & i32(0xFFFF)) == i32(0xFFFF)) || ((c & i32(0xFFFF)) == i32(0xFFFE))) => false,
+    ((c >= i32(0x00)) && (c <= i32(0x08))) => false,
+    (c == i32(0x0B)) => false,
+    ((c >= i32(0x0E)) && (c <= i32(0x1F))) => false,
+    ((c >= i32(0x7F)) && (c <= i32(0x9F))) => false,
+    (c > i32(0x10FFFF)) => false,
+    true => true
+  )
+);
+
+// ============================================================================
+// fromCodePoint
+// ============================================================================
+
+// Convert a Unicode codepoint to a String.
+fromCodePoint :: (fn(c: i32) -> String)(
+  {
+    (r : rune) = rune(u32(c));
+    `${r}`
+  }
+);
+
+// ============================================================================
+// escapeHtml
+// ============================================================================
+
+// Escape HTML special characters: & < > "
+escapeHtml :: (fn(input: String) -> String)(
+  {
+    (bytes : ArrayList(u8)) = input.as_bytes();
+    (result : String) = ``;
+    (i : usize) = usize(0);
+    (len : usize) = bytes.len();
+    (has_special : bool) = false;
+
+    // Quick test — if no special chars, return as-is
+    while ((i < len) && (!(has_special))), {
+      (ch : u8) = bytes.get(i).unwrap();
+      if(((ch == u8(0x26)) || ((ch == u8(0x3C)) || ((ch == u8(0x3E)) || (ch == u8(0x22))))), {
+        has_special = true;
+      });
+      i = (i + usize(1));
+    };
+
+    if(!(has_special), {
+      return input;
+    });
+
+    i = usize(0);
+    while (i < len), {
+      (ch : u8) = bytes.get(i).unwrap();
+      cond(
+        (ch == u8(0x26)) => { result = `${result}&amp;`; },
+        (ch == u8(0x3C)) => { result = `${result}&lt;`; },
+        (ch == u8(0x3E)) => { result = `${result}&gt;`; },
+        (ch == u8(0x22)) => { result = `${result}&quot;`; },
+        true => { result = `${result}${fromCodePoint(i32(ch))}`; }
+      );
+      i = (i + usize(1));
+    };
+
+    result
+  }
+);
+
+// ============================================================================
+// isSpace
+// ============================================================================
+
+// Check if character code is a markdown space (tab or space)
+isSpace :: (fn(code: i32) -> bool)(
+  cond(
+    (code == i32(0x09)) => true,
+    (code == i32(0x20)) => true,
+    true => false
+  )
+);
+
+// ============================================================================
+// isWhiteSpace
+// ============================================================================
+
+// Check if character code is Unicode whitespace (Zs class) or [\t\f\v\r\n]
+isWhiteSpace :: (fn(code: i32) -> bool)(
+  cond(
+    ((code >= i32(0x2000)) && (code <= i32(0x200A))) => true,
+    (code == i32(0x09)) => true,
+    (code == i32(0x0A)) => true,
+    (code == i32(0x0B)) => true,
+    (code == i32(0x0C)) => true,
+    (code == i32(0x0D)) => true,
+    (code == i32(0x20)) => true,
+    (code == i32(0xA0)) => true,
+    (code == i32(0x1680)) => true,
+    (code == i32(0x202F)) => true,
+    (code == i32(0x205F)) => true,
+    (code == i32(0x3000)) => true,
+    true => false
+  )
+);
+
+// ============================================================================
+// isMdAsciiPunct
+// ============================================================================
+
+// Markdown ASCII punctuation characters.
+// !, ", #, $, %, &, ', (, ), *, +, ,, -, ., /, :, ;, <, =, >, ?, @, [, \, ], ^, _, `, {, |, }, or ~
+isMdAsciiPunct :: (fn(ch: i32) -> bool)(
+  cond(
+    ((ch >= i32(0x21)) && (ch <= i32(0x2F))) => true,
+    ((ch >= i32(0x3A)) && (ch <= i32(0x40))) => true,
+    ((ch >= i32(0x5B)) && (ch <= i32(0x60))) => true,
+    ((ch >= i32(0x7B)) && (ch <= i32(0x7E))) => true,
+    true => false
+  )
+);
+
+// ============================================================================
+// unescapeMd
+// ============================================================================
+
+// Remove backslash escapes from markdown: \* → *
+unescapeMd :: (fn(input: String) -> String)(
+  {
+    if(!(input.contains(String.from("\\"))), {
+      return input;
+    });
+
+    (re : Regex) = Regex.new(String.from("\\\\([!\"#$%&'()*+,\\-./:;<=>?@[\\\\\\]^_`{|}~])"), ``).unwrap();
+    re.replace(input, String.from("$1"))
+  }
+);
+
+// ============================================================================
+// normalizeReference
+// ============================================================================
+
+// Helper to unify [reference labels].
+normalizeReference :: (fn(input: String) -> String)(
+  {
+    (trimmed : String) = input.trim();
+    (re : Regex) = Regex.new(`\\s+`, `g`).unwrap();
+    (collapsed : String) = re.replace_all(trimmed, ` `);
+    collapsed.to_lowercase().to_uppercase()
+  }
+);
+
+// ============================================================================
+// arrayReplaceAt
+// ============================================================================
+
+// Remove element from array at `pos` and insert `newElements` at that position.
+arrayReplaceAt :: (fn(forall(T : Type), src: ArrayList(T), pos: i32, newElements: ArrayList(T)) -> ArrayList(T))(
+  {
+    (result : ArrayList(T)) = ArrayList(T).new();
+
+    (i : i32) = i32(0);
+    while (i < pos), {
+      result.push(src.get(usize(i)).unwrap());
+      i = (i + i32(1));
+    };
+
+    (j : i32) = i32(0);
+    (new_len : i32) = i32(newElements.len());
+    while (j < new_len), {
+      result.push(newElements.get(usize(j)).unwrap());
+      j = (j + i32(1));
+    };
+
+    (k : i32) = (pos + i32(1));
+    (src_len : i32) = i32(src.len());
+    while (k < src_len), {
+      result.push(src.get(usize(k)).unwrap());
+      k = (k + i32(1));
+    };
+
+    result
+  }
+);
+
+export isValidEntityCode, fromCodePoint, escapeHtml, isSpace, isWhiteSpace,
+       isMdAsciiPunct, unescapeMd, normalizeReference, arrayReplaceAt;

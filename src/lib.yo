@@ -1,6 +1,18 @@
-// Library root module
+// Library root module — markdown-it-yo
+//
+// A Yo port of markdown-it (v14.1.1), a modern pluggable markdown parser.
 
-add :: (fn(a: i32, b: i32) -> i32)(
-  (a + b)
-);
-export add;
+// Core types
+{ Token, StringPair } :: import "./token.yo";
+{ Ruler, RuleEntry } :: import "./ruler.yo";
+
+// Common utilities
+{ isValidEntityCode, fromCodePoint, escapeHtml, isSpace, isWhiteSpace,
+  isMdAsciiPunct, unescapeMd, normalizeReference, arrayReplaceAt } :: import "./common/utils.yo";
+{ html_blocks } :: import "./common/html_blocks.yo";
+{ html_re, HtmlRegexPatterns } :: import "./common/html_re.yo";
+
+export Token, StringPair, Ruler, RuleEntry,
+       isValidEntityCode, fromCodePoint, escapeHtml, isSpace, isWhiteSpace,
+       isMdAsciiPunct, unescapeMd, normalizeReference, arrayReplaceAt,
+       html_blocks, html_re, HtmlRegexPatterns;

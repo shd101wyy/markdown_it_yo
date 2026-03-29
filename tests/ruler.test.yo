@@ -1,0 +1,144 @@
+open import "std/string";
+{ ArrayList } :: import "std/collections/array_list";
+{ Ruler, RuleEntry } :: import "../src/ruler.yo";
+
+// Define a simple function type for testing
+RuleFn :: (fn(x: i32) -> i32);
+
+test "Ruler — new creates empty ruler", {
+  (r : Ruler(RuleFn)) = Ruler(RuleFn).new();
+  rules := r.getRules(``);
+  assert((rules.len() == usize(0)), "new ruler should have no rules");
+};
+
+test "Ruler — push and getRules", {
+  (r : Ruler(RuleFn)) = Ruler(RuleFn).new();
+  (alt : ArrayList(String)) = ArrayList(String).new();
+  r.push(`rule1`, (fn(x: i32) -> i32)(x), alt);
+  rules := r.getRules(``);
+  assert((rules.len() == usize(1)), "should have 1 rule");
+};
+
+test "Ruler — enable/disable", {
+  (r : Ruler(RuleFn)) = Ruler(RuleFn).new();
+  (alt : ArrayList(String)) = ArrayList(String).new();
+  r.push(`rule1`, (fn(x: i32) -> i32)(x), alt);
+  r.push(`rule2`, (fn(x: i32) -> i32)((x + i32(1))), alt);
+
+  // Disable rule1
+  (disable_list : ArrayList(String)) = ArrayList(String).new();
+  disable_list.push(`rule1`);
+  r.disable(disable_list, false);
+
+  rules := r.getRules(``);
+  assert((rules.len() == usize(1)), "should have 1 active rule after disable");
+
+  // Re-enable rule1
+  (enable_list : ArrayList(String)) = ArrayList(String).new();
+  enable_list.push(`rule1`);
+  r.enable(enable_list, false);
+
+  rules2 := r.getRules(``);
+  assert((rules2.len() == usize(2)), "should have 2 active rules after re-enable");
+};
+
+test "Ruler — at replaces rule", {
+  (r : Ruler(RuleFn)) = Ruler(RuleFn).new();
+  (alt : ArrayList(String)) = ArrayList(String).new();
+  r.push(`rule1`, (fn(x: i32) -> i32)(x), alt);
+
+  r.at(`rule1`, (fn(x: i32) -> i32)((x + i32(100))), alt);
+  rules := r.getRules(``);
+  assert((rules.len() == usize(1)), "should still have 1 rule after replace");
+
+  // Verify the replacement function works
+  replaced_fn := rules.get(usize(0)).unwrap();
+  result := replaced_fn(i32(5));
+  assert((result == i32(105)), "replaced rule should add 100");
+};
+
+test "Ruler — before inserts rule", {
+  (r : Ruler(RuleFn)) = Ruler(RuleFn).new();
+  (alt : ArrayList(String)) = ArrayList(String).new();
+  r.push(`rule1`, (fn(x: i32) -> i32)(x), alt);
+  r.push(`rule2`, (fn(x: i32) -> i32)((x + i32(1))), alt);
+
+  r.before(`rule2`, `rule1.5`, (fn(x: i32) -> i32)((x + i32(50))), alt);
+  rules := r.getRules(``);
+  assert((rules.len() == usize(3)), "should have 3 rules after before");
+
+  // Verify the order: rule1, rule1.5, rule2
+  fn1 := rules.get(usize(0)).unwrap();
+  fn15 := rules.get(usize(1)).unwrap();
+  fn2 := rules.get(usize(2)).unwrap();
+  assert((fn1(i32(0)) == i32(0)), "first rule should return x");
+  assert((fn15(i32(0)) == i32(50)), "second rule should add 50");
+  assert((fn2(i32(0)) == i32(1)), "third rule should add 1");
+};
+
+test "Ruler — after inserts rule", {
+  (r : Ruler(RuleFn)) = Ruler(RuleFn).new();
+  (alt : ArrayList(String)) = ArrayList(String).new();
+  r.push(`rule1`, (fn(x: i32) -> i32)(x), alt);
+  r.push(`rule2`, (fn(x: i32) -> i32)((x + i32(1))), alt);
+
+  r.after(`rule1`, `rule1.5`, (fn(x: i32) -> i32)((x + i32(50))), alt);
+  rules := r.getRules(``);
+  assert((rules.len() == usize(3)), "should have 3 rules after after");
+
+  // Verify the order: rule1, rule1.5, rule2
+  fn1 := rules.get(usize(0)).unwrap();
+  fn15 := rules.get(usize(1)).unwrap();
+  fn2 := rules.get(usize(2)).unwrap();
+  assert((fn1(i32(0)) == i32(0)), "first rule should return x");
+  assert((fn15(i32(0)) == i32(50)), "second rule should add 50");
+  assert((fn2(i32(0)) == i32(1)), "third rule should add 1");
+};
+
+test "Ruler — enableOnly", {
+  (r : Ruler(RuleFn)) = Ruler(RuleFn).new();
+  (alt : ArrayList(String)) = ArrayList(String).new();
+  r.push(`rule1`, (fn(x: i32) -> i32)(x), alt);
+  r.push(`rule2`, (fn(x: i32) -> i32)((x + i32(1))), alt);
+  r.push(`rule3`, (fn(x: i32) -> i32)((x + i32(2))), alt);
+
+  (only_list : ArrayList(String)) = ArrayList(String).new();
+  only_list.push(`rule2`);
+  r.enableOnly(only_list, false);
+
+  rules := r.getRules(``);
+  assert((rules.len() == usize(1)), "should have only 1 active rule");
+  fn2 := rules.get(usize(0)).unwrap();
+  assert((fn2(i32(0)) == i32(1)), "active rule should be rule2");
+};
+
+test "Ruler — alt chains", {
+  (r : Ruler(RuleFn)) = Ruler(RuleFn).new();
+
+  // rule1 with no alt chains
+  (alt1 : ArrayList(String)) = ArrayList(String).new();
+  r.push(`rule1`, (fn(x: i32) -> i32)(x), alt1);
+
+  // rule2 with "paragraph" alt chain
+  (alt2 : ArrayList(String)) = ArrayList(String).new();
+  alt2.push(`paragraph`);
+  r.push(`rule2`, (fn(x: i32) -> i32)((x + i32(1))), alt2);
+
+  // rule3 with "paragraph" and "reference" alt chains
+  (alt3 : ArrayList(String)) = ArrayList(String).new();
+  alt3.push(`paragraph`);
+  alt3.push(`reference`);
+  r.push(`rule3`, (fn(x: i32) -> i32)((x + i32(2))), alt3);
+
+  // Default chain has all rules
+  all_rules := r.getRules(``);
+  assert((all_rules.len() == usize(3)), "default chain should have all 3 rules");
+
+  // paragraph chain should have rule2 and rule3
+  para_rules := r.getRules(`paragraph`);
+  assert((para_rules.len() == usize(2)), "paragraph chain should have 2 rules");
+
+  // reference chain should have only rule3
+  ref_rules := r.getRules(`reference`);
+  assert((ref_rules.len() == usize(1)), "reference chain should have 1 rule");
+};
