@@ -1,0 +1,21 @@
+build :: import "std/build";
+
+mod :: build.module({ name: "markdown-it-yo", root: "./src/lib.yo" });
+
+exe :: build.executable({ name: "markdown-it-yo", root: "./src/main.yo" });
+
+lib :: build.static_library({ name: "markdown-it-yo-lib", root: "./src/lib.yo" });
+
+tests :: build.test({ name: "tests", root: "./tests/" });
+
+run_exe :: build.run(exe);
+
+install :: build.step("install", "Build all artifacts");
+install.depend_on(exe);
+install.depend_on(lib);
+
+run_step :: build.step("run", "Run the application");
+run_step.depend_on(run_exe);
+
+test_step :: build.step("test", "Run unit tests");
+test_step.depend_on(tests);
