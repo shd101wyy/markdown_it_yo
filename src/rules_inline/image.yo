@@ -160,6 +160,7 @@ image_rule :: (fn(state: *(StateInline), silent: bool) -> bool)({
     (token : Token) = state_push(state, `image`, `img`, i32(0));
     (attrs : ArrayList(StringPair)) = ArrayList(StringPair).new();
     _ := attrs.push(StringPair(name: `src`, value: href));
+    _ := attrs.push(StringPair(name: `alt`, value: ``));
     if((title.len() > usize(0)), {
       _ := attrs.push(StringPair(name: `title`, value: title));
     });

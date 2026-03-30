@@ -143,13 +143,25 @@ _render_fence :: (fn(tokens: ArrayList(Token), idx: i32, options: *(Options)) ->
 
 _render_image :: (fn(tokens: ArrayList(Token), idx: i32, options: *(Options)) -> String)({
   (token : Token) = tokens.get(usize(idx)).unwrap();
-  // TODO: renderInlineAsText for alt attribute from children
-  (alt_text : String) = token.content;
-  (result : String) = `<img${render_attrs(token)} alt="${escapeHtml(alt_text)}"`;
-  if(options.*.xhtml_out, {
-    result = `${result} /`;
-  });
-  `${result}>`
+  // Set alt attribute value from content (like JS renderInlineAsText)
+  (alt_text : String) = escapeHtml(token.content);
+  // Find and update the alt attribute
+  match(token.attrs,
+    .Some(attrs) => {
+      (ai : i32) = i32(0);
+      while (ai < i32(attrs.len())), {
+        (pair : StringPair) = attrs.get(usize(ai)).unwrap();
+        if((pair.name == `alt`), {
+          attrs.set(usize(ai), StringPair(name: `alt`, value: alt_text));
+        });
+        ai = (ai + i32(1));
+      };
+    },
+    .None => ()
+  );
+  // Update token in the list then render via renderToken
+  tokens.set(usize(idx), token);
+  render_token(tokens, idx, options)
 });
 
 _render_hardbreak :: (fn(options: *(Options)) -> String)(
