@@ -5,8 +5,8 @@
 open import "std/string";
 { ArrayList } :: import "std/collections/array_list";
 { Token } :: import "../token.yo";
-{ isSpace } :: import "../common/utils.yo";
-{ fromCodePoint } :: import "../common/char_utils.yo";
+{ is_space } :: import "../common/utils.yo";
+{ from_code_point } :: import "../common/char_utils.yo";
 { StateInline } :: import "./state_inline.yo";
 { flush_pending, inline_push_token } :: import "./inline_helpers.yo";
 
@@ -74,7 +74,7 @@ escape_rule :: (fn(state: *(StateInline), silent: bool) -> bool)({
 
     pos = (pos + i32(1));
     // skip leading whitespaces from next line
-    while (((pos < max) && isSpace(i32(state.*._src_bytes.get(usize(pos)).unwrap())))), {
+    while (((pos < max) && is_space(i32(state.*._src_bytes.get(usize(pos)).unwrap())))), {
       pos = (pos + i32(1));
     };
 
@@ -82,11 +82,11 @@ escape_rule :: (fn(state: *(StateInline), silent: bool) -> bool)({
     return true;
   });
 
-  (escaped_str : String) = fromCodePoint(ch1);
+  (escaped_str : String) = from_code_point(ch1);
 
   // Handle surrogate pairs (UTF-16 in JS, we handle UTF-8 multi-byte)
   // In UTF-8, if ch1 >= 0xC0 we have a multi-byte char. But since we work
-  // at the byte level and fromCodePoint handles single bytes, we check if
+  // at the byte level and from_code_point handles single bytes, we check if
   // the original JS would have seen a surrogate pair (0xD800-0xDBFF).
   // In UTF-8, surrogate code points don't appear, so this path is skipped.
   // Instead, for non-ASCII bytes, we need to collect the full UTF-8 sequence.

@@ -99,7 +99,7 @@ _find_earliest :: (fn(bytes: *(ArrayList(u8)), set: str, start: usize) -> i32)({
   result
 });
 
-// Non-host characters: %/?;# plus autoEscape chars (<>"` \r\n\t{}|\^`')
+// Non-host characters: %/?;# plus auto_escape chars (<>"` \r\n\t{}|\^`')
 NON_HOST_CHARS :: "%/?;#<>\" \r\n\t{}|\\^`'";
 
 // Host-ending characters

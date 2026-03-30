@@ -1,5 +1,5 @@
 // Link validation and normalization utilities.
-// Ported from markdown-it's normalizeLink/validateLink/normalizeLinkText.
+// Ported from markdown-it's normalize_link/validate_link/normalize_link_text.
 
 open import "std/string";
 { ArrayList } :: import "std/collections/array_list";
@@ -43,7 +43,7 @@ validate_link :: (fn(url: String) -> bool)(
 );
 
 // Normalize a link URL. Parse, optionally recode hostname, format, then encode.
-// Matches markdown-it's normalizeLink behavior.
+// Matches markdown-it's normalize_link behavior.
 normalize_link :: (fn(url: String) -> String)({
   (parsed : Url) = parse(url, true);
 
@@ -54,13 +54,13 @@ normalize_link :: (fn(url: String) -> String)({
       (has_proto : bool) = match(parsed.protocol, .Some(_p) => true, .None => false);
       if(!(has_proto), {
         // No protocol — would recode hostname
-        // TODO: punycode.toASCII(hostname) when punycode is ported
+        // TODO: punycode.to_ascii(hostname) when punycode is ported
         ();
       }, {
         match(parsed.protocol,
           .Some(p) => {
             if(_should_recode_hostname(&(p)), {
-              // TODO: punycode.toASCII(hostname) when punycode is ported
+              // TODO: punycode.to_ascii(hostname) when punycode is ported
               ();
             });
           },
@@ -87,13 +87,13 @@ normalize_link_text :: (fn(url: String) -> String)({
       (has_proto : bool) = match(parsed.protocol, .Some(_p) => true, .None => false);
       if(!(has_proto), {
         // No protocol — would recode hostname
-        // TODO: punycode.toUnicode(hostname) when punycode is ported
+        // TODO: punycode.to_unicode(hostname) when punycode is ported
         ();
       }, {
         match(parsed.protocol,
           .Some(p) => {
             if(_should_recode_hostname(&(p)), {
-              // TODO: punycode.toUnicode(hostname) when punycode is ported
+              // TODO: punycode.to_unicode(hostname) when punycode is ported
               ();
             });
           },

@@ -5,7 +5,7 @@
 open import "std/string";
 { ArrayList } :: import "std/collections/array_list";
 { Token } :: import "../token.yo";
-{ isSpace } :: import "../common/utils.yo";
+{ is_space } :: import "../common/utils.yo";
 { Env } :: import "../env.yo";
 
 // Block parser state
@@ -85,7 +85,7 @@ new_state_block :: (fn(src: String, env: *(Env), tokens: ArrayList(Token), html_
       (ch : i32) = i32(bytes.get(usize(pos)).unwrap());
 
       if(!(indent_found), {
-        if(isSpace(ch), {
+        if(is_space(ch), {
           indent = (indent + i32(1));
           if((ch == i32(0x09)), {
             offset = (offset + (i32(4) - (offset % i32(4))));
@@ -224,7 +224,7 @@ impl(StateBlock,
     (max : i32) = i32(self._src_bytes.len());
     while (pos < max), {
       (ch : i32) = i32(self._src_bytes.get(usize(pos)).unwrap());
-      if(!(isSpace(ch)), {
+      if(!(is_space(ch)), {
         return pos;
       });
       pos = (pos + i32(1));
@@ -240,7 +240,7 @@ impl(StateBlock,
     });
     while (pos > min), {
       pos = (pos - i32(1));
-      if(!(isSpace(i32(self._src_bytes.get(usize(pos)).unwrap()))), {
+      if(!(is_space(i32(self._src_bytes.get(usize(pos)).unwrap()))), {
         return (pos + i32(1));
       });
     };
@@ -302,7 +302,7 @@ impl(StateBlock,
       while ((first < last) && ((line_indent < indent) && !(done))), {
         (ch : i32) = i32(self._src_bytes.get(usize(first)).unwrap());
         cond(
-          isSpace(ch) => {
+          is_space(ch) => {
             if((ch == i32(0x09)), {
               line_indent = (line_indent + (i32(4) - ((line_indent + self.bs_count.get(usize(line)).unwrap()) % i32(4))));
             }, {

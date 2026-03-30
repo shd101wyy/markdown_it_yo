@@ -3,7 +3,7 @@
 
 open import "std/string";
 { ArrayList } :: import "std/collections/array_list";
-{ fromCodePoint } :: import "./common/char_utils.yo";
+{ from_code_point } :: import "./common/char_utils.yo";
 
 Options :: struct(
   html : bool,
@@ -20,10 +20,10 @@ Options :: struct(
 
 default_options :: (fn() -> Options)({
   (quotes : ArrayList(String)) = ArrayList(String).new();
-  _ := quotes.push(fromCodePoint(i32(0x201C)));
-  _ := quotes.push(fromCodePoint(i32(0x201D)));
-  _ := quotes.push(fromCodePoint(i32(0x2018)));
-  _ := quotes.push(fromCodePoint(i32(0x2019)));
+  _ := quotes.push(from_code_point(i32(0x201C)));
+  _ := quotes.push(from_code_point(i32(0x201D)));
+  _ := quotes.push(from_code_point(i32(0x2018)));
+  _ := quotes.push(from_code_point(i32(0x2019)));
   Options(
     html: false,
     xhtml_out: false,
@@ -41,10 +41,10 @@ default_options :: (fn() -> Options)({
 // Options matching the CommonMark preset
 commonmark_options :: (fn() -> Options)({
   (quotes : ArrayList(String)) = ArrayList(String).new();
-  _ := quotes.push(fromCodePoint(i32(0x201C)));
-  _ := quotes.push(fromCodePoint(i32(0x201D)));
-  _ := quotes.push(fromCodePoint(i32(0x2018)));
-  _ := quotes.push(fromCodePoint(i32(0x2019)));
+  _ := quotes.push(from_code_point(i32(0x201C)));
+  _ := quotes.push(from_code_point(i32(0x201D)));
+  _ := quotes.push(from_code_point(i32(0x2018)));
+  _ := quotes.push(from_code_point(i32(0x2019)));
   Options(
     html: true,
     xhtml_out: true,

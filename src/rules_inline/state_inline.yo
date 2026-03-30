@@ -6,8 +6,8 @@ open import "std/string";
 { ArrayList } :: import "std/collections/array_list";
 { HashMap } :: import "std/collections/hash_map";
 { Token } :: import "../token.yo";
-{ isWhiteSpace, isPunctChar, isMdAsciiPunct } :: import "../common/utils.yo";
-{ isValidEntityCode, fromCodePoint } :: import "../common/char_utils.yo";
+{ is_white_space, is_punct_char, is_md_ascii_punct } :: import "../common/utils.yo";
+{ is_valid_entity_code, from_code_point } :: import "../common/char_utils.yo";
 { Env } :: import "../env.yo";
 
 // Emphasis-like delimiter
@@ -25,7 +25,7 @@ TokenMeta :: struct(
   delimiters : ArrayList(Delimiter)
 );
 
-// Result of scanDelims
+// Result of scan_delims
 ScanDelimsResult :: struct(
   can_open : bool,
   can_close : bool,
@@ -198,11 +198,11 @@ impl(StateInline,
       true => i32(0x20)
     );
 
-    (is_last_punct : bool) = (isMdAsciiPunct(last_char) || isPunctChar(last_char));
-    (is_next_punct : bool) = (isMdAsciiPunct(next_char) || isPunctChar(next_char));
+    (is_last_punct : bool) = (is_md_ascii_punct(last_char) || is_punct_char(last_char));
+    (is_next_punct : bool) = (is_md_ascii_punct(next_char) || is_punct_char(next_char));
 
-    (is_last_ws : bool) = isWhiteSpace(last_char);
-    (is_next_ws : bool) = isWhiteSpace(next_char);
+    (is_last_ws : bool) = is_white_space(last_char);
+    (is_next_ws : bool) = is_white_space(next_char);
 
     (left_flanking : bool) = (!(is_next_ws) && (!(is_next_punct) || (is_last_ws || is_last_punct)));
     (right_flanking : bool) = (!(is_last_ws) && (!(is_last_punct) || (is_next_ws || is_next_punct)));

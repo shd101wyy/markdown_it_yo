@@ -81,7 +81,7 @@ impl(Token,
   ),
 
   // Search attribute index by name.
-  attrIndex : (fn(self: *(Self), name: String) -> i32)(
+  attr_index : (fn(self: *(Self), name: String) -> i32)(
     match(self.*.attrs,
       .None => i32(-1),
       .Some(attrs) => {
@@ -101,30 +101,30 @@ impl(Token,
   ),
 
   // Add [name, value] attribute to list. Init attrs if necessary.
-  attrPush : (fn(self: *(Self), attrData: StringPair) -> unit)({
+  attr_push : (fn(self: *(Self), attr_data: StringPair) -> unit)({
     match(self.*.attrs,
       .Some(attrs) => {
-        attrs.push(attrData);
+        attrs.push(attr_data);
       },
       .None => {
         (new_attrs : ArrayList(StringPair)) = ArrayList(StringPair).new();
-        new_attrs.push(attrData);
+        new_attrs.push(attr_data);
         self.*.attrs = .Some(new_attrs);
       }
     );
   }),
 
   // Set `name` attribute to `value`. Override old value if exists.
-  attrSet : (fn(self: *(Self), name: String, value: String) -> unit)({
-    (idx : i32) = self.attrIndex(name);
-    (attrData : StringPair) = StringPair(name: name, value: value);
+  attr_set : (fn(self: *(Self), name: String, value: String) -> unit)({
+    (idx : i32) = self.attr_index(name);
+    (attr_data : StringPair) = StringPair(name: name, value: value);
 
     if((idx < i32(0)), {
-      self.attrPush(attrData);
+      self.attr_push(attr_data);
     }, {
       match(self.*.attrs,
         .Some(attrs) => {
-          attrs.set(usize(idx), attrData);
+          attrs.set(usize(idx), attr_data);
         },
         .None => ()
       );
@@ -132,8 +132,8 @@ impl(Token,
   }),
 
   // Get the value of attribute `name`, or .None if it does not exist.
-  attrGet : (fn(self: *(Self), name: String) -> Option(String))({
-    (idx : i32) = self.attrIndex(name);
+  attr_get : (fn(self: *(Self), name: String) -> Option(String))({
+    (idx : i32) = self.attr_index(name);
     cond(
       (idx >= i32(0)) => match(self.*.attrs,
         .Some(attrs) => {
@@ -155,11 +155,11 @@ impl(Token,
 
   // Join value to existing attribute via space. Or create a new attribute if not
   // exists. Useful to operate with token classes.
-  attrJoin : (fn(self: *(Self), name: String, value: String) -> unit)({
-    (idx : i32) = self.attrIndex(name);
+  attr_join : (fn(self: *(Self), name: String, value: String) -> unit)({
+    (idx : i32) = self.attr_index(name);
 
     if((idx < i32(0)), {
-      self.attrPush(StringPair(name: name, value: value));
+      self.attr_push(StringPair(name: name, value: value));
     }, {
       match(self.*.attrs,
         .Some(attrs) => {

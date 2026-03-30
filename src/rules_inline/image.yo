@@ -7,7 +7,7 @@ open import "std/string";
 { Token, StringPair } :: import "../token.yo";
 { StateInline, new_state_inline } :: import "./state_inline.yo";
 { state_push } :: import "./inline_helpers.yo";
-{ isSpace, normalizeReference } :: import "../common/utils.yo";
+{ is_space, normalize_reference } :: import "../common/utils.yo";
 { validate_link, normalize_link } :: import "../common/link_utils.yo";
 { parse_link_label } :: import "../helpers/parse_link_label.yo";
 { LinkDestResult, parse_link_destination } :: import "../helpers/parse_link_destination.yo";
@@ -45,7 +45,7 @@ image_rule :: (fn(state: *(StateInline), silent: bool) -> bool)({
     pos = (pos + i32(1));
 
     // Skip spaces
-    while (((pos < max) && (isSpace(i32(state.*._src_bytes.get(usize(pos)).unwrap())) || (i32(state.*._src_bytes.get(usize(pos)).unwrap()) == i32(0x0A))))), {
+    while (((pos < max) && (is_space(i32(state.*._src_bytes.get(usize(pos)).unwrap())) || (i32(state.*._src_bytes.get(usize(pos)).unwrap()) == i32(0x0A))))), {
       pos = (pos + i32(1));
     };
     if((pos >= max), { return false; });
@@ -63,7 +63,7 @@ image_rule :: (fn(state: *(StateInline), silent: bool) -> bool)({
 
     // Skip spaces
     start = pos;
-    while (((pos < max) && (isSpace(i32(state.*._src_bytes.get(usize(pos)).unwrap())) || (i32(state.*._src_bytes.get(usize(pos)).unwrap()) == i32(0x0A))))), {
+    while (((pos < max) && (is_space(i32(state.*._src_bytes.get(usize(pos)).unwrap())) || (i32(state.*._src_bytes.get(usize(pos)).unwrap()) == i32(0x0A))))), {
       pos = (pos + i32(1));
     };
 
@@ -73,7 +73,7 @@ image_rule :: (fn(state: *(StateInline), silent: bool) -> bool)({
       title = title_result.str;
       pos = title_result.pos;
 
-      while (((pos < max) && (isSpace(i32(state.*._src_bytes.get(usize(pos)).unwrap())) || (i32(state.*._src_bytes.get(usize(pos)).unwrap()) == i32(0x0A))))), {
+      while (((pos < max) && (is_space(i32(state.*._src_bytes.get(usize(pos)).unwrap())) || (i32(state.*._src_bytes.get(usize(pos)).unwrap()) == i32(0x0A))))), {
         pos = (pos + i32(1));
       };
     });
@@ -109,7 +109,7 @@ image_rule :: (fn(state: *(StateInline), silent: bool) -> bool)({
       ref_label = state.*.src.substring(usize(label_start), usize(label_end));
     });
 
-    (label : String) = normalizeReference(ref_label);
+    (label : String) = normalize_reference(ref_label);
     if((label.len() == usize(0)), { return false; });
 
     (env : *(Env)) = state.*.env;

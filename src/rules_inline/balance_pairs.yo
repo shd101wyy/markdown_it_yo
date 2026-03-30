@@ -13,11 +13,11 @@ process_delimiters :: (fn(delimiters: ArrayList(Delimiter)) -> unit)({
     return ();
   });
 
-  // openersBottom: for each marker, stores 6 lower bounds
+  // openers_bottom: for each marker, stores 6 lower bounds
   // indices: [close%0, close%1, close%2, open%0, open%1, open%2]
   (openers_bottom : HashMap(i32, ArrayList(i32))) = HashMap(i32, ArrayList(i32)).new();
 
-  // headerIdx is the first delimiter of the current delimiter run
+  // header_idx is the first delimiter of the current delimiter run
   (header_idx : i32) = i32(0);
   (last_token_idx : i32) = i32(-2);
   (jumps : ArrayList(i32)) = ArrayList(i32).new();

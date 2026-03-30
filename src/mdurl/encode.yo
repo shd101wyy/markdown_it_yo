@@ -5,11 +5,11 @@
 open import "std/string";
 { ArrayList } :: import "std/collections/array_list";
 
-// Characters that are safe in encodeURI (default):
+// Characters that are safe in encode_uri (default):
 // ;/?:@&=+$,-_.!~*'()# plus alphanumeric
 ENCODE_DEFAULT_CHARS :: ";/?:@&=+$,-_.!~*'()#";
 
-// Characters that are safe in encodeURIComponent:
+// Characters that are safe in encode_uri_component:
 // -_.!~*'() plus alphanumeric
 ENCODE_COMPONENT_CHARS :: "-_.!~*'()";
 

@@ -68,7 +68,7 @@ _block_tokenize :: (fn(state: *(StateBlock), start_line: i32, end_line: i32) -> 
   (has_empty_lines : bool) = false;
 
   while (line < end_line), {
-    // JS: state.line = line = state.skipEmptyLines(line)
+    // JS: state.line = line = state.skip_empty_lines(line)
     line = state.*.skip_empty_lines(line);
     state.*.line = line;
     if((line >= end_line), { return (); });
@@ -99,7 +99,7 @@ _block_tokenize :: (fn(state: *(StateBlock), start_line: i32, end_line: i32) -> 
     if(!(ok), { ok = paragraph(state, line, end_line, false, (&para_terminators)); });
 
     // Set state.tight based on whether empty lines have been seen before this tag.
-    // i.e. latest empty line should not count (matches JS: state.tight = !hasEmptyLines)
+    // i.e. latest empty line should not count (matches JS: state.tight = !has_empty_lines)
     state.*.tight = !(has_empty_lines);
 
     // Paragraph might "eat" one newline after it in nested lists

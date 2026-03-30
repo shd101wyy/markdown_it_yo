@@ -5,7 +5,7 @@
 open import "std/string";
 { ArrayList } :: import "std/collections/array_list";
 { Token } :: import "../token.yo";
-{ fromCodePoint } :: import "../common/char_utils.yo";
+{ from_code_point } :: import "../common/char_utils.yo";
 { StateInline, Delimiter, TokenMeta, ScanDelimsResult } :: import "./state_inline.yo";
 { flush_pending, inline_push_token } :: import "./inline_helpers.yo";
 
@@ -24,7 +24,7 @@ strikethrough_tokenize :: (fn(state: *(StateInline), silent: bool) -> bool)({
 
   (scanned : ScanDelimsResult) = state.*.scan_delims(state.*.pos, true);
   (len : i32) = scanned.length;
-  (ch_str : String) = fromCodePoint(marker);
+  (ch_str : String) = from_code_point(marker);
 
   if((len < i32(2)), {
     return false;

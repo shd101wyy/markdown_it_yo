@@ -5,10 +5,10 @@
 open import "std/string";
 { ArrayList } :: import "std/collections/array_list";
 
-// Characters to keep encoded in decodeURI (default):
+// Characters to keep encoded in decode_uri (default):
 DECODE_DEFAULT_CHARS :: ";/?:@&=+$,#";
 
-// Characters to keep encoded in decodeURIComponent:
+// Characters to keep encoded in decode_uri_component:
 DECODE_COMPONENT_CHARS :: "";
 
 // Parse a single hex digit, returns -1 on failure.

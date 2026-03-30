@@ -6,10 +6,10 @@ open import "std/string";
 { ArrayList } :: import "std/collections/array_list";
 { Token } :: import "../token.yo";
 { StateCore } :: import "./state_core.yo";
-{ isWhiteSpace, isPunctChar, isMdAsciiPunct } :: import "../common/utils.yo";
-{ fromCodePoint } :: import "../common/char_utils.yo";
+{ is_white_space, is_punct_char, is_md_ascii_punct } :: import "../common/utils.yo";
+{ from_code_point } :: import "../common/char_utils.yo";
 
-APOSTROPHE := fromCodePoint(i32(0x2019));
+APOSTROPHE := from_code_point(i32(0x2019));
 
 // Stack entry for tracking quote positions
 _QuoteEntry :: struct(
@@ -123,10 +123,10 @@ _process_inlines :: (fn(tokens: ArrayList(Token), quotes: ArrayList(String)) -> 
             };
           });
 
-          (is_last_punct : bool) = ((isMdAsciiPunct(last_char)) || (isPunctChar(last_char)));
-          (is_next_punct : bool) = ((isMdAsciiPunct(next_char)) || (isPunctChar(next_char)));
-          (is_last_ws : bool) = isWhiteSpace(last_char);
-          (is_next_ws : bool) = isWhiteSpace(next_char);
+          (is_last_punct : bool) = ((is_md_ascii_punct(last_char)) || (is_punct_char(last_char)));
+          (is_next_punct : bool) = ((is_md_ascii_punct(next_char)) || (is_punct_char(next_char)));
+          (is_last_ws : bool) = is_white_space(last_char);
+          (is_next_ws : bool) = is_white_space(next_char);
 
           if(is_next_ws, {
             can_open = false;

@@ -65,7 +65,7 @@ _skip_code_span :: (fn(src_bytes: ArrayList(u8), pos: i32, max: i32) -> i32)({
 // Parse a link label starting at position `start` (which should point to '[').
 // Returns the position of the closing ']', or -1 if not found.
 // `disable_nested` — if true, returns -1 when nested link/image tokens are found
-// (but plain nested brackets are allowed, matching JS skipToken behavior).
+// (but plain nested brackets are allowed, matching JS skip_token behavior).
 parse_link_label :: (fn(src_bytes: ArrayList(u8), start: i32, pos_max: i32, disable_nested: bool) -> i32)({
   (max : i32) = pos_max;
   (pos : i32) = (start + i32(1));
@@ -95,7 +95,7 @@ parse_link_label :: (fn(src_bytes: ArrayList(u8), start: i32, pos_max: i32, disa
       // Opening bracket — check if it starts a nested link token
       (marker == i32(0x5B)) => {
         if(disable_nested, {
-          // Use recur to find matching ']' (without disableNested to avoid infinite recursion)
+          // Use recur to find matching ']' (without disable_nested to avoid infinite recursion)
           (inner_end : i32) = recur(src_bytes, pos, max, false);
           if((inner_end >= i32(0)), {
             (after : i32) = (inner_end + i32(1));

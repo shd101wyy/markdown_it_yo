@@ -169,12 +169,12 @@ impl(forall(F : Type), Ruler(F),
   }),
 
   // Add new rule before one with given name.
-  before : (fn(self: *(Self), beforeName: String, ruleName: String, rule_fn: F, alt: ArrayList(String)) -> unit)({
-    (index : i32) = self._find(beforeName);
+  before : (fn(self: *(Self), before_name: String, rule_name: String, rule_fn: F, alt: ArrayList(String)) -> unit)({
+    (index : i32) = self._find(before_name);
     assert((index != i32(-1)), "Parser rule not found");
 
     _arrayListInsert(self.*._rules, usize(index), RuleEntry(F)(
-      name: ruleName,
+      name: rule_name,
       enabled: true,
       rule_fn: rule_fn,
       alt: alt
@@ -183,12 +183,12 @@ impl(forall(F : Type), Ruler(F),
   }),
 
   // Add new rule after one with given name.
-  after : (fn(self: *(Self), afterName: String, ruleName: String, rule_fn: F, alt: ArrayList(String)) -> unit)({
-    (index : i32) = self._find(afterName);
+  after : (fn(self: *(Self), after_name: String, rule_name: String, rule_fn: F, alt: ArrayList(String)) -> unit)({
+    (index : i32) = self._find(after_name);
     assert((index != i32(-1)), "Parser rule not found");
 
     _arrayListInsert(self.*._rules, usize((index + i32(1))), RuleEntry(F)(
-      name: ruleName,
+      name: rule_name,
       enabled: true,
       rule_fn: rule_fn,
       alt: alt
@@ -197,9 +197,9 @@ impl(forall(F : Type), Ruler(F),
   }),
 
   // Push new rule to the end of chain.
-  push : (fn(self: *(Self), ruleName: String, rule_fn: F, alt: ArrayList(String)) -> unit)({
+  push : (fn(self: *(Self), rule_name: String, rule_fn: F, alt: ArrayList(String)) -> unit)({
     self.*._rules.push(RuleEntry(F)(
-      name: ruleName,
+      name: rule_name,
       enabled: true,
       rule_fn: rule_fn,
       alt: alt
@@ -208,7 +208,7 @@ impl(forall(F : Type), Ruler(F),
   }),
 
   // Enable rules with given names.
-  enable : (fn(self: *(Self), list: ArrayList(String), ignoreInvalid: bool) -> ArrayList(String))({
+  enable : (fn(self: *(Self), list: ArrayList(String), ignore_invalid: bool) -> ArrayList(String))({
     (result : ArrayList(String)) = ArrayList(String).new();
 
     (i : i32) = i32(0);
@@ -218,7 +218,7 @@ impl(forall(F : Type), Ruler(F),
       (idx : i32) = self._find(name);
 
       if((idx < i32(0)), {
-        if(!(ignoreInvalid), {
+        if(!(ignore_invalid), {
           assert(false, "Rules manager: invalid rule name");
         });
       }, {
@@ -240,7 +240,7 @@ impl(forall(F : Type), Ruler(F),
   }),
 
   // Enable rules with given names, and disable everything else.
-  enableOnly : (fn(self: *(Self), list: ArrayList(String), ignoreInvalid: bool) -> unit)({
+  enable_only : (fn(self: *(Self), list: ArrayList(String), ignore_invalid: bool) -> unit)({
     (i : i32) = i32(0);
     (len : i32) = i32(self.*._rules.len());
     while (i < len), {
@@ -254,12 +254,12 @@ impl(forall(F : Type), Ruler(F),
       i = (i + i32(1));
     };
 
-    self.enable(list, ignoreInvalid);
+    self.enable(list, ignore_invalid);
     ();
   }),
 
   // Disable rules with given names.
-  disable : (fn(self: *(Self), list: ArrayList(String), ignoreInvalid: bool) -> ArrayList(String))({
+  disable : (fn(self: *(Self), list: ArrayList(String), ignore_invalid: bool) -> ArrayList(String))({
     (result : ArrayList(String)) = ArrayList(String).new();
 
     (i : i32) = i32(0);
@@ -269,7 +269,7 @@ impl(forall(F : Type), Ruler(F),
       (idx : i32) = self._find(name);
 
       if((idx < i32(0)), {
-        if(!(ignoreInvalid), {
+        if(!(ignore_invalid), {
           assert(false, "Rules manager: invalid rule name");
         });
       }, {
@@ -291,7 +291,7 @@ impl(forall(F : Type), Ruler(F),
   }),
 
   // Return array of active functions for given chain name.
-  getRules : (fn(self: *(Self), chainName: String) -> ArrayList(F))({
+  get_rules : (fn(self: *(Self), chain_name: String) -> ArrayList(F))({
     match(self.*._cache,
       .None => {
         self._compile();
@@ -300,7 +300,7 @@ impl(forall(F : Type), Ruler(F),
     );
 
     match(self.*._cache,
-      .Some(cache) => match(cache.get(chainName),
+      .Some(cache) => match(cache.get(chain_name),
         .Some(rules) => rules,
         .None => ArrayList(F).new()
       ),

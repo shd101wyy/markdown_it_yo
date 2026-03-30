@@ -1,13 +1,13 @@
 // Ported from: entities npm package (v4.5.0)
 // HTML entity decoding — the only function markdown-it uses from this package.
 //
-// decodeHTML(str) decodes named (&amp;), decimal (&#38;), and hex (&#x26;) entities.
+// decode_html(str) decodes named (&amp;), decimal (&#38;), and hex (&#x26;) entities.
 // Uses Legacy mode (entities without trailing semicolon are also decoded).
 
 open import "std/string";
 { HashMap } :: import "std/collections/hash_map";
 { HashSet } :: import "std/collections/hash_set";
-{ isValidEntityCode, fromCodePoint } :: import "./char_utils.yo";
+{ is_valid_entity_code, from_code_point } :: import "./char_utils.yo";
 { _build_entity_map, _build_legacy_set } :: import "./entities_data.yo";
 
 // Module-level state: lazily initialized entity map and legacy set.
@@ -109,7 +109,7 @@ _isAlphaNumeric :: (fn(c: rune) -> bool)(
 
 // Decode HTML entities in a string (Legacy mode — entities without ; are also decoded).
 // This is the only function markdown-it uses from the entities package.
-decodeHTML :: (fn(input: String) -> String)({
+decode_html :: (fn(input: String) -> String)({
   _ensure_init();
 
   (len : usize) = input.len();
@@ -130,7 +130,7 @@ decodeHTML :: (fn(input: String) -> String)({
 
     if((c != rune(u32('&'))), {
       // Not an entity start, just append the character
-      result = `${result}${fromCodePoint(i32(c.to_u32()))}`;
+      result = `${result}${from_code_point(i32(c.to_u32()))}`;
       i = (i + usize(1));
     }, {
       // Found '&' — try to decode entity
@@ -194,14 +194,14 @@ decodeHTML :: (fn(input: String) -> String)({
                   i = digit_end;
                 });
 
-                if(isValidEntityCode(code), {
-                  result = `${result}${fromCodePoint(code)}`;
+                if(is_valid_entity_code(code), {
+                  result = `${result}${from_code_point(code)}`;
                 }, {
-                  result = `${result}${fromCodePoint(i32(65533))}`;
+                  result = `${result}${from_code_point(i32(65533))}`;
                 });
               }, {
                 // No hex digits — output literally
-                result = `${result}&#${fromCodePoint(i32(hex_char.to_u32()))}`;
+                result = `${result}&#${from_code_point(i32(hex_char.to_u32()))}`;
                 i = (i + usize(1));
               });
             }, {
@@ -231,10 +231,10 @@ decodeHTML :: (fn(input: String) -> String)({
                   i = digit_end;
                 });
 
-                if(isValidEntityCode(code), {
-                  result = `${result}${fromCodePoint(code)}`;
+                if(is_valid_entity_code(code), {
+                  result = `${result}${from_code_point(code)}`;
                 }, {
-                  result = `${result}${fromCodePoint(i32(65533))}`;
+                  result = `${result}${from_code_point(i32(65533))}`;
                 });
               }, {
                 // No decimal digits
@@ -320,4 +320,4 @@ decodeHTML :: (fn(input: String) -> String)({
   result
 });
 
-export decodeHTML;
+export decode_html;

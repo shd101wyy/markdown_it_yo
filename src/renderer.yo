@@ -6,7 +6,7 @@ open import "std/string";
 { ArrayList } :: import "std/collections/array_list";
 { Token, StringPair } :: import "./token.yo";
 { Options } :: import "./options.yo";
-{ escapeHtml, unescapeAll, isWhiteSpace } :: import "./common/utils.yo";
+{ escape_html, unescape_all, is_white_space } :: import "./common/utils.yo";
 
 // Render attributes of a token as an HTML attribute string.
 // Returns a string like ` class="foo" id="bar"`.
@@ -18,8 +18,8 @@ render_attrs :: (fn(token: Token) -> String)(
       (i : i32) = i32(0);
       while (i < i32(attrs.len())), {
         (pair : StringPair) = attrs.get(usize(i)).unwrap();
-        (ek : String) = escapeHtml(pair.name);
-        (ev : String) = escapeHtml(pair.value);
+        (ek : String) = escape_html(pair.name);
+        (ev : String) = escape_html(pair.value);
         result = `${result} ${ek}="${ev}"`;
         i = (i + i32(1));
       };
@@ -95,18 +95,18 @@ render_token :: (fn(tokens: ArrayList(Token), idx: i32, options: *(Options)) -> 
 
 _render_code_inline :: (fn(tokens: ArrayList(Token), idx: i32, options: *(Options)) -> String)({
   (token : Token) = tokens.get(usize(idx)).unwrap();
-  `<code${render_attrs(token)}>${escapeHtml(token.content)}</code>`
+  `<code${render_attrs(token)}>${escape_html(token.content)}</code>`
 });
 
 _render_code_block :: (fn(tokens: ArrayList(Token), idx: i32, options: *(Options)) -> String)({
   (token : Token) = tokens.get(usize(idx)).unwrap();
-  `<pre${render_attrs(token)}><code>${escapeHtml(token.content)}</code></pre>\n`
+  `<pre${render_attrs(token)}><code>${escape_html(token.content)}</code></pre>\n`
 });
 
 _render_fence :: (fn(tokens: ArrayList(Token), idx: i32, options: *(Options)) -> String)({
   (token : Token) = tokens.get(usize(idx)).unwrap();
   (info : String) = cond(
-    (token.info.len() > usize(0)) => unescapeAll(token.info).trim(),
+    (token.info.len() > usize(0)) => unescape_all(token.info).trim(),
     true => ``
   );
 
@@ -133,11 +133,11 @@ _render_fence :: (fn(tokens: ArrayList(Token), idx: i32, options: *(Options)) ->
   });
 
   // TODO: highlight callback support
-  (highlighted : String) = escapeHtml(token.content);
+  (highlighted : String) = escape_html(token.content);
 
   if((lang_name.len() > usize(0)), {
     // Add language class
-    (lang_class : String) = `${options.*.lang_prefix}${escapeHtml(lang_name)}`;
+    (lang_class : String) = `${options.*.lang_prefix}${escape_html(lang_name)}`;
     `<pre><code class="${lang_class}"${render_attrs(token)}>${highlighted}</code></pre>\n`
   }, {
     `<pre><code${render_attrs(token)}>${highlighted}</code></pre>\n`
@@ -178,8 +178,8 @@ render_inline_as_text :: (fn(tokens: ArrayList(Token)) -> String)({
 
 _render_image :: (fn(tokens: ArrayList(Token), idx: i32, options: *(Options)) -> String)({
   (token : Token) = tokens.get(usize(idx)).unwrap();
-  // Alt text: strip markdown from children (renderInlineAsText)
-  // render_token will escapeHtml the attribute value
+  // Alt text: strip markdown from children (render_inline_as_text)
+  // render_token will escape_html the attribute value
   (alt_text : String) = match(token.children,
     .Some(children) => render_inline_as_text(children),
     .None => token.content
@@ -198,7 +198,7 @@ _render_image :: (fn(tokens: ArrayList(Token), idx: i32, options: *(Options)) ->
     },
     .None => ()
   );
-  // Update token in the list then render via renderToken
+  // Update token in the list then render via render_token
   tokens.set(usize(idx), token);
   render_token(tokens, idx, options)
 });
@@ -221,7 +221,7 @@ _render_softbreak :: (fn(options: *(Options)) -> String)(
 );
 
 _render_text :: (fn(token: Token) -> String)(
-  escapeHtml(token.content)
+  escape_html(token.content)
 );
 
 _render_html_block :: (fn(token: Token) -> String)(

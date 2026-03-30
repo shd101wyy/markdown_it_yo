@@ -5,7 +5,7 @@
 open import "std/string";
 { ArrayList } :: import "std/collections/array_list";
 { Token } :: import "../token.yo";
-{ isSpace } :: import "../common/utils.yo";
+{ is_space } :: import "../common/utils.yo";
 { StateInline } :: import "./state_inline.yo";
 { flush_pending, inline_push_token } :: import "./inline_helpers.yo";
 
@@ -45,7 +45,7 @@ newline :: (fn(state: *(StateInline), silent: bool) -> bool)({
   pos = (pos + i32(1));
 
   // skip heading spaces for next line
-  while (((pos < max) && isSpace(i32(state.*._src_bytes.get(usize(pos)).unwrap())))), {
+  while (((pos < max) && is_space(i32(state.*._src_bytes.get(usize(pos)).unwrap())))), {
     pos = (pos + i32(1));
   };
 

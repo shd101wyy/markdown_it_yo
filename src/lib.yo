@@ -7,12 +7,12 @@
 { Ruler, RuleEntry } :: import "./ruler.yo";
 
 // Common utilities
-{ isValidEntityCode, fromCodePoint, escapeHtml, isSpace, isWhiteSpace,
-  isMdAsciiPunct, unescapeMd, normalizeReference, arrayReplaceAt } :: import "./common/utils.yo";
+{ is_valid_entity_code, from_code_point, escape_html, is_space, is_white_space,
+  is_md_ascii_punct, unescape_md, normalize_reference, array_replace_at } :: import "./common/utils.yo";
 { html_blocks } :: import "./common/html_blocks.yo";
 { html_re, HtmlRegexPatterns } :: import "./common/html_re.yo";
 
 export Token, StringPair, Ruler, RuleEntry,
-       isValidEntityCode, fromCodePoint, escapeHtml, isSpace, isWhiteSpace,
-       isMdAsciiPunct, unescapeMd, normalizeReference, arrayReplaceAt,
+       is_valid_entity_code, from_code_point, escape_html, is_space, is_white_space,
+       is_md_ascii_punct, unescape_md, normalize_reference, array_replace_at,
        html_blocks, html_re, HtmlRegexPatterns;

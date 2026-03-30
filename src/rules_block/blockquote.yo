@@ -6,7 +6,7 @@ open import "std/string";
 { ArrayList } :: import "std/collections/array_list";
 { Token } :: import "../token.yo";
 { StateBlock, BlockTokenizeFn, block_push_token } :: import "./state_block.yo";
-{ isSpace } :: import "../common/utils.yo";
+{ is_space } :: import "../common/utils.yo";
 { fence } :: import "./fence.yo";
 { hr } :: import "./hr.yo";
 { html_block } :: import "./html_block.yo";
@@ -28,7 +28,7 @@ _is_list_start :: (fn(state: *(StateBlock), line: i32) -> bool)({
   // Bullet: -, +, *
   if((((ch == i32(0x2A)) || (ch == i32(0x2D))) || (ch == i32(0x2B))), {
     if(((pos + i32(1)) < max), {
-      if(!(isSpace(i32(state.*._src_bytes.get(usize((pos + i32(1)))).unwrap()))), {
+      if(!(is_space(i32(state.*._src_bytes.get(usize((pos + i32(1)))).unwrap()))), {
         return false;
       });
     });
@@ -51,7 +51,7 @@ _is_list_start :: (fn(state: *(StateBlock), line: i32) -> bool)({
     }));
   };
   if((opos < max), {
-    if(!(isSpace(i32(state.*._src_bytes.get(usize(opos)).unwrap()))), { return false; });
+    if(!(is_space(i32(state.*._src_bytes.get(usize(opos)).unwrap()))), { return false; });
   });
   true
 });
@@ -135,7 +135,7 @@ blockquote :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: 
       (ws_done : bool) = false;
       while ((pos < max) && !(ws_done)), {
         (ch : i32) = i32(state.*._src_bytes.get(usize(pos)).unwrap());
-        if(isSpace(ch), {
+        if(is_space(ch), {
           if((ch == i32(0x09)), {
             offset = (offset + (i32(4) - (((offset + state.*.bs_count.get(usize(next_line)).unwrap()) + cond(adjust_tab => i32(1), true => i32(0))) % i32(4))));
           }, {
@@ -173,7 +173,7 @@ blockquote :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: 
         || heading(state, next_line, end_line, true));
 
       if(terminate, {
-        // Hard termination: limit lineMax to prevent paragraph continuation
+        // Hard termination: limit line_max to prevent paragraph continuation
         state.*.line_max = next_line;
 
         if((state.*.blk_indent != i32(0)), {

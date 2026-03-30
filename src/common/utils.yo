@@ -5,15 +5,15 @@
 open import "std/string";
 { ArrayList } :: import "std/collections/array_list";
 { Regex, RegexMatch } :: import "std/regex";
-{ isValidEntityCode, fromCodePoint } :: import "./char_utils.yo";
-{ decodeHTML } :: import "./entities.yo";
+{ is_valid_entity_code, from_code_point } :: import "./char_utils.yo";
+{ decode_html } :: import "./entities.yo";
 
 // ============================================================================
-// escapeHtml
+// escape_html
 // ============================================================================
 
 // Escape HTML special characters: & < > "
-escapeHtml :: (fn(input: String) -> String)(
+escape_html :: (fn(input: String) -> String)(
   {
     (bytes : ArrayList(u8)) = input.as_bytes();
     (i : usize) = usize(0);
@@ -78,11 +78,11 @@ escapeHtml :: (fn(input: String) -> String)(
 );
 
 // ============================================================================
-// isSpace
+// is_space
 // ============================================================================
 
 // Check if character code is a markdown space (tab or space)
-isSpace :: (fn(code: i32) -> bool)(
+is_space :: (fn(code: i32) -> bool)(
   cond(
     (code == i32(0x09)) => true,
     (code == i32(0x20)) => true,
@@ -91,11 +91,11 @@ isSpace :: (fn(code: i32) -> bool)(
 );
 
 // ============================================================================
-// isWhiteSpace
+// is_white_space
 // ============================================================================
 
 // Check if character code is Unicode whitespace (Zs class) or [\t\f\v\r\n]
-isWhiteSpace :: (fn(code: i32) -> bool)(
+is_white_space :: (fn(code: i32) -> bool)(
   cond(
     ((code >= i32(0x2000)) && (code <= i32(0x200A))) => true,
     (code == i32(0x09)) => true,
@@ -114,12 +114,12 @@ isWhiteSpace :: (fn(code: i32) -> bool)(
 );
 
 // ============================================================================
-// isMdAsciiPunct
+// is_md_ascii_punct
 // ============================================================================
 
 // Markdown ASCII punctuation characters.
 // !, ", #, $, %, &, ', (, ), *, +, ,, -, ., /, :, ;, <, =, >, ?, @, [, \, ], ^, _, `, {, |, }, or ~
-isMdAsciiPunct :: (fn(ch: i32) -> bool)(
+is_md_ascii_punct :: (fn(ch: i32) -> bool)(
   cond(
     ((ch >= i32(0x21)) && (ch <= i32(0x2F))) => true,
     ((ch >= i32(0x3A)) && (ch <= i32(0x40))) => true,
@@ -130,11 +130,11 @@ isMdAsciiPunct :: (fn(ch: i32) -> bool)(
 );
 
 // ============================================================================
-// unescapeMd
+// unescape_md
 // ============================================================================
 
 // Remove backslash escapes from markdown: \* → *
-unescapeMd :: (fn(input: String) -> String)(
+unescape_md :: (fn(input: String) -> String)(
   {
     if(!(input.contains(String.from("\\"))), {
       return input;
@@ -146,11 +146,11 @@ unescapeMd :: (fn(input: String) -> String)(
 );
 
 // ============================================================================
-// normalizeReference
+// normalize_reference
 // ============================================================================
 
 // Helper to unify [reference labels].
-normalizeReference :: (fn(input: String) -> String)(
+normalize_reference :: (fn(input: String) -> String)(
   {
     (trimmed : String) = input.trim();
     (re : Regex) = Regex.new(`\\s+`, `g`).unwrap();
@@ -160,11 +160,11 @@ normalizeReference :: (fn(input: String) -> String)(
 );
 
 // ============================================================================
-// arrayReplaceAt
+// array_replace_at
 // ============================================================================
 
-// Remove element from array at `pos` and insert `newElements` at that position.
-arrayReplaceAt :: (fn(forall(T : Type), src: ArrayList(T), pos: i32, newElements: ArrayList(T)) -> ArrayList(T))(
+// Remove element from array at `pos` and insert `new_elements` at that position.
+array_replace_at :: (fn(forall(T : Type), src: ArrayList(T), pos: i32, new_elements: ArrayList(T)) -> ArrayList(T))(
   {
     (result : ArrayList(T)) = ArrayList(T).new();
 
@@ -175,9 +175,9 @@ arrayReplaceAt :: (fn(forall(T : Type), src: ArrayList(T), pos: i32, newElements
     };
 
     (j : i32) = i32(0);
-    (new_len : i32) = i32(newElements.len());
+    (new_len : i32) = i32(new_elements.len());
     while (j < new_len), {
-      result.push(newElements.get(usize(j)).unwrap());
+      result.push(new_elements.get(usize(j)).unwrap());
       j = (j + i32(1));
     };
 
@@ -193,7 +193,7 @@ arrayReplaceAt :: (fn(forall(T : Type), src: ArrayList(T), pos: i32, newElements
 );
 
 // ============================================================================
-// isPunctChar
+// is_punct_char
 // ============================================================================
 
 // Ported from: uc.micro — checks if a character is a Unicode punctuation or symbol.
@@ -201,7 +201,7 @@ arrayReplaceAt :: (fn(forall(T : Type), src: ArrayList(T), pos: i32, newElements
 //
 // Instead of porting the full uc.micro regex (which is huge), we check the
 // Unicode ranges directly. This covers the same codepoints as uc.micro P and S.
-isPunctChar :: (fn(ch: i32) -> bool)(
+is_punct_char :: (fn(ch: i32) -> bool)(
   cond(
     // ASCII punctuation (common case, fast path)
     ((ch >= i32(0x21)) && (ch <= i32(0x2F))) => true,
@@ -269,10 +269,10 @@ isPunctChar :: (fn(ch: i32) -> bool)(
 );
 
 // ============================================================================
-// unescapeAll
+// unescape_all
 // ============================================================================
 
-// Ported from: lib/common/utils.mjs — unescapeAll
+// Ported from: lib/common/utils.mjs — unescape_all
 // Unescapes both markdown backslash escapes (\*) AND HTML entities (&amp; &#x26; etc.)
 _is_md_punct_char :: (fn(ch: u8) -> bool)(
   cond(
@@ -312,7 +312,7 @@ _is_md_punct_char :: (fn(ch: u8) -> bool)(
   )
 );
 
-unescapeAll :: (fn(input: String) -> String)(
+unescape_all :: (fn(input: String) -> String)(
   {
     // Fast path: no backslash or ampersand means nothing to unescape
     if((!(input.contains(`\\`)) && !(input.contains(`&`))), {
@@ -332,7 +332,7 @@ unescapeAll :: (fn(input: String) -> String)(
         ((ch == u8(0x5C)) && ((i + usize(1)) < len)) => {
           (next : u8) = bytes.get((i + usize(1))).unwrap();
           if(_is_md_punct_char(next), {
-            result = `${result}${fromCodePoint(i32(next))}`;
+            result = `${result}${from_code_point(i32(next))}`;
             i = (i + usize(2));
           }, {
             result = `${result}\\`;
@@ -364,8 +364,8 @@ unescapeAll :: (fn(input: String) -> String)(
           if(found_semi, {
             // Extract the entity substring including & and ;
             (entity_str : String) = input.substring(entity_start, (j + usize(1)));
-            (decoded : String) = decodeHTML(entity_str);
-            // If decodeHTML changed the string, it was a valid entity
+            (decoded : String) = decode_html(entity_str);
+            // If decode_html changed the string, it was a valid entity
             if(!(decoded == entity_str), {
               result = `${result}${decoded}`;
               i = (j + usize(1));
@@ -380,7 +380,7 @@ unescapeAll :: (fn(input: String) -> String)(
         },
 
         true => {
-          result = `${result}${fromCodePoint(i32(ch))}`;
+          result = `${result}${from_code_point(i32(ch))}`;
           i = (i + usize(1));
         }
       );
@@ -390,5 +390,5 @@ unescapeAll :: (fn(input: String) -> String)(
   }
 );
 
-export isValidEntityCode, fromCodePoint, escapeHtml, isSpace, isWhiteSpace,
-       isMdAsciiPunct, isPunctChar, unescapeMd, unescapeAll, normalizeReference, arrayReplaceAt;
+export is_valid_entity_code, from_code_point, escape_html, is_space, is_white_space,
+       is_md_ascii_punct, is_punct_char, unescape_md, unescape_all, normalize_reference, array_replace_at;

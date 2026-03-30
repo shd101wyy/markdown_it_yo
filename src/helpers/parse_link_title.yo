@@ -5,7 +5,7 @@
 
 open import "std/string";
 { ArrayList } :: import "std/collections/array_list";
-{ unescapeAll } :: import "../common/utils.yo";
+{ unescape_all } :: import "../common/utils.yo";
 
 // Result of parsing a link title
 LinkTitleResult :: struct(
@@ -83,7 +83,7 @@ parse_link_title :: (fn(input: String, start_param: i32, max: i32, prev_state: O
             ok: true,
             can_continue: false,
             pos: (pos + i32(1)),
-            str: `${state.str}${unescapeAll(String.from_bytes(slice_bytes))}`,
+            str: `${state.str}${unescape_all(String.from_bytes(slice_bytes))}`,
             marker: state.marker
           );
           return state;
@@ -108,7 +108,7 @@ parse_link_title :: (fn(input: String, start_param: i32, max: i32, prev_state: O
       ok: false,
       can_continue: true,
       pos: i32(0),
-      str: `${state.str}${unescapeAll(String.from_bytes(slice_bytes))}`,
+      str: `${state.str}${unescape_all(String.from_bytes(slice_bytes))}`,
       marker: state.marker
     );
     state
