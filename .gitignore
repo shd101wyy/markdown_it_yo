@@ -8,9 +8,9 @@ a.out.c
 *.dSYM/
 
 # Compiled binaries and their C output
-markdown_it
-markdown_it.c
-markdown_it_debug*
+/markdown_it
+/markdown_it.c
+/markdown_it_debug*
 
 # OS files
 .DS_Store

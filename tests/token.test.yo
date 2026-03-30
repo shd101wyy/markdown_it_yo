@@ -17,69 +17,69 @@ test "Token — constructor defaults", {
   assert((tok.hidden == false), "hidden should default to false");
 };
 
-test "Token — attrIndex with no attrs", {
+test "Token — attr_index with no attrs", {
   (tok : Token) = Token.new(`inline`, ``, i32(0));
-  (idx : i32) = (&tok).attrIndex(`href`);
+  (idx : i32) = (&tok).attr_index(`href`);
   assert((idx == i32(-1)), "should return -1 when no attrs");
 };
 
-test "Token — attrPush", {
+test "Token — attr_push", {
   (tok : Token) = Token.new(`link_open`, `a`, i32(1));
-  (&tok).attrPush(StringPair(name: `href`, value: `https://example.com`));
+  (&tok).attr_push(StringPair(name: `href`, value: `https://example.com`));
 
-  (idx : i32) = (&tok).attrIndex(`href`);
+  (idx : i32) = (&tok).attr_index(`href`);
   assert((idx == i32(0)), "should find pushed attr at index 0");
 };
 
-test "Token — attrSet creates new attr", {
+test "Token — attr_set creates new attr", {
   (tok : Token) = Token.new(`link_open`, `a`, i32(1));
-  (&tok).attrSet(`href`, `https://example.com`);
+  (&tok).attr_set(`href`, `https://example.com`);
 
-  (val : Option(String)) = (&tok).attrGet(`href`);
+  (val : Option(String)) = (&tok).attr_get(`href`);
   match(val,
     .Some(v) => assert((v == `https://example.com`), "should get correct value"),
     .None => assert(false, "should find attr")
   );
 };
 
-test "Token — attrSet overrides existing", {
+test "Token — attr_set overrides existing", {
   (tok : Token) = Token.new(`link_open`, `a`, i32(1));
-  (&tok).attrSet(`href`, `old`);
-  (&tok).attrSet(`href`, `new`);
+  (&tok).attr_set(`href`, `old`);
+  (&tok).attr_set(`href`, `new`);
 
-  (val : Option(String)) = (&tok).attrGet(`href`);
+  (val : Option(String)) = (&tok).attr_get(`href`);
   match(val,
     .Some(v) => assert((v == `new`), "should override with new value"),
     .None => assert(false, "should find attr")
   );
 };
 
-test "Token — attrGet returns None for missing attr", {
+test "Token — attr_get returns None for missing attr", {
   (tok : Token) = Token.new(`inline`, ``, i32(0));
-  (val : Option(String)) = (&tok).attrGet(`class`);
+  (val : Option(String)) = (&tok).attr_get(`class`);
   match(val,
     .Some(_) => assert(false, "should not find attr"),
     .None => ()
   );
 };
 
-test "Token — attrJoin creates new attr", {
+test "Token — attr_join creates new attr", {
   (tok : Token) = Token.new(`paragraph_open`, `p`, i32(1));
-  (&tok).attrJoin(`class`, `foo`);
+  (&tok).attr_join(`class`, `foo`);
 
-  (val : Option(String)) = (&tok).attrGet(`class`);
+  (val : Option(String)) = (&tok).attr_get(`class`);
   match(val,
     .Some(v) => assert((v == `foo`), "should create attr with value"),
     .None => assert(false, "should find attr")
   );
 };
 
-test "Token — attrJoin appends to existing", {
+test "Token — attr_join appends to existing", {
   (tok : Token) = Token.new(`paragraph_open`, `p`, i32(1));
-  (&tok).attrJoin(`class`, `foo`);
-  (&tok).attrJoin(`class`, `bar`);
+  (&tok).attr_join(`class`, `foo`);
+  (&tok).attr_join(`class`, `bar`);
 
-  (val : Option(String)) = (&tok).attrGet(`class`);
+  (val : Option(String)) = (&tok).attr_get(`class`);
   match(val,
     .Some(v) => assert((v == `foo bar`), "should join with space"),
     .None => assert(false, "should find attr")
@@ -88,12 +88,12 @@ test "Token — attrJoin appends to existing", {
 
 test "Token — multiple different attrs", {
   (tok : Token) = Token.new(`link_open`, `a`, i32(1));
-  (&tok).attrSet(`href`, `https://example.com`);
-  (&tok).attrSet(`title`, `Example`);
-  (&tok).attrJoin(`class`, `link`);
+  (&tok).attr_set(`href`, `https://example.com`);
+  (&tok).attr_set(`title`, `Example`);
+  (&tok).attr_join(`class`, `link`);
 
-  assert(((&tok).attrIndex(`href`) == i32(0)), "href at index 0");
-  assert(((&tok).attrIndex(`title`) == i32(1)), "title at index 1");
-  assert(((&tok).attrIndex(`class`) == i32(2)), "class at index 2");
-  assert(((&tok).attrIndex(`missing`) == i32(-1)), "missing returns -1");
+  assert(((&tok).attr_index(`href`) == i32(0)), "href at index 0");
+  assert(((&tok).attr_index(`title`) == i32(1)), "title at index 1");
+  assert(((&tok).attr_index(`class`) == i32(2)), "class at index 2");
+  assert(((&tok).attr_index(`missing`) == i32(-1)), "missing returns -1");
 };
