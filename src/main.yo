@@ -14,6 +14,12 @@ open import "std/string";
 { MarkdownIt, new_markdown_it, new_markdown_it_with_options } :: import "./markdown_it.yo";
 { Options, default_options, commonmark_options } :: import "./options.yo";
 
+// For Unicode-aware towlower/towupper (used by normalize_reference)
+c_include "<locale.h>",
+  setlocale :
+    fn(category : i32, locale : *(u8)) -> *(u8)
+;
+
 // Read entire file contents into a String using libc
 _read_file :: (fn(path: String) -> Option(String))({
   cstr := path.to_cstr();
@@ -100,6 +106,9 @@ _read_stdin :: (fn() -> String)({
 });
 
 main :: (fn() -> unit)({
+  // Set locale for Unicode-aware case conversion (towlower/towupper)
+  _ := setlocale(i32(0), *(u8)(""));
+
   argv := args();
 
   // Parse flags

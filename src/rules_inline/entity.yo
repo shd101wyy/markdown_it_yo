@@ -8,6 +8,7 @@ open import "std/string";
 { Token } :: import "../token.yo";
 { is_valid_entity_code, from_code_point } :: import "../common/char_utils.yo";
 { decode_html } :: import "../common/entities.yo";
+{ byte_substring } :: import "../common/utils.yo";
 { StateInline } :: import "./state_inline.yo";
 { flush_pending, inline_push_token } :: import "./inline_helpers.yo";
 
@@ -68,7 +69,7 @@ entity :: (fn(state: *(StateInline), silent: bool) -> bool)({
 
   if((ch == i32(0x23)), {
     // Numeric entity: &#...;
-    (tail : String) = state.*.src.substring(usize(pos), usize(max));
+    (tail : String) = byte_substring(state.*._src_bytes, pos, max);
     (m : Option(RegexMatch)) = _DIGITAL_RE.exec(tail);
     match(m,
       .Some(match_result) => {
@@ -110,7 +111,7 @@ entity :: (fn(state: *(StateInline), silent: bool) -> bool)({
     );
   }, {
     // Named entity: &quot;
-    (tail : String) = state.*.src.substring(usize(pos), usize(max));
+    (tail : String) = byte_substring(state.*._src_bytes, pos, max);
     (m : Option(RegexMatch)) = _NAMED_RE.exec(tail);
     match(m,
       .Some(match_result) => {

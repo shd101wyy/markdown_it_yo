@@ -6,7 +6,7 @@ open import "std/string";
 { ArrayList } :: import "std/collections/array_list";
 { Token } :: import "../token.yo";
 { StateBlock } :: import "./state_block.yo";
-{ is_space, normalize_reference } :: import "../common/utils.yo";
+{ is_space, normalize_reference, byte_substring } :: import "../common/utils.yo";
 { validate_link, normalize_link } :: import "../common/link_utils.yo";
 { LinkDestResult, parse_link_destination } :: import "../helpers/parse_link_destination.yo";
 { LinkTitleResult, parse_link_title } :: import "../helpers/parse_link_title.yo";
@@ -57,9 +57,9 @@ _try_get_next_line :: (fn(state: *(StateBlock), buf: *(String), str_max: *(i32),
 
   (line_pos : i32) = (state.*.b_marks.get(usize(next_line.*)).unwrap() + state.*.t_shift.get(usize(next_line.*)).unwrap());
   (line_max : i32) = state.*.e_marks.get(usize(next_line.*)).unwrap();
-  (line_content : String) = state.*.src.substring(usize(line_pos), usize((line_max + i32(1))));
+  (line_content : String) = byte_substring(state.*._src_bytes, line_pos, (line_max + i32(1)));
   buf.* = `${buf.*}${line_content}`;
-  str_max.* = i32(buf.*.len());
+  str_max.* = i32(buf.*.as_bytes().len());
   next_line.* = (next_line.* + i32(1));
   true
 });
@@ -81,8 +81,8 @@ reference :: (fn(state: *(StateBlock), start_line: i32, _end_line: i32, silent: 
 
   // Collect content across multiple lines.
   // Start with the first line (pos to max+1 to include newline).
-  (buf : String) = state.*.src.substring(usize(pos), usize((max + i32(1))));
-  (str_max : i32) = i32(buf.len());
+  (buf : String) = byte_substring(state.*._src_bytes, pos, (max + i32(1)));
+  (str_max : i32) = i32(buf.as_bytes().len());
 
   // Find label end: scan for unescaped ']'
   (label_end : i32) = i32(-1);
@@ -198,7 +198,7 @@ reference :: (fn(state: *(StateBlock), start_line: i32, _end_line: i32, silent: 
     return false;
   });
 
-  (label : String) = normalize_reference(buf.substring(usize(1), usize(label_end)));
+  (label : String) = normalize_reference(byte_substring(buf.as_bytes(), i32(1), label_end));
   if((label.len() == usize(0)), {
     return false;
   });

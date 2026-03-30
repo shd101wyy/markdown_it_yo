@@ -7,6 +7,7 @@ open import "std/string";
 { Regex, RegexMatch } :: import "std/regex";
 { is_valid_entity_code, from_code_point } :: import "./char_utils.yo";
 { decode_html } :: import "./entities.yo";
+{ unicode_to_lowercase, unicode_to_uppercase } :: import "./unicode_casefold.yo";
 
 // ============================================================================
 // escape_html
@@ -150,12 +151,14 @@ unescape_md :: (fn(input: String) -> String)(
 // ============================================================================
 
 // Helper to unify [reference labels].
+// Uses .toLowerCase().toUpperCase() to normalize Unicode case variants,
+// matching JS markdown-it behavior.
 normalize_reference :: (fn(input: String) -> String)(
   {
     (trimmed : String) = input.trim();
     (re : Regex) = Regex.new(`\\s+`, `g`).unwrap();
     (collapsed : String) = re.replace_all(trimmed, ` `);
-    collapsed.to_lowercase().to_uppercase()
+    unicode_to_uppercase(unicode_to_lowercase(collapsed))
   }
 );
 
@@ -390,5 +393,19 @@ unescape_all :: (fn(input: String) -> String)(
   }
 );
 
+// Extract a substring from byte positions [start, end) of a byte array
+// and return it as a String. This is needed because String.substring uses
+// character positions, but our parser works with byte positions.
+byte_substring :: (fn(bytes: ArrayList(u8), start: i32, end: i32) -> String)({
+  (out : ArrayList(u8)) = ArrayList(u8).with_capacity(usize((end - start)));
+  (i : i32) = start;
+  while (i < end), {
+    out.push(bytes.get(usize(i)).unwrap());
+    i = (i + i32(1));
+  };
+  String.from_bytes(out)
+});
+
 export is_valid_entity_code, from_code_point, escape_html, is_space, is_white_space,
-       is_md_ascii_punct, is_punct_char, unescape_md, unescape_all, normalize_reference, array_replace_at;
+       is_md_ascii_punct, is_punct_char, unescape_md, unescape_all, normalize_reference,
+       array_replace_at, byte_substring;

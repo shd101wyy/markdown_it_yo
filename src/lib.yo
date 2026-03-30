@@ -8,11 +8,13 @@
 
 // Common utilities
 { is_valid_entity_code, from_code_point, escape_html, is_space, is_white_space,
-  is_md_ascii_punct, unescape_md, normalize_reference, array_replace_at } :: import "./common/utils.yo";
+  is_md_ascii_punct, unescape_md, normalize_reference, array_replace_at,
+  byte_substring } :: import "./common/utils.yo";
 { html_blocks } :: import "./common/html_blocks.yo";
 { html_re, HtmlRegexPatterns } :: import "./common/html_re.yo";
 
 export Token, StringPair, Ruler, RuleEntry,
        is_valid_entity_code, from_code_point, escape_html, is_space, is_white_space,
        is_md_ascii_punct, unescape_md, normalize_reference, array_replace_at,
+       byte_substring,
        html_blocks, html_re, HtmlRegexPatterns;
