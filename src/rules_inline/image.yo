@@ -87,70 +87,42 @@ image_rule :: (fn(state: *(StateInline), silent: bool) -> bool)({
 
   // Reference image: ![alt][ref] or ![alt][] or ![alt]
   if(parse_reference, {
-    // ![alt][ref] — full form
+    (ref_label : String) = ``;
+
     if(((pos < max) && (i32(state.*._src_bytes.get(usize(pos)).unwrap()) == i32(0x5B))), {
+      // ![alt][ref] — full form or ![alt][] — collapsed form
       (ref_start : i32) = (pos + i32(1));
       (ref_end : i32) = parse_link_label(state.*._src_bytes, pos, max, false);
       if((ref_end >= i32(0)), {
-        (ref_label : String) = state.*.src.substring(usize(ref_start), usize(ref_end));
-        (label : String) = normalizeReference(ref_label);
-        if((label.len() > usize(0)), {
-          (env : *(Env)) = state.*.env;
-          (ref_opt : Option(Reference)) = env.*.references.get(label);
-          match(ref_opt,
-            .Some(r) => {
-              href = r.href;
-              title = r.title;
-              pos = (ref_end + i32(1));
-              parse_reference = false;
-            },
-            .None => ()
-          );
-        });
+        ref_label = state.*.src.substring(usize(ref_start), usize(ref_end));
+        pos = (ref_end + i32(1));
+      }, {
+        pos = (label_end + i32(1));
       });
+    }, {
+      // ![alt] — shortcut form
+      pos = (label_end + i32(1));
     });
 
-    // ![alt][] — collapsed form
-    if(parse_reference, {
-      if(((pos < max) && ((pos + i32(1)) < max)), {
-        if(((i32(state.*._src_bytes.get(usize(pos)).unwrap()) == i32(0x5B)) && (i32(state.*._src_bytes.get(usize((pos + i32(1)))).unwrap()) == i32(0x5D))), {
-          (label : String) = normalizeReference(state.*.src.substring(usize(label_start), usize(label_end)));
-          if((label.len() > usize(0)), {
-            (env : *(Env)) = state.*.env;
-            (ref_opt : Option(Reference)) = env.*.references.get(label);
-            match(ref_opt,
-              .Some(r) => {
-                href = r.href;
-                title = r.title;
-                pos = (pos + i32(2));
-                parse_reference = false;
-              },
-              .None => ()
-            );
-          });
-        });
-      });
+    // If no explicit ref label (collapsed/shortcut), use the alt text
+    if((ref_label.len() == usize(0)), {
+      ref_label = state.*.src.substring(usize(label_start), usize(label_end));
     });
 
-    // ![alt] — shortcut form
-    if(parse_reference, {
-      (label : String) = normalizeReference(state.*.src.substring(usize(label_start), usize(label_end)));
-      if((label.len() > usize(0)), {
-        (env : *(Env)) = state.*.env;
-        (ref_opt : Option(Reference)) = env.*.references.get(label);
-        match(ref_opt,
-          .Some(r) => {
-            href = r.href;
-            title = r.title;
-            pos = (label_end + i32(1));
-            parse_reference = false;
-          },
-          .None => ()
-        );
-      });
-    });
+    (label : String) = normalizeReference(ref_label);
+    if((label.len() == usize(0)), { return false; });
 
-    if(parse_reference, { return false; });
+    (env : *(Env)) = state.*.env;
+    (ref_opt : Option(Reference)) = env.*.references.get(label);
+    match(ref_opt,
+      .Some(r) => {
+        href = r.href;
+        title = r.title;
+      },
+      .None => {
+        return false;
+      }
+    );
   });
 
   if(!(silent), {

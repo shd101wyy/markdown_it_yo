@@ -2,9 +2,6 @@
 //
 // Parse link label — finds matching ']' for a '[' at position start.
 // Returns the position of ']', or -1 if not found.
-//
-// Simplified version: tracks bracket nesting with escape handling,
-// but doesn't use skipToken for complex inline structures.
 
 open import "std/string";
 { ArrayList } :: import "std/collections/array_list";
@@ -20,9 +17,55 @@ _count_backticks :: (fn(src_bytes: ArrayList(u8), pos: i32, max: i32) -> i32)({
   count
 });
 
+// Try to skip an autolink or HTML inline starting at '<'.
+// Returns the position after '>', or -1 if not a valid <...> construct.
+_skip_angle_bracket :: (fn(src_bytes: ArrayList(u8), pos: i32, max: i32) -> i32)({
+  (p : i32) = (pos + i32(1));
+  while (p < max), {
+    (ch : i32) = i32(src_bytes.get(usize(p)).unwrap());
+    cond(
+      (ch == i32(0x3E)) => {
+        return (p + i32(1));
+      },
+      (ch == i32(0x3C)) => {
+        return i32(-1);
+      },
+      ((ch == i32(0x0A)) || (ch == i32(0x0D))) => {
+        return i32(-1);
+      },
+      true => {
+        p = (p + i32(1));
+      }
+    );
+  };
+  i32(-1)
+});
+
+// Skip a backtick code span starting at pos. Returns position after the closing backticks.
+_skip_code_span :: (fn(src_bytes: ArrayList(u8), pos: i32, max: i32) -> i32)({
+  (open_count : i32) = _count_backticks(src_bytes, pos, max);
+  (scan_pos : i32) = (pos + open_count);
+  (found_close : bool) = false;
+  while (((scan_pos < max) && !(found_close))), {
+    if((i32(src_bytes.get(usize(scan_pos)).unwrap()) == i32(0x60)), {
+      (close_count : i32) = _count_backticks(src_bytes, scan_pos, max);
+      if((close_count == open_count), {
+        found_close = true;
+        scan_pos = (scan_pos + close_count);
+      }, {
+        scan_pos = (scan_pos + close_count);
+      });
+    }, {
+      scan_pos = (scan_pos + i32(1));
+    });
+  };
+  scan_pos
+});
+
 // Parse a link label starting at position `start` (which should point to '[').
 // Returns the position of the closing ']', or -1 if not found.
-// `disable_nested` — if true, returns -1 when nested brackets are found.
+// `disable_nested` — if true, returns -1 when nested link/image tokens are found
+// (but plain nested brackets are allowed, matching JS skipToken behavior).
 parse_link_label :: (fn(src_bytes: ArrayList(u8), start: i32, pos_max: i32, disable_nested: bool) -> i32)({
   (max : i32) = pos_max;
   (pos : i32) = (start + i32(1));
@@ -49,33 +92,60 @@ parse_link_label :: (fn(src_bytes: ArrayList(u8), start: i32, pos_max: i32, disa
         });
         pos = (pos + i32(1));
       },
-      // Opening bracket
+      // Opening bracket — check if it starts a nested link token
       (marker == i32(0x5B)) => {
         if(disable_nested, {
-          return i32(-1);
+          // Use recur to find matching ']' (without disableNested to avoid infinite recursion)
+          (inner_end : i32) = recur(src_bytes, pos, max, false);
+          if((inner_end >= i32(0)), {
+            (after : i32) = (inner_end + i32(1));
+            if((after < max), {
+              (next_ch : i32) = i32(src_bytes.get(usize(after)).unwrap());
+              // Check if followed by '(' (inline link) — scan for matching ')'
+              if((next_ch == i32(0x28)), {
+                (p : i32) = (after + i32(1));
+                (depth : i32) = i32(1);
+                while (((p < max) && (depth > i32(0)))), {
+                  (ch : i32) = i32(src_bytes.get(usize(p)).unwrap());
+                  cond(
+                    (ch == i32(0x5C)) => { p = (p + i32(2)); },
+                    (ch == i32(0x28)) => { depth = (depth + i32(1)); p = (p + i32(1)); },
+                    (ch == i32(0x29)) => { depth = (depth - i32(1)); p = (p + i32(1)); },
+                    true => { p = (p + i32(1)); }
+                  );
+                };
+                if((depth == i32(0)), {
+                  // Found complete [text](url) — nested link, disallow
+                  return i32(-1);
+                });
+              });
+              // Check if followed by '[' (reference link)
+              if((next_ch == i32(0x5B)), {
+                (ref_end : i32) = recur(src_bytes, after, max, false);
+                if((ref_end >= i32(0)), {
+                  // Found complete [text][ref] — nested link, disallow
+                  return i32(-1);
+                });
+              });
+            });
+          });
         });
+        // Plain bracket — just track nesting level
         level = (level + i32(1));
         pos = (pos + i32(1));
       },
       // Backtick — skip code span
       (marker == i32(0x60)) => {
-        (open_count : i32) = _count_backticks(src_bytes, pos, max);
-        (scan_pos : i32) = (pos + open_count);
-        (found_close : bool) = false;
-        while (((scan_pos < max) && !(found_close))), {
-          if((i32(src_bytes.get(usize(scan_pos)).unwrap()) == i32(0x60)), {
-            (close_count : i32) = _count_backticks(src_bytes, scan_pos, max);
-            if((close_count == open_count), {
-              found_close = true;
-              scan_pos = (scan_pos + close_count);
-            }, {
-              scan_pos = (scan_pos + close_count);
-            });
-          }, {
-            scan_pos = (scan_pos + i32(1));
-          });
-        };
-        pos = scan_pos;
+        pos = _skip_code_span(src_bytes, pos, max);
+      },
+      // Angle bracket — skip autolink or HTML inline <...>
+      (marker == i32(0x3C)) => {
+        (skip_end : i32) = _skip_angle_bracket(src_bytes, pos, max);
+        if((skip_end > i32(0)), {
+          pos = skip_end;
+        }, {
+          pos = (pos + i32(1));
+        });
       },
       // Any other character
       true => {
