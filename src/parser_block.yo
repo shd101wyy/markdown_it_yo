@@ -54,7 +54,7 @@ _block_tokenize :: (fn(state: *(StateBlock), start_line: i32, end_line: i32) -> 
 
   (line : i32) = start_line;
   (max_nesting : i32) = i32(100);
-  (prev_line_was_empty : bool) = false;
+  (has_empty_lines : bool) = false;
 
   while (line < end_line), {
     // JS: state.line = line = state.skipEmptyLines(line)
@@ -87,12 +87,13 @@ _block_tokenize :: (fn(state: *(StateBlock), start_line: i32, end_line: i32) -> 
     if(!(ok), { ok = lheading(state, line, end_line, false, (&para_terminators)); });
     if(!(ok), { ok = paragraph(state, line, end_line, false, (&para_terminators)); });
 
-    if(ok, {
-      // Track tight mode: if previous line was empty, mark as not tight
-      if(prev_line_was_empty, {
-        state.*.tight = false;
-      });
-      prev_line_was_empty = false;
+    // Set state.tight based on whether empty lines have been seen before this tag.
+    // i.e. latest empty line should not count (matches JS: state.tight = !hasEmptyLines)
+    state.*.tight = !(has_empty_lines);
+
+    // Paragraph might "eat" one newline after it in nested lists
+    if(state.*.is_empty((state.*.line - i32(1))), {
+      has_empty_lines = true;
     });
 
     // Update line from state (rule should have advanced it)
@@ -103,7 +104,7 @@ _block_tokenize :: (fn(state: *(StateBlock), start_line: i32, end_line: i32) -> 
 
     // Check for empty line after the matched rule
     if(((line < end_line) && state.*.is_empty(line)), {
-      prev_line_was_empty = true;
+      has_empty_lines = true;
       line = (line + i32(1));
       state.*.line = line;
     });

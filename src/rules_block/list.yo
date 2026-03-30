@@ -7,6 +7,20 @@ open import "std/string";
 { Token, StringPair } :: import "../token.yo";
 { StateBlock, BlockTokenizeFn, block_push_token } :: import "./state_block.yo";
 { isSpace } :: import "../common/utils.yo";
+{ fence } :: import "./fence.yo";
+{ hr } :: import "./hr.yo";
+
+// Inline blockquote-start check to avoid circular import with blockquote.yo.
+// Replicates blockquote() in silent mode.
+_is_blockquote_start :: (fn(state: *(StateBlock), line: i32) -> bool)({
+  if(((state.*.s_count.get(usize(line)).unwrap() - state.*.blk_indent) >= i32(4)), {
+    return false;
+  });
+  (pos : i32) = (state.*.b_marks.get(usize(line)).unwrap() + state.*.t_shift.get(usize(line)).unwrap());
+  (max : i32) = state.*.e_marks.get(usize(line)).unwrap();
+  if((pos >= max), { return false; });
+  (i32(state.*._src_bytes.get(usize(pos)).unwrap()) == i32(0x3E))
+});
 
 // Search [-+*][\n ], returns next pos after marker on success, or -1 on fail.
 skip_bullet_list_marker :: (fn(state: *(StateBlock), start_line: i32) -> i32)({
@@ -330,7 +344,14 @@ list :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: bool) 
       });
     });
 
-    // No terminator rules check (getRules('list') returns empty in markdown-it default preset)
+    // Check terminator rules: fence, blockquote, hr can interrupt a list
+    if(!(list_done), {
+      if(((fence(state, next_line, end_line, true)
+        || _is_blockquote_start(state, next_line))
+        || hr(state, next_line, end_line, true)), {
+        list_done = true;
+      });
+    });
 
     if(!(list_done), {
       // Check for next list item with same marker style

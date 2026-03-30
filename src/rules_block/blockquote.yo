@@ -7,15 +7,53 @@ open import "std/string";
 { Token } :: import "../token.yo";
 { StateBlock, BlockTokenizeFn, block_push_token } :: import "./state_block.yo";
 { isSpace } :: import "../common/utils.yo";
-{ BlockRuleFn } :: import "./lheading.yo";
+{ fence } :: import "./fence.yo";
+{ hr } :: import "./hr.yo";
+{ html_block } :: import "./html_block.yo";
+{ heading } :: import "./heading.yo";
 
-// Blockquote terminator rules — block rules that can interrupt a blockquote.
-// These are called in silent mode to check if a new block element starts.
-_bq_terminator_code :: (fn(state: *(StateBlock), line: i32, end: i32, silent: bool) -> bool)({
-  // Indented code — 4+ spaces relative to blk_indent
+// Inline list-start check to avoid circular import with list.yo.
+// Replicates list() in silent mode when parent_type != "paragraph".
+_is_list_start :: (fn(state: *(StateBlock), line: i32) -> bool)({
+  if(((state.*.s_count.get(usize(line)).unwrap() - state.*.blk_indent) >= i32(4)), {
+    return false;
+  });
+  if(((state.*.list_indent >= i32(0)) && (((state.*.s_count.get(usize(line)).unwrap() - state.*.list_indent) >= i32(4)) && (state.*.s_count.get(usize(line)).unwrap() < state.*.blk_indent))), {
+    return false;
+  });
+  (max : i32) = state.*.e_marks.get(usize(line)).unwrap();
   (pos : i32) = (state.*.b_marks.get(usize(line)).unwrap() + state.*.t_shift.get(usize(line)).unwrap());
-  if((pos >= state.*.e_marks.get(usize(line)).unwrap()), { return false; });
-  ((state.*.s_count.get(usize(line)).unwrap() - state.*.blk_indent) >= i32(4))
+  if((pos >= max), { return false; });
+  (ch : i32) = i32(state.*._src_bytes.get(usize(pos)).unwrap());
+  // Bullet: -, +, *
+  if((((ch == i32(0x2A)) || (ch == i32(0x2D))) || (ch == i32(0x2B))), {
+    if(((pos + i32(1)) < max), {
+      if(!(isSpace(i32(state.*._src_bytes.get(usize((pos + i32(1)))).unwrap()))), {
+        return false;
+      });
+    });
+    return true;
+  });
+  // Ordered: digit(s) then . or )
+  if(((ch < i32(0x30)) || (ch > i32(0x39))), { return false; });
+  (opos : i32) = (pos + i32(1));
+  (found : bool) = false;
+  while !(found), {
+    if((opos >= max), { return false; });
+    ch = i32(state.*._src_bytes.get(usize(opos)).unwrap());
+    opos = (opos + i32(1));
+    if(((ch >= i32(0x30)) && (ch <= i32(0x39))), {
+      if(((opos - pos) >= i32(10)), { return false; });
+    }, if(((ch == i32(0x29)) || (ch == i32(0x2E))), {
+      found = true;
+    }, {
+      return false;
+    }));
+  };
+  if((opos < max), {
+    if(!(isSpace(i32(state.*._src_bytes.get(usize(opos)).unwrap()))), { return false; });
+  });
+  true
 });
 
 blockquote :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: bool) -> bool)({
@@ -41,10 +79,6 @@ blockquote :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: 
   (old_bs_count : ArrayList(i32)) = ArrayList(i32).new();
   (old_s_count : ArrayList(i32)) = ArrayList(i32).new();
   (old_t_shift : ArrayList(i32)) = ArrayList(i32).new();
-
-  // Build terminator rules (rules that can interrupt blockquote, checked in silent mode)
-  (terminator_rules : ArrayList(BlockRuleFn)) = ArrayList(BlockRuleFn).new();
-  _ := terminator_rules.push(_bq_terminator_code);
 
   (old_parent_type : String) = state.*.parent_type;
   state.*.parent_type = `blockquote`;
@@ -130,16 +164,13 @@ blockquote :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: 
       bq_done = true;
     }, {
       // Case 3: another tag found — check terminators
-      (terminate : bool) = false;
-      (ti : i32) = i32(0);
-      (tl : i32) = i32(terminator_rules.len());
-      while ((ti < tl) && !(terminate)), {
-        (rule : BlockRuleFn) = terminator_rules.get(usize(ti)).unwrap();
-        if(rule(state, next_line, end_line, true), {
-          terminate = true;
-        });
-        ti = (ti + i32(1));
-      };
+      // Terminators for blockquote: fence, blockquote (self/recur), hr, list, html_block, heading
+      (terminate : bool) = (((((fence(state, next_line, end_line, true)
+        || recur(state, next_line, end_line, true))
+        || hr(state, next_line, end_line, true))
+        || _is_list_start(state, next_line))
+        || html_block(state, next_line, end_line, true))
+        || heading(state, next_line, end_line, true));
 
       if(terminate, {
         // Hard termination: limit lineMax to prevent paragraph continuation
