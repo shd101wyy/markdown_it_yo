@@ -1,0 +1,61 @@
+// Ported from: lib/rules_inline/text.mjs (markdown-it v14.1.1)
+//
+// Skip text characters for text token, place those to pending buffer
+// and increment current pos.
+
+open import "std/string";
+{ ArrayList } :: import "std/collections/array_list";
+{ StateInline } :: import "./state_inline.yo";
+
+// Check if character is a terminator that ends a text run.
+// '{}$%@~+=:' reserved for extensions
+is_terminator_char :: (fn(ch: i32) -> bool)(
+  cond(
+    (ch == i32(0x0A)) => true,
+    (ch == i32(0x21)) => true,
+    (ch == i32(0x23)) => true,
+    (ch == i32(0x24)) => true,
+    (ch == i32(0x25)) => true,
+    (ch == i32(0x26)) => true,
+    (ch == i32(0x2A)) => true,
+    (ch == i32(0x2B)) => true,
+    (ch == i32(0x2D)) => true,
+    (ch == i32(0x3A)) => true,
+    (ch == i32(0x3C)) => true,
+    (ch == i32(0x3D)) => true,
+    (ch == i32(0x3E)) => true,
+    (ch == i32(0x40)) => true,
+    (ch == i32(0x5B)) => true,
+    (ch == i32(0x5C)) => true,
+    (ch == i32(0x5D)) => true,
+    (ch == i32(0x5E)) => true,
+    (ch == i32(0x5F)) => true,
+    (ch == i32(0x60)) => true,
+    (ch == i32(0x7B)) => true,
+    (ch == i32(0x7D)) => true,
+    (ch == i32(0x7E)) => true,
+    true => false
+  )
+);
+
+text :: (fn(state: *(StateInline), silent: bool) -> bool)({
+  (pos : i32) = state.*.pos;
+
+  while ((pos < state.*.pos_max) && !(is_terminator_char(i32(state.*._src_bytes.get(usize(pos)).unwrap())))), {
+    pos = (pos + i32(1));
+  };
+
+  if((pos == state.*.pos), {
+    return false;
+  });
+
+  if(!(silent), {
+    (text_bytes : ArrayList(u8)) = state.*._src_bytes.slice(usize(state.*.pos), usize(pos)).unwrap();
+    state.*.pending = `${state.*.pending}${String.from_bytes(text_bytes)}`;
+  });
+
+  state.*.pos = pos;
+  true
+});
+
+export text, is_terminator_char;

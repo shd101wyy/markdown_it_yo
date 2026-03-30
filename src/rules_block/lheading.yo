@@ -1,0 +1,139 @@
+// Ported from: lib/rules_block/lheading.mjs (markdown-it v14.1.1)
+//
+// Setext headings (---, ===)
+
+open import "std/string";
+{ ArrayList } :: import "std/collections/array_list";
+{ Token } :: import "../token.yo";
+{ StateBlock } :: import "./state_block.yo";
+
+// Block rule function type: (state, startLine, endLine, silent) -> bool
+BlockRuleFn :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: bool) -> bool);
+
+// Setext heading rule
+// terminator_rules: pointer to array of block rules that can terminate a paragraph
+lheading :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: bool,
+               terminator_rules: *(ArrayList(BlockRuleFn))) -> bool)({
+  // if it's indented more than 3 spaces, it should be a code block
+  if(((state.*.s_count.get(usize(start_line)).unwrap() - state.*.blk_indent) >= i32(4)), {
+    return false;
+  });
+
+  (old_parent_type : String) = state.*.parent_type;
+  state.*.parent_type = `paragraph`;
+
+  // jump line-by-line until empty one or EOF
+  (level : i32) = i32(0);
+  (marker : i32) = i32(0);
+  (next_line : i32) = (start_line + i32(1));
+
+  (searching : bool) = true;
+  while (((next_line < end_line) && (!(state.*.is_empty(next_line)))) && searching), {
+    // this would be a code block normally, but after paragraph
+    // it's considered a lazy continuation regardless of what's there
+    if(((state.*.s_count.get(usize(next_line)).unwrap() - state.*.blk_indent) > i32(3)), {
+      next_line = (next_line + i32(1));
+    }, {
+      // Check for underline in setext header
+      (found_underline : bool) = false;
+      if((state.*.s_count.get(usize(next_line)).unwrap() >= state.*.blk_indent), {
+        (pos : i32) = (state.*.b_marks.get(usize(next_line)).unwrap() + state.*.t_shift.get(usize(next_line)).unwrap());
+        (max : i32) = state.*.e_marks.get(usize(next_line)).unwrap();
+
+        if((pos < max), {
+          marker = i32(state.*._src_bytes.get(usize(pos)).unwrap());
+
+          if(((marker == i32(0x2D)) || (marker == i32(0x3D))), {
+            pos = state.*.skip_chars(pos, marker);
+            pos = state.*.skip_spaces(pos);
+
+            if((pos >= max), {
+              level = cond(
+                (marker == i32(0x3D)) => i32(1),
+                true => i32(2)
+              );
+              found_underline = true;
+            });
+          });
+        });
+      });
+
+      if(found_underline, {
+        searching = false;
+      }, {
+        // quirk for blockquotes, this line should already be checked by that rule
+        if((state.*.s_count.get(usize(next_line)).unwrap() < i32(0)), {
+          next_line = (next_line + i32(1));
+        }, {
+          // Some tags can terminate paragraph without empty line.
+          (terminate : bool) = false;
+          (ti : usize) = usize(0);
+          (tlen : usize) = terminator_rules.*.len();
+          while ((ti < tlen) && (!(terminate))), {
+            (rule : BlockRuleFn) = terminator_rules.*.get(ti).unwrap();
+            if(rule(state, next_line, end_line, true), {
+              terminate = true;
+            });
+            ti = (ti + usize(1));
+          };
+          if(terminate, {
+            searching = false;
+          }, {
+            next_line = (next_line + i32(1));
+          });
+        });
+      });
+    });
+  };
+
+  if((level == i32(0)), {
+    // Didn't find valid underline
+    state.*.parent_type = old_parent_type;
+    return false;
+  });
+
+  (content : String) = state.*.get_lines(start_line, next_line, state.*.blk_indent, false).trim();
+
+  state.*.line = (next_line + i32(1));
+
+  (level_str : String) = `${level}`;
+  (h_tag : String) = `h${level_str}`;
+  (marker_str : String) = String.from_bytes({
+    (b : ArrayList(u8)) = ArrayList(u8).new();
+    _ := b.push(u8(marker));
+    b
+  });
+
+  // heading_open
+  (token_o : Token) = Token.new(`heading_open`, h_tag, i32(1));
+  token_o.markup = marker_str;
+  token_o.block = true;
+  (map_o : ArrayList(i32)) = ArrayList(i32).new();
+  _ := map_o.push(start_line);
+  _ := map_o.push(state.*.line);
+  token_o.map = .Some(map_o);
+  state.*.push_token(token_o);
+
+  // inline content
+  (token_i : Token) = Token.new(`inline`, ``, i32(0));
+  token_i.content = content;
+  token_i.block = true;
+  (map_i : ArrayList(i32)) = ArrayList(i32).new();
+  _ := map_i.push(start_line);
+  _ := map_i.push((state.*.line - i32(1)));
+  token_i.map = .Some(map_i);
+  token_i.children = .Some(ArrayList(Token).new());
+  state.*.push_token(token_i);
+
+  // heading_close
+  (token_c : Token) = Token.new(`heading_close`, h_tag, i32(-1));
+  token_c.markup = marker_str;
+  token_c.block = true;
+  state.*.push_token(token_c);
+
+  state.*.parent_type = old_parent_type;
+
+  true
+});
+
+export lheading, BlockRuleFn;

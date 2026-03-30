@@ -1,0 +1,79 @@
+// Ported from: lib/rules_block/hr.mjs (markdown-it v14.1.1)
+//
+// Horizontal rule (---, ***, ___)
+
+open import "std/string";
+{ ArrayList } :: import "std/collections/array_list";
+{ Token } :: import "../token.yo";
+{ StateBlock } :: import "./state_block.yo";
+{ isSpace } :: import "../common/utils.yo";
+
+// Horizontal rule block rule
+hr :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: bool) -> bool)({
+  (max : i32) = state.*.e_marks.get(usize(start_line)).unwrap();
+
+  // if it's indented more than 3 spaces, it should be a code block
+  if(((state.*.s_count.get(usize(start_line)).unwrap() - state.*.blk_indent) >= i32(4)), {
+    return false;
+  });
+
+  (pos : i32) = (state.*.b_marks.get(usize(start_line)).unwrap() + state.*.t_shift.get(usize(start_line)).unwrap());
+
+  (marker : i32) = i32(state.*._src_bytes.get(usize(pos)).unwrap());
+  pos = (pos + i32(1));
+
+  // Check hr marker: * - _
+  if(((marker != i32(0x2A)) && ((marker != i32(0x2D)) && (marker != i32(0x5F)))), {
+    return false;
+  });
+
+  // markers can be mixed with spaces, but there should be at least 3 of them
+  (cnt : i32) = i32(1);
+  while (pos < max), {
+    (ch : i32) = i32(state.*._src_bytes.get(usize(pos)).unwrap());
+    pos = (pos + i32(1));
+    if(((ch != marker) && (!(isSpace(ch)))), {
+      return false;
+    });
+    if((ch == marker), {
+      cnt = (cnt + i32(1));
+    });
+  };
+
+  if((cnt < i32(3)), {
+    return false;
+  });
+
+  if(silent, {
+    return true;
+  });
+
+  state.*.line = (start_line + i32(1));
+
+  // Build markup string (repeat the marker character cnt+1 times matches JS Array(cnt+1).join())
+  // Actually JS Array(cnt+1).join(char) produces cnt copies of char
+  (markup : String) = ``;
+  (mi : i32) = i32(0);
+  (marker_str : String) = String.from_bytes({
+    (b : ArrayList(u8)) = ArrayList(u8).new();
+    _ := b.push(u8(marker));
+    b
+  });
+  while (mi < cnt), {
+    markup = `${markup}${marker_str}`;
+    mi = (mi + i32(1));
+  };
+
+  (token : Token) = Token.new(`hr`, `hr`, i32(0));
+  token.block = true;
+  token.markup = markup;
+  (map : ArrayList(i32)) = ArrayList(i32).new();
+  _ := map.push(start_line);
+  _ := map.push(state.*.line);
+  token.map = .Some(map);
+  state.*.push_token(token);
+
+  true
+});
+
+export hr;

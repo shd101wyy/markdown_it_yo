@@ -1,0 +1,134 @@
+// Ported from: lib/rules_inline/backticks.mjs (markdown-it v14.1.1)
+//
+// Parse backticks — inline code spans
+
+open import "std/string";
+{ ArrayList } :: import "std/collections/array_list";
+{ HashMap } :: import "std/collections/hash_map";
+{ Token } :: import "../token.yo";
+{ StateInline } :: import "./state_inline.yo";
+{ flush_pending, inline_push_token } :: import "./inline_helpers.yo";
+
+backtick :: (fn(state: *(StateInline), silent: bool) -> bool)({
+  (pos : i32) = state.*.pos;
+  (ch : i32) = i32(state.*._src_bytes.get(usize(pos)).unwrap());
+
+  if((ch != i32(0x60)), {
+    return false;
+  });
+
+  (start : i32) = pos;
+  pos = (pos + i32(1));
+  (max : i32) = state.*.pos_max;
+
+  // scan marker length
+  while (((pos < max) && (i32(state.*._src_bytes.get(usize(pos)).unwrap()) == i32(0x60)))), {
+    pos = (pos + i32(1));
+  };
+
+  (marker : String) = String.from_bytes(state.*._src_bytes.slice(usize(start), usize(pos)).unwrap());
+  (opener_length : i32) = (pos - start);
+
+  // Check cache: if we already scanned and found no closer at this length,
+  // skip if the cached position is past current start
+  if(state.*.backticks_scanned, {
+    (cached : Option(i32)) = state.*.backticks.get(opener_length);
+    match(cached,
+      .Some(cached_pos) => {
+        if((cached_pos <= start), {
+          if(!(silent), {
+            state.*.pending = `${state.*.pending}${marker}`;
+          });
+          state.*.pos = (state.*.pos + opener_length);
+          return true;
+        });
+      },
+      .None => {
+        // No cache entry at this length — fall through to scan
+      }
+    );
+  });
+
+  (match_end : i32) = pos;
+  (found : bool) = false;
+
+  // Scan until the end of the line (or until matching closer is found)
+  while ((found == false)), {
+    // Find next backtick
+    (match_start : i32) = i32(-1);
+    (scan : i32) = match_end;
+    while (((scan < max) && (match_start == i32(-1)))), {
+      if((i32(state.*._src_bytes.get(usize(scan)).unwrap()) == i32(0x60)), {
+        match_start = scan;
+      }, {
+        scan = (scan + i32(1));
+      });
+    };
+
+    if((match_start == i32(-1)), {
+      // No more backticks found
+      found = true;
+    }, {
+      match_end = (match_start + i32(1));
+
+      // scan closer length
+      while (((match_end < max) && (i32(state.*._src_bytes.get(usize(match_end)).unwrap()) == i32(0x60)))), {
+        match_end = (match_end + i32(1));
+      };
+
+      (closer_length : i32) = (match_end - match_start);
+
+      if((closer_length == opener_length), {
+        // Found matching closer length.
+        if(!(silent), {
+          // Extract content between opener and closer
+          (content_bytes : ArrayList(u8)) = state.*._src_bytes.slice(usize(pos), usize(match_start)).unwrap();
+          (raw_content : String) = String.from_bytes(content_bytes);
+          // Replace newlines with spaces and strip leading/trailing single space
+          (content : String) = raw_content.replace_all(`\n`, ` `);
+          // Apply the regex-like rule: /^ (.+) $/ → strip one leading + trailing space
+          (content_len : usize) = content.len();
+          if((((content_len >= usize(3)) && (content.starts_with(` `))) && (content.ends_with(` `))), {
+            // Check it's not all spaces
+            (trimmed : String) = content.trim();
+            if((trimmed.len() > usize(0)), {
+              content = content.substring(usize(1), (content_len - usize(1)));
+            });
+          });
+
+          (token : Token) = Token(
+            type_name: `code_inline`,
+            tag: `code`,
+            nesting: i32(0),
+            attrs: .None,
+            map: .None,
+            children: .None,
+            content: content,
+            markup: marker,
+            info: ``,
+            block: false,
+            hidden: false,
+            level: i32(0)
+          );
+          inline_push_token(state, token);
+        });
+        state.*.pos = match_end;
+        return true;
+      });
+
+      // Different length found, cache it as upper limit
+      state.*.backticks.set(closer_length, match_start);
+    });
+  };
+
+  // Scanned through the end, didn't find anything
+  state.*.backticks_scanned = true;
+
+  if(!(silent), {
+    state.*.pending = `${state.*.pending}${marker}`;
+  });
+  state.*.pos = (state.*.pos + opener_length);
+  true
+});
+
+export backtick;

@@ -1,0 +1,131 @@
+// Ported from: lib/rules_block/fence.mjs (markdown-it v14.1.1)
+//
+// Fenced code blocks (``` lang, ~~~ lang)
+
+open import "std/string";
+{ ArrayList } :: import "std/collections/array_list";
+{ Token } :: import "../token.yo";
+{ StateBlock } :: import "./state_block.yo";
+
+// Fenced code block rule
+fence :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: bool) -> bool)({
+  (pos : i32) = (state.*.b_marks.get(usize(start_line)).unwrap() + state.*.t_shift.get(usize(start_line)).unwrap());
+  (max : i32) = state.*.e_marks.get(usize(start_line)).unwrap();
+
+  // if it's indented more than 3 spaces, it should be a code block
+  if(((state.*.s_count.get(usize(start_line)).unwrap() - state.*.blk_indent) >= i32(4)), {
+    return false;
+  });
+
+  if(((pos + i32(3)) > max), {
+    return false;
+  });
+
+  (marker : i32) = i32(state.*._src_bytes.get(usize(pos)).unwrap());
+
+  if(((marker != i32(0x7E)) && (marker != i32(0x60))), {
+    return false;
+  });
+
+  // scan marker length
+  (mem : i32) = pos;
+  pos = state.*.skip_chars(pos, marker);
+
+  (len : i32) = (pos - mem);
+
+  if((len < i32(3)), {
+    return false;
+  });
+
+  // Extract markup and params from source bytes
+  (markup_bytes : ArrayList(u8)) = state.*._src_bytes.slice(usize(mem), usize(pos)).unwrap();
+  (markup : String) = String.from_bytes(markup_bytes);
+  (params_bytes : ArrayList(u8)) = state.*._src_bytes.slice(usize(pos), usize(max)).unwrap();
+  (params : String) = String.from_bytes(params_bytes);
+
+  // if backtick fence, check that params don't contain backticks
+  if((marker == i32(0x60)), {
+    (params_al : ArrayList(u8)) = params.as_bytes();
+    (pi : usize) = usize(0);
+    (has_backtick : bool) = false;
+    while (pi < params_al.len()), {
+      if((params_al.get(pi).unwrap() == u8(0x60)), {
+        has_backtick = true;
+      });
+      pi = (pi + usize(1));
+    };
+    if(has_backtick, {
+      return false;
+    });
+  });
+
+  // Since start is found, we can report success here in validation mode
+  if(silent, {
+    return true;
+  });
+
+  // search end of block
+  (next_line : i32) = start_line;
+  (have_end_marker : bool) = false;
+
+  (searching : bool) = true;
+  while searching, {
+    next_line = (next_line + i32(1));
+    if((next_line >= end_line), {
+      // unclosed block should be autoclosed by end of document
+      searching = false;
+    }, {
+      pos = (state.*.b_marks.get(usize(next_line)).unwrap() + state.*.t_shift.get(usize(next_line)).unwrap());
+      mem = pos;
+      max = state.*.e_marks.get(usize(next_line)).unwrap();
+
+      if(((pos < max) && ((state.*.s_count.get(usize(next_line)).unwrap() - state.*.blk_indent) < i32(0))), {
+        // non-empty line with negative indent should stop the list
+        searching = false;
+      }, {
+        if((i32(state.*._src_bytes.get(usize(pos)).unwrap()) != marker), {
+          // not our marker, continue searching
+          ();
+        }, {
+          if(((state.*.s_count.get(usize(next_line)).unwrap() - state.*.blk_indent) >= i32(4)), {
+            // closing fence should be indented less than 4 spaces
+            ();
+          }, {
+            pos = state.*.skip_chars(pos, marker);
+
+            // closing code fence must be at least as long as the opening one
+            if(((pos - mem) >= len), {
+              // make sure tail has spaces only
+              pos = state.*.skip_spaces(pos);
+
+              if((pos >= max), {
+                have_end_marker = true;
+                searching = false;
+              });
+            });
+          });
+        });
+      });
+    });
+  };
+
+  // If a fence has heading spaces, they should be removed from its inner block
+  (fence_indent : i32) = state.*.s_count.get(usize(start_line)).unwrap();
+
+  state.*.line = (next_line + cond(have_end_marker => i32(1), true => i32(0)));
+
+  (token : Token) = Token.new(`fence`, `code`, i32(0));
+  token.info = params;
+  token.content = state.*.get_lines((start_line + i32(1)), next_line, fence_indent, true);
+  token.markup = markup;
+  token.block = true;
+  (map : ArrayList(i32)) = ArrayList(i32).new();
+  _ := map.push(start_line);
+  _ := map.push(state.*.line);
+  token.map = .Some(map);
+  state.*.push_token(token);
+
+  true
+});
+
+export fence;

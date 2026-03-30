@@ -1,0 +1,258 @@
+// Test for inline rules: text, newline, escape, backticks
+open import "std/string";
+open import "std/fmt";
+{ ArrayList } :: import "std/collections/array_list";
+{ Token, StringPair } :: import "../src/token.yo";
+{ StateInline, new_state_inline } :: import "../src/rules_inline/state_inline.yo";
+{ text, is_terminator_char } :: import "../src/rules_inline/text.yo";
+{ newline } :: import "../src/rules_inline/newline.yo";
+{ escape_rule } :: import "../src/rules_inline/escape.yo";
+{ backtick } :: import "../src/rules_inline/backticks.yo";
+{ flush_pending } :: import "../src/rules_inline/inline_helpers.yo";
+
+// Helper to create a StateInline for testing
+make_state :: (fn(src: String) -> StateInline)(
+  {
+    (tokens : ArrayList(Token)) = ArrayList(Token).new();
+    (stack_var : i32) = i32(0);
+    new_state_inline(src, *(void)((&stack_var)), tokens)
+  }
+);
+
+main :: (fn() -> unit)({
+  // ============================================================
+  // Test 1: is_terminator_char
+  // ============================================================
+  println(`Test 1: is_terminator_char`);
+  assert(is_terminator_char(i32(0x0A)), "\\n should be terminator");
+  assert(is_terminator_char(i32(0x5C)), "\\ should be terminator");
+  assert(is_terminator_char(i32(0x60)), "` should be terminator");
+  assert(!(is_terminator_char(i32(0x41))), "A should not be terminator");
+  assert(!(is_terminator_char(i32(0x20))), "space should not be terminator");
+  println(`  PASS`);
+
+  // ============================================================
+  // Test 2: text rule — simple text
+  // ============================================================
+  println(`Test 2: text rule - simple text`);
+  {
+    (state : StateInline) = make_state(`hello world`);
+    (result : bool) = text((&state), false);
+    assert(result, "text should return true");
+    assert((state.pending == `hello world`), "pending should be 'hello world'");
+    assert((state.pos == i32(11)), "pos should be 11 (end of string)");
+  };
+  println(`  PASS`);
+
+  // ============================================================
+  // Test 3: text rule — stops at terminator
+  // ============================================================
+  println(`Test 3: text rule - stops at terminator`);
+  {
+    (state : StateInline) = make_state(`abc*def`);
+    (result : bool) = text((&state), false);
+    assert(result, "text should return true");
+    assert((state.pending == `abc`), "pending should be 'abc'");
+    assert((state.pos == i32(3)), "pos should be 3 (stopped at *)");
+  };
+  println(`  PASS`);
+
+  // ============================================================
+  // Test 4: text rule — all terminators, returns false
+  // ============================================================
+  println(`Test 4: text rule - starts at terminator`);
+  {
+    (state : StateInline) = make_state(`*bold*`);
+    (result : bool) = text((&state), false);
+    assert(!(result), "text should return false when pos is at terminator");
+  };
+  println(`  PASS`);
+
+  // ============================================================
+  // Test 5: text rule — silent mode
+  // ============================================================
+  println(`Test 5: text rule - silent mode`);
+  {
+    (state : StateInline) = make_state(`hello*world`);
+    (result : bool) = text((&state), true);
+    assert(result, "text should return true in silent mode");
+    assert((state.pending == ``), "pending should be empty in silent mode");
+    assert((state.pos == i32(5)), "pos should advance even in silent mode");
+  };
+  println(`  PASS`);
+
+  // ============================================================
+  // Test 6: escape rule — escaped char
+  // ============================================================
+  println(`Test 6: escape rule - escaped char`);
+  {
+    (state : StateInline) = make_state(String.from("\\*rest"));
+    (result : bool) = escape_rule((&state), false);
+    assert(result, "escape should return true");
+    assert((state.pos == i32(2)), "pos should be 2");
+    flush_pending((&state));
+    assert((state.tokens.len() == usize(1)), "should have 1 token");
+    (tok : Token) = state.tokens.get(usize(0)).unwrap();
+    assert((tok.type_name == `text_special`), "token type should be text_special");
+    assert((tok.content == `*`), "content should be the escaped char");
+    assert((tok.markup == String.from("\\*")), "markup should be backslash star");
+    assert((tok.info == `escape`), "info should be escape");
+  };
+  println(`  PASS`);
+
+  // ============================================================
+  // Test 7: escape rule — non-escapable char
+  // ============================================================
+  println(`Test 7: escape rule - non-escapable char`);
+  {
+    (state : StateInline) = make_state(String.from("\\arest"));
+    (result : bool) = escape_rule((&state), false);
+    assert(result, "escape should return true");
+    assert((state.pos == i32(2)), "pos should be 2");
+    flush_pending((&state));
+    assert((state.tokens.len() == usize(1)), "should have 1 token");
+    (tok : Token) = state.tokens.get(usize(0)).unwrap();
+    assert((tok.content == String.from("\\a")), "non-escapable char should keep backslash");
+  };
+  println(`  PASS`);
+
+  // ============================================================
+  // Test 8: escape rule — backslash newline → hardbreak
+  // ============================================================
+  println(`Test 8: escape rule - backslash newline`);
+  {
+    (state : StateInline) = make_state(String.from("\\\nrest"));
+    (result : bool) = escape_rule((&state), false);
+    assert(result, "escape should return true");
+    // Should have pushed hardbreak token
+    flush_pending((&state));
+    assert((state.tokens.len() == usize(1)), "should have 1 token");
+    (tok : Token) = state.tokens.get(usize(0)).unwrap();
+    assert((tok.type_name == `hardbreak`), "token type should be hardbreak");
+    assert((tok.tag == `br`), "tag should be br");
+    // pos should skip \n and any leading whitespace
+    assert((state.pos == i32(2)), "pos should skip past newline to 'r'");
+  };
+  println(`  PASS`);
+
+  // ============================================================
+  // Test 9: escape rule — not a backslash
+  // ============================================================
+  println(`Test 9: escape rule - not a backslash`);
+  {
+    (state : StateInline) = make_state(`hello`);
+    (result : bool) = escape_rule((&state), false);
+    assert(!(result), "escape should return false for non-backslash");
+  };
+  println(`  PASS`);
+
+  // ============================================================
+  // Test 10: backtick rule — simple code span
+  // ============================================================
+  println(`Test 10: backtick rule - simple code span`);
+  {
+    (state : StateInline) = make_state(String.from("`code`"));
+    (result : bool) = backtick((&state), false);
+    assert(result, "backtick should return true");
+    assert((state.pos == i32(6)), "pos should be at end");
+    flush_pending((&state));
+    assert((state.tokens.len() == usize(1)), "should have 1 token");
+    (tok : Token) = state.tokens.get(usize(0)).unwrap();
+    assert((tok.type_name == `code_inline`), "token type should be code_inline");
+    assert((tok.tag == `code`), "tag should be code");
+    assert((tok.content == `code`), "content should be 'code'");
+    assert((tok.markup == String.from("`")), "markup should be backtick");
+  };
+  println(`  PASS`);
+
+  // ============================================================
+  // Test 11: backtick rule — double backtick
+  // ============================================================
+  println(`Test 11: backtick rule - double backtick`);
+  {
+    (state : StateInline) = make_state(String.from("``code span``"));
+    (result : bool) = backtick((&state), false);
+    assert(result, "backtick should return true");
+    assert((state.pos == i32(13)), "pos should be at end");
+    flush_pending((&state));
+    assert((state.tokens.len() == usize(1)), "should have 1 token");
+    (tok : Token) = state.tokens.get(usize(0)).unwrap();
+    assert((tok.content == `code span`), "content should be 'code span'");
+    assert((tok.markup == String.from("``")), "markup should be double backtick");
+  };
+  println(`  PASS`);
+
+  // ============================================================
+  // Test 12: backtick rule — no matching closer
+  // ============================================================
+  println(`Test 12: backtick rule - no matching closer`);
+  {
+    (state : StateInline) = make_state(String.from("`no close"));
+    (result : bool) = backtick((&state), false);
+    assert(result, "backtick should return true (adds to pending)");
+    assert((state.pos == i32(1)), "pos should advance by opener length");
+    assert((state.pending == String.from("`")), "pending should have the backtick");
+    assert(state.backticks_scanned, "backticks_scanned should be true");
+  };
+  println(`  PASS`);
+
+  // ============================================================
+  // Test 13: backtick rule — content with spaces stripped
+  // ============================================================
+  println(`Test 13: backtick rule - space stripping`);
+  {
+    (state : StateInline) = make_state(String.from("` code `"));
+    (result : bool) = backtick((&state), false);
+    assert(result, "backtick should return true");
+    flush_pending((&state));
+    (tok : Token) = state.tokens.get(usize(0)).unwrap();
+    assert((tok.content == `code`), "single leading+trailing space should be stripped");
+  };
+  println(`  PASS`);
+
+  // ============================================================
+  // Test 14: newline rule — softbreak
+  // ============================================================
+  println(`Test 14: newline rule - softbreak`);
+  {
+    (state : StateInline) = make_state(String.from("a\nb"));
+    state.pos = i32(1);
+    state.pending = `a`;
+    (result : bool) = newline((&state), false);
+    assert(result, "newline should return true");
+    assert((state.pos == i32(2)), "pos should advance past newline");
+    // Should have flushed pending 'a' + pushed softbreak
+    assert((state.tokens.len() == usize(2)), "should have 2 tokens (text + softbreak)");
+    (tok0 : Token) = state.tokens.get(usize(0)).unwrap();
+    assert((tok0.type_name == `text`), "first token should be text");
+    assert((tok0.content == `a`), "text content should be 'a'");
+    (tok1 : Token) = state.tokens.get(usize(1)).unwrap();
+    assert((tok1.type_name == `softbreak`), "second token should be softbreak");
+  };
+  println(`  PASS`);
+
+  // ============================================================
+  // Test 15: newline rule — hardbreak with trailing spaces
+  // ============================================================
+  println(`Test 15: newline rule - hardbreak`);
+  {
+    (state : StateInline) = make_state(String.from("a  \nb"));
+    state.pos = i32(3);
+    state.pending = `a  `;
+    (result : bool) = newline((&state), false);
+    assert(result, "newline should return true");
+    assert((state.pos == i32(4)), "pos should advance past newline");
+    // Check tokens: flushed trimmed text + hardbreak
+    assert((state.tokens.len() == usize(2)), "should have 2 tokens");
+    (tok0 : Token) = state.tokens.get(usize(0)).unwrap();
+    assert((tok0.type_name == `text`), "first token should be text");
+    assert((tok0.content == `a`), "text should be trimmed to 'a'");
+    (tok1 : Token) = state.tokens.get(usize(1)).unwrap();
+    assert((tok1.type_name == `hardbreak`), "second token should be hardbreak");
+  };
+  println(`  PASS`);
+
+  println(`\nAll inline rule tests passed!`);
+});
+
+export main;

@@ -1,0 +1,331 @@
+// Ported from: lib/rules_block/table.mjs (markdown-it v14.1.1)
+//
+// GFM table, https://github.github.com/gfm/#tables-extension-
+
+open import "std/string";
+{ ArrayList } :: import "std/collections/array_list";
+{ Token, StringPair } :: import "../token.yo";
+{ StateBlock } :: import "./state_block.yo";
+{ BlockRuleFn } :: import "./lheading.yo";
+{ isSpace } :: import "../common/utils.yo";
+{ table_get_line, escaped_split } :: import "./table_helpers.yo";
+
+// Type alias to work around Yo evaluator cache bug with fn type aliases in generic params
+RuleList :: ArrayList(BlockRuleFn);
+
+// Limit the amount of empty autocompleted cells in a table
+MAX_AUTOCOMPLETED_CELLS :: i32(0x10000);
+
+// GFM table rule
+// terminator_rules: pointer to array of block rules that can terminate a table
+table :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: bool, terminator_rules: *(RuleList)) -> bool)({
+  // should have at least two lines
+  if(((start_line + i32(2)) > end_line), {
+    return false;
+  });
+
+  (next_line : i32) = (start_line + i32(1));
+
+  if((state.*.s_count.get(usize(next_line)).unwrap() < state.*.blk_indent), {
+    return false;
+  });
+
+  // if it's indented more than 3 spaces, it should be a code block
+  if(((state.*.s_count.get(usize(next_line)).unwrap() - state.*.blk_indent) >= i32(4)), {
+    return false;
+  });
+
+  // first character of the second line should be '|', '-', ':',
+  // and no other characters are allowed but spaces;
+  // basically, this is the equivalent of /^[-:|][-:|\s]*$/
+  (pos : i32) = (state.*.b_marks.get(usize(next_line)).unwrap() + state.*.t_shift.get(usize(next_line)).unwrap());
+  if((pos >= state.*.e_marks.get(usize(next_line)).unwrap()), {
+    return false;
+  });
+
+  (first_ch : i32) = i32(state.*._src_bytes.get(usize(pos)).unwrap());
+  pos = (pos + i32(1));
+  if((((first_ch != i32(0x7C)) && (first_ch != i32(0x2D))) && (first_ch != i32(0x3A))), {
+    return false;
+  });
+
+  if((pos >= state.*.e_marks.get(usize(next_line)).unwrap()), {
+    return false;
+  });
+
+  (second_ch : i32) = i32(state.*._src_bytes.get(usize(pos)).unwrap());
+  pos = (pos + i32(1));
+  if(((((second_ch != i32(0x7C)) && (second_ch != i32(0x2D))) && (second_ch != i32(0x3A))) && !(isSpace(second_ch))), {
+    return false;
+  });
+
+  // if first character is '-', then second character must not be a space
+  if(((first_ch == i32(0x2D)) && isSpace(second_ch)), {
+    return false;
+  });
+
+  // check remaining chars on separator line
+  (check_pos : i32) = pos;
+  (sep_valid : bool) = true;
+  while ((check_pos < state.*.e_marks.get(usize(next_line)).unwrap()) && sep_valid), {
+    (ch : i32) = i32(state.*._src_bytes.get(usize(check_pos)).unwrap());
+    if(((((ch != i32(0x7C)) && (ch != i32(0x2D))) && (ch != i32(0x3A))) && !(isSpace(ch))), {
+      sep_valid = false;
+    }, {
+      check_pos = (check_pos + i32(1));
+    });
+  };
+  if(!(sep_valid), {
+    return false;
+  });
+
+  // Parse alignment info from separator line
+  (line_text : String) = table_get_line((&state.*), (start_line + i32(1)));
+  (columns : ArrayList(String)) = line_text.split(`|`);
+  (aligns : ArrayList(String)) = ArrayList(String).new();
+
+  (ci : i32) = i32(0);
+  (col_valid : bool) = true;
+  while ((ci < i32(columns.len())) && col_valid), {
+    (t : String) = columns.get(usize(ci)).unwrap().trim();
+    if((t.len() == usize(0)), {
+      // allow empty columns before and after table, but not in between
+      if(((ci == i32(0)) || (ci == (i32(columns.len()) - i32(1)))), {
+        ci = (ci + i32(1));
+      }, {
+        col_valid = false;
+      });
+    }, {
+      // Check pattern: /^:?-+:?$/
+      (t_bytes : ArrayList(u8)) = t.as_bytes();
+      (t_len : i32) = i32(t_bytes.len());
+      (ti : i32) = i32(0);
+      (first_colon : bool) = (i32(t_bytes.get(usize(0)).unwrap()) == i32(0x3A));
+      if(first_colon, {
+        ti = i32(1);
+      });
+      (has_dash : bool) = false;
+      (pattern_ok : bool) = true;
+      while ((ti < t_len) && pattern_ok), {
+        (tc : i32) = i32(t_bytes.get(usize(ti)).unwrap());
+        if((tc == i32(0x2D)), {
+          has_dash = true;
+          ti = (ti + i32(1));
+        }, {
+          if(((tc == i32(0x3A)) && (ti == (t_len - i32(1)))), {
+            ti = (ti + i32(1));
+          }, {
+            pattern_ok = false;
+          });
+        });
+      };
+      if((!(pattern_ok) || !(has_dash)), {
+        col_valid = false;
+      }, {
+        (last_colon : bool) = (i32(t_bytes.get(usize((t_len - i32(1)))).unwrap()) == i32(0x3A));
+        if(last_colon, {
+          if(first_colon, {
+            _ := aligns.push(`center`);
+          }, {
+            _ := aligns.push(`right`);
+          });
+        }, {
+          if(first_colon, {
+            _ := aligns.push(`left`);
+          }, {
+            _ := aligns.push(``);
+          });
+        });
+        ci = (ci + i32(1));
+      });
+    });
+  };
+  if(!(col_valid), {
+    return false;
+  });
+
+  // Parse header row
+  (header_text : String) = table_get_line((&state.*), start_line).trim();
+  if(header_text.index_of(`|`).is_none(), {
+    return false;
+  });
+  if(((state.*.s_count.get(usize(start_line)).unwrap() - state.*.blk_indent) >= i32(4)), {
+    return false;
+  });
+
+  (header_columns : ArrayList(String)) = escaped_split(header_text);
+  // trim leading empty
+  if(((header_columns.len() > usize(0)) && (header_columns.get(usize(0)).unwrap().len() == usize(0))), {
+    _ := header_columns.remove(usize(0));
+  });
+  // trim trailing empty
+  if(((header_columns.len() > usize(0)) && (header_columns.get(usize((i32(header_columns.len()) - i32(1)))).unwrap().len() == usize(0))), {
+    _ := header_columns.remove(usize((i32(header_columns.len()) - i32(1))));
+  });
+
+  (column_count : i32) = i32(header_columns.len());
+  if(((column_count == i32(0)) || (column_count != i32(aligns.len()))), {
+    return false;
+  });
+
+  if(silent, {
+    return true;
+  });
+
+  (old_parent_type : String) = state.*.parent_type;
+  state.*.parent_type = `table`;
+
+  // table_open
+  (token_to : Token) = Token.new(`table_open`, `table`, i32(1));
+  (table_lines : ArrayList(i32)) = ArrayList(i32).new();
+  _ := table_lines.push(start_line);
+  _ := table_lines.push(i32(0));
+  token_to.map = .Some(table_lines);
+  state.*.push_token(token_to);
+
+  // thead_open
+  (token_tho : Token) = Token.new(`thead_open`, `thead`, i32(1));
+  (thead_map : ArrayList(i32)) = ArrayList(i32).new();
+  _ := thead_map.push(start_line);
+  _ := thead_map.push((start_line + i32(1)));
+  token_tho.map = .Some(thead_map);
+  state.*.push_token(token_tho);
+
+  // tr_open
+  (token_htro : Token) = Token.new(`tr_open`, `tr`, i32(1));
+  (tr_map : ArrayList(i32)) = ArrayList(i32).new();
+  _ := tr_map.push(start_line);
+  _ := tr_map.push((start_line + i32(1)));
+  token_htro.map = .Some(tr_map);
+  state.*.push_token(token_htro);
+
+  // header cells
+  (hi : i32) = i32(0);
+  while (hi < i32(header_columns.len())), {
+    (token_ho : Token) = Token.new(`th_open`, `th`, i32(1));
+    (align_val : String) = aligns.get(usize(hi)).unwrap();
+    if((align_val.len() > usize(0)), {
+      token_ho.attrPush(StringPair(name: `style`, value: `text-align:${align_val}`));
+    });
+    state.*.push_token(token_ho);
+
+    (token_il : Token) = Token.new(`inline`, ``, i32(0));
+    token_il.content = header_columns.get(usize(hi)).unwrap().trim();
+    token_il.children = .Some(ArrayList(Token).new());
+    state.*.push_token(token_il);
+
+    state.*.push_token(Token.new(`th_close`, `th`, i32(-1)));
+    hi = (hi + i32(1));
+  };
+
+  state.*.push_token(Token.new(`tr_close`, `tr`, i32(-1)));
+  state.*.push_token(Token.new(`thead_close`, `thead`, i32(-1)));
+
+  // Body rows
+  (tbody_opened : bool) = false;
+  (tbody_start_line : i32) = (start_line + i32(2));
+  (autocompleted_cells : i32) = i32(0);
+
+  next_line = (start_line + i32(2));
+  (body_done : bool) = false;
+  while ((next_line < end_line) && !(body_done)), {
+    if((state.*.s_count.get(usize(next_line)).unwrap() < state.*.blk_indent), {
+      body_done = true;
+    }, {
+      // check terminator rules
+      (terminate : bool) = false;
+      (ti : i32) = i32(0);
+      while ((ti < i32(terminator_rules.*.len())) && !(terminate)), {
+        // Workaround: separate .unwrap() from call to avoid evaluator chained-call bug
+        (rule_fn : BlockRuleFn) = terminator_rules.*.get(usize(ti)).unwrap();
+        if(rule_fn((&state.*), next_line, end_line, true), {
+          terminate = true;
+        }, {
+          ti = (ti + i32(1));
+        });
+      };
+      if(terminate, {
+        body_done = true;
+      }, {
+        (row_text : String) = table_get_line((&state.*), next_line).trim();
+        if((row_text.len() == usize(0)), {
+          body_done = true;
+        }, {
+          if(((state.*.s_count.get(usize(next_line)).unwrap() - state.*.blk_indent) >= i32(4)), {
+            body_done = true;
+          }, {
+            (row_columns : ArrayList(String)) = escaped_split(row_text);
+            if(((row_columns.len() > usize(0)) && (row_columns.get(usize(0)).unwrap().len() == usize(0))), {
+              _ := row_columns.remove(usize(0));
+            });
+            if(((row_columns.len() > usize(0)) && (row_columns.get(usize((i32(row_columns.len()) - i32(1)))).unwrap().len() == usize(0))), {
+              _ := row_columns.remove(usize((i32(row_columns.len()) - i32(1))));
+            });
+
+            autocompleted_cells = (autocompleted_cells + (column_count - i32(row_columns.len())));
+            if((autocompleted_cells > MAX_AUTOCOMPLETED_CELLS), {
+              body_done = true;
+            }, {
+              if(!(tbody_opened), {
+                (token_tbo : Token) = Token.new(`tbody_open`, `tbody`, i32(1));
+                (tbody_map : ArrayList(i32)) = ArrayList(i32).new();
+                _ := tbody_map.push(tbody_start_line);
+                _ := tbody_map.push(i32(0));
+                token_tbo.map = .Some(tbody_map);
+                state.*.push_token(token_tbo);
+                tbody_opened = true;
+              });
+
+              (token_tro : Token) = Token.new(`tr_open`, `tr`, i32(1));
+              (tro_map : ArrayList(i32)) = ArrayList(i32).new();
+              _ := tro_map.push(next_line);
+              _ := tro_map.push((next_line + i32(1)));
+              token_tro.map = .Some(tro_map);
+              state.*.push_token(token_tro);
+
+              (ri : i32) = i32(0);
+              while (ri < column_count), {
+                (token_tdo : Token) = Token.new(`td_open`, `td`, i32(1));
+                (a_val : String) = aligns.get(usize(ri)).unwrap();
+                if((a_val.len() > usize(0)), {
+                  token_tdo.attrPush(StringPair(name: `style`, value: `text-align:${a_val}`));
+                });
+                state.*.push_token(token_tdo);
+
+                (token_il : Token) = Token.new(`inline`, ``, i32(0));
+                if((ri < i32(row_columns.len())), {
+                  token_il.content = row_columns.get(usize(ri)).unwrap().trim();
+                }, {
+                  token_il.content = ``;
+                });
+                token_il.children = .Some(ArrayList(Token).new());
+                state.*.push_token(token_il);
+
+                state.*.push_token(Token.new(`td_close`, `td`, i32(-1)));
+                ri = (ri + i32(1));
+              };
+
+              state.*.push_token(Token.new(`tr_close`, `tr`, i32(-1)));
+              next_line = (next_line + i32(1));
+            });
+          });
+        });
+      });
+    });
+  };
+
+  if(tbody_opened, {
+    state.*.push_token(Token.new(`tbody_close`, `tbody`, i32(-1)));
+    // Update tbody_map end line — we can't easily update in-place through the token list,
+    // so we skip this for now (it's only used for source map)
+  });
+
+  state.*.push_token(Token.new(`table_close`, `table`, i32(-1)));
+  // Update table_lines end line — same caveat as above
+
+  state.*.parent_type = old_parent_type;
+  state.*.line = next_line;
+  true
+});
+
+export table;

@@ -1,0 +1,46 @@
+// Ported from: lib/rules_block/code.mjs (markdown-it v14.1.1)
+//
+// Code block (4 spaces padded)
+
+open import "std/string";
+{ ArrayList } :: import "std/collections/array_list";
+{ Token } :: import "../token.yo";
+{ StateBlock } :: import "./state_block.yo";
+
+// Indented code block rule
+code :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: bool) -> bool)({
+  if(((state.*.s_count.get(usize(start_line)).unwrap() - state.*.blk_indent) < i32(4)), {
+    return false;
+  });
+
+  (next_line : i32) = (start_line + i32(1));
+  (last : i32) = next_line;
+
+  while (next_line < end_line), {
+    if(state.*.is_empty(next_line), {
+      next_line = (next_line + i32(1));
+    }, {
+      if(((state.*.s_count.get(usize(next_line)).unwrap() - state.*.blk_indent) >= i32(4)), {
+        next_line = (next_line + i32(1));
+        last = next_line;
+      }, {
+        break;
+      });
+    });
+  };
+
+  state.*.line = last;
+
+  (token : Token) = Token.new(`code_block`, `code`, i32(0));
+  token.content = `${state.*.get_lines(start_line, last, (i32(4) + state.*.blk_indent), false)}\n`;
+  token.block = true;
+  (map : ArrayList(i32)) = ArrayList(i32).new();
+  _ := map.push(start_line);
+  _ := map.push(state.*.line);
+  token.map = .Some(map);
+  state.*.push_token(token);
+
+  true
+});
+
+export code;

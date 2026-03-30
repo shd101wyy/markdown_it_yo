@@ -1,0 +1,56 @@
+// Ported from: lib/rules_inline/newline.mjs (markdown-it v14.1.1)
+//
+// Process '\n'
+
+open import "std/string";
+{ ArrayList } :: import "std/collections/array_list";
+{ Token } :: import "../token.yo";
+{ isSpace } :: import "../common/utils.yo";
+{ StateInline } :: import "./state_inline.yo";
+{ flush_pending, inline_push_token } :: import "./inline_helpers.yo";
+
+newline :: (fn(state: *(StateInline), silent: bool) -> bool)({
+  (pos : i32) = state.*.pos;
+
+  if((i32(state.*._src_bytes.get(usize(pos)).unwrap()) != i32(0x0A)), {
+    return false;
+  });
+
+  (max : i32) = state.*.pos_max;
+
+  if(!(silent), {
+    (pending_bytes : ArrayList(u8)) = state.*.pending.as_bytes();
+    (pmax : i32) = (i32(pending_bytes.len()) - i32(1));
+
+    // '  \n' -> hardbreak
+    if(((pmax >= i32(0)) && (i32(pending_bytes.get(usize(pmax)).unwrap()) == i32(0x20))), {
+      if(((pmax >= i32(1)) && (i32(pending_bytes.get(usize((pmax - i32(1)))).unwrap()) == i32(0x20))), {
+        // Find whitespace tail of pending chars.
+        (ws : i32) = (pmax - i32(1));
+        while (((ws >= i32(1)) && (i32(pending_bytes.get(usize((ws - i32(1)))).unwrap()) == i32(0x20)))), {
+          ws = (ws - i32(1));
+        };
+        state.*.pending = String.from_bytes(pending_bytes.slice(usize(0), usize(ws)).unwrap());
+        inline_push_token(state, Token.new(`hardbreak`, `br`, i32(0)));
+      }, {
+        // Single trailing space
+        state.*.pending = String.from_bytes(pending_bytes.slice(usize(0), usize(pmax)).unwrap());
+        inline_push_token(state, Token.new(`softbreak`, `br`, i32(0)));
+      });
+    }, {
+      inline_push_token(state, Token.new(`softbreak`, `br`, i32(0)));
+    });
+  });
+
+  pos = (pos + i32(1));
+
+  // skip heading spaces for next line
+  while (((pos < max) && isSpace(i32(state.*._src_bytes.get(usize(pos)).unwrap())))), {
+    pos = (pos + i32(1));
+  };
+
+  state.*.pos = pos;
+  true
+});
+
+export newline;

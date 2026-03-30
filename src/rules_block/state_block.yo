@@ -125,7 +125,24 @@ new_state_block :: (fn(src: String, env: *(void), tokens: ArrayList(Token)) -> S
 );
 
 impl(StateBlock,
-  // Push a new token to the stream
+  // Push a pre-built token to the stream, managing nesting levels.
+  // The token's level field is set based on the current state level.
+  push_token : (fn(self: Self, tok: Token) -> unit)({
+    (token : Token) = tok;
+
+    if((token.nesting < i32(0)), {
+      self.level = (self.level - i32(1));
+    });
+    token.level = self.level;
+    if((token.nesting > i32(0)), {
+      self.level = (self.level + i32(1));
+    });
+
+    _ := self.tokens.push(token);
+  }),
+
+  // Convenience: create a minimal block-level token and push it.
+  // Returns a copy of the pushed token (not a reference into the list).
   push : (fn(self: Self, type_name: String, tag: String, nesting: i32) -> Token)({
     (token : Token) = Token(
       type_name: type_name,

@@ -1,0 +1,204 @@
+// Ported from: lib/rules_block/html_block.mjs (markdown-it v14.1.1)
+//
+// HTML block
+
+open import "std/string";
+{ ArrayList } :: import "std/collections/array_list";
+{ Regex } :: import "std/regex";
+{ Token } :: import "../token.yo";
+{ StateBlock } :: import "./state_block.yo";
+{ html_blocks } :: import "../common/html_blocks.yo";
+{ html_re, HtmlRegexPatterns } :: import "../common/html_re.yo";
+
+// HTML sequence: opening regex, closing regex, can_terminate_paragraph
+HtmlSequence :: struct(
+  open_re : Regex,
+  close_re : Regex,
+  can_terminate : bool
+);
+
+// Build the list of HTML block sequences.
+// Matches markdown-it's HTML_SEQUENCES array.
+_build_html_sequences :: (fn() -> ArrayList(HtmlSequence))({
+  (seqs : ArrayList(HtmlSequence)) = ArrayList(HtmlSequence).new();
+
+  // Sequence 0: <script|pre|style|textarea ...>
+  _ := seqs.push(HtmlSequence(
+    open_re: Regex.new(`^<(script|pre|style|textarea)(\\s|>|$)`, `i`).unwrap(),
+    close_re: Regex.new(`</(script|pre|style|textarea)>`, `i`).unwrap(),
+    can_terminate: true
+  ));
+
+  // Sequence 1: <!-- (comment)
+  _ := seqs.push(HtmlSequence(
+    open_re: Regex.new(`^<!--`, ``).unwrap(),
+    close_re: Regex.new(`-->`, ``).unwrap(),
+    can_terminate: true
+  ));
+
+  // Sequence 2: <? (processing instruction)
+  _ := seqs.push(HtmlSequence(
+    open_re: Regex.new(`^<\\?`, ``).unwrap(),
+    close_re: Regex.new(`\\?>`, ``).unwrap(),
+    can_terminate: true
+  ));
+
+  // Sequence 3: <![A-Z] (declaration)
+  _ := seqs.push(HtmlSequence(
+    open_re: Regex.new(`^<![A-Z]`, ``).unwrap(),
+    close_re: Regex.new(`>`, ``).unwrap(),
+    can_terminate: true
+  ));
+
+  // Sequence 4: <![CDATA[ (CDATA)
+  _ := seqs.push(HtmlSequence(
+    open_re: Regex.new(`^<!\\[CDATA\\[`, ``).unwrap(),
+    close_re: Regex.new(`\\]\\]>`, ``).unwrap(),
+    can_terminate: true
+  ));
+
+  // Sequence 5: block-level HTML tags
+  // Build pattern: ^</?(address|article|aside|...) followed by \s|/?>|$
+  (blocks : ArrayList(String)) = ArrayList(String).new();
+  _ := blocks.push(`address`); _ := blocks.push(`article`); _ := blocks.push(`aside`);
+  _ := blocks.push(`base`); _ := blocks.push(`basefont`); _ := blocks.push(`blockquote`);
+  _ := blocks.push(`body`); _ := blocks.push(`caption`); _ := blocks.push(`center`);
+  _ := blocks.push(`col`); _ := blocks.push(`colgroup`); _ := blocks.push(`dd`);
+  _ := blocks.push(`details`); _ := blocks.push(`dialog`); _ := blocks.push(`dir`);
+  _ := blocks.push(`div`); _ := blocks.push(`dl`); _ := blocks.push(`dt`);
+  _ := blocks.push(`fieldset`); _ := blocks.push(`figcaption`); _ := blocks.push(`figure`);
+  _ := blocks.push(`footer`); _ := blocks.push(`form`); _ := blocks.push(`frame`);
+  _ := blocks.push(`frameset`); _ := blocks.push(`h1`); _ := blocks.push(`h2`);
+  _ := blocks.push(`h3`); _ := blocks.push(`h4`); _ := blocks.push(`h5`);
+  _ := blocks.push(`h6`); _ := blocks.push(`head`); _ := blocks.push(`header`);
+  _ := blocks.push(`hr`); _ := blocks.push(`html`); _ := blocks.push(`iframe`);
+  _ := blocks.push(`legend`); _ := blocks.push(`li`); _ := blocks.push(`link`);
+  _ := blocks.push(`main`); _ := blocks.push(`menu`); _ := blocks.push(`menuitem`);
+  _ := blocks.push(`nav`); _ := blocks.push(`noframes`); _ := blocks.push(`ol`);
+  _ := blocks.push(`optgroup`); _ := blocks.push(`option`); _ := blocks.push(`p`);
+  _ := blocks.push(`param`); _ := blocks.push(`search`); _ := blocks.push(`section`);
+  _ := blocks.push(`summary`); _ := blocks.push(`table`); _ := blocks.push(`tbody`);
+  _ := blocks.push(`td`); _ := blocks.push(`tfoot`); _ := blocks.push(`th`);
+  _ := blocks.push(`thead`); _ := blocks.push(`title`); _ := blocks.push(`tr`);
+  _ := blocks.push(`track`); _ := blocks.push(`ul`);
+
+  (block_names_pattern : String) = ``;
+  (bi : usize) = usize(0);
+  while (bi < blocks.len()), {
+    if((bi > usize(0)), {
+      block_names_pattern = `${block_names_pattern}|`;
+    });
+    block_names_pattern = `${block_names_pattern}${blocks.get(bi).unwrap()}`;
+    bi = (bi + usize(1));
+  };
+
+  _ := seqs.push(HtmlSequence(
+    open_re: Regex.new(`^</?(${block_names_pattern})(\\s|/?>|$)`, `i`).unwrap(),
+    close_re: Regex.new(`^$`, ``).unwrap(),
+    can_terminate: true
+  ));
+
+  // Sequence 6: generic open/close tag followed by whitespace/end
+  (patterns : HtmlRegexPatterns) = html_re();
+  _ := seqs.push(HtmlSequence(
+    open_re: Regex.new(`${patterns.HTML_OPEN_CLOSE_TAG_RE_STR}\\s*$`, ``).unwrap(),
+    close_re: Regex.new(`^$`, ``).unwrap(),
+    can_terminate: false
+  ));
+
+  seqs
+});
+
+// HTML block rule
+// Note: html_enabled flag is passed separately since we don't have MarkdownIt type yet
+html_block :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: bool,
+                  html_enabled: bool) -> bool)({
+  (pos : i32) = (state.*.b_marks.get(usize(start_line)).unwrap() + state.*.t_shift.get(usize(start_line)).unwrap());
+  (max : i32) = state.*.e_marks.get(usize(start_line)).unwrap();
+
+  // if it's indented more than 3 spaces, it should be a code block
+  if(((state.*.s_count.get(usize(start_line)).unwrap() - state.*.blk_indent) >= i32(4)), {
+    return false;
+  });
+
+  // HTML option must be enabled
+  if(!(html_enabled), {
+    return false;
+  });
+
+  if((i32(state.*._src_bytes.get(usize(pos)).unwrap()) != i32(0x3C)), {
+    return false;
+  });
+
+  // Extract line text from pos to max
+  (line_bytes : ArrayList(u8)) = state.*._src_bytes.slice(usize(pos), usize(max)).unwrap();
+  (line_text : String) = String.from_bytes(line_bytes);
+
+  // Build sequences (TODO: cache these for performance)
+  (seqs : ArrayList(HtmlSequence)) = _build_html_sequences();
+
+  // Find matching sequence
+  (seq_idx : i32) = i32(0);
+  (found : bool) = false;
+  while ((seq_idx < i32(seqs.len())) && (!(found))), {
+    (seq : HtmlSequence) = seqs.get(usize(seq_idx)).unwrap();
+    if(seq.open_re.test(line_text), {
+      found = true;
+    }, {
+      seq_idx = (seq_idx + i32(1));
+    });
+  };
+
+  if(!(found), {
+    return false;
+  });
+
+  if(silent, {
+    // true if this sequence can be a terminator, false otherwise
+    (seq : HtmlSequence) = seqs.get(usize(seq_idx)).unwrap();
+    return seq.can_terminate;
+  });
+
+  (next_line : i32) = (start_line + i32(1));
+
+  // If we are here - we detected HTML block.
+  // Let's roll down till block end.
+  (matched_seq : HtmlSequence) = seqs.get(usize(seq_idx)).unwrap();
+  if(!(matched_seq.close_re.test(line_text)), {
+    (scanning : bool) = true;
+    while ((next_line < end_line) && scanning), {
+      if((state.*.s_count.get(usize(next_line)).unwrap() < state.*.blk_indent), {
+        scanning = false;
+      }, {
+        (p : i32) = (state.*.b_marks.get(usize(next_line)).unwrap() + state.*.t_shift.get(usize(next_line)).unwrap());
+        (m : i32) = state.*.e_marks.get(usize(next_line)).unwrap();
+        (lb : ArrayList(u8)) = state.*._src_bytes.slice(usize(p), usize(m)).unwrap();
+        (lt : String) = String.from_bytes(lb);
+
+        if(matched_seq.close_re.test(lt), {
+          if((lt.len() != usize(0)), {
+            next_line = (next_line + i32(1));
+          });
+          scanning = false;
+        }, {
+          next_line = (next_line + i32(1));
+        });
+      });
+    };
+  });
+
+  state.*.line = next_line;
+
+  (token : Token) = Token.new(`html_block`, ``, i32(0));
+  token.block = true;
+  token.content = state.*.get_lines(start_line, next_line, state.*.blk_indent, true);
+  (map : ArrayList(i32)) = ArrayList(i32).new();
+  _ := map.push(start_line);
+  _ := map.push(next_line);
+  token.map = .Some(map);
+  state.*.push_token(token);
+
+  true
+});
+
+export html_block, HtmlSequence, _build_html_sequences;

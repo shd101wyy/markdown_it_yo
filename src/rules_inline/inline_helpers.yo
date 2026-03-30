@@ -1,0 +1,45 @@
+// Helper functions for inline rules.
+// These work through *(StateInline) to avoid the self-by-value mutation issue.
+
+open import "std/string";
+{ ArrayList } :: import "std/collections/array_list";
+{ Token } :: import "../token.yo";
+{ StateInline, TokenMeta } :: import "./state_inline.yo";
+
+// Inline rule function signature
+InlineRuleFn :: (fn(state: *(StateInline), silent: bool) -> bool);
+
+// Flush pending text into a text token.
+flush_pending :: (fn(state: *(StateInline)) -> unit)({
+  if((state.*.pending.len() > usize(0)), {
+    (token : Token) = Token(
+      type_name: `text`,
+      tag: ``,
+      nesting: i32(0),
+      attrs: .None,
+      map: .None,
+      children: .None,
+      content: state.*.pending,
+      markup: ``,
+      info: ``,
+      block: false,
+      hidden: false,
+      level: state.*.pending_level
+    );
+    _ := state.*.tokens.push(token);
+    (none_meta : Option(TokenMeta)) = .None;
+    _ := state.*.tokens_meta.push(none_meta);
+    state.*.pending = ``;
+  });
+});
+
+// Flush pending, then push a pre-built token to the inline state.
+inline_push_token :: (fn(state: *(StateInline), token: Token) -> unit)({
+  flush_pending(state);
+  _ := state.*.tokens.push(token);
+  (none_meta : Option(TokenMeta)) = .None;
+  _ := state.*.tokens_meta.push(none_meta);
+  state.*.pending_level = state.*.level;
+});
+
+export InlineRuleFn, flush_pending, inline_push_token;
