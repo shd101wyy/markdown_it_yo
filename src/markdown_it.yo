@@ -69,7 +69,7 @@ _core_block :: (fn(state: *(StateCore), block_parser: ParserBlock, html_enabled:
 });
 
 // Core inline rule: for each 'inline' token, parse its content
-_core_inline :: (fn(state: *(StateCore), inline_parser: ParserInline) -> unit)({
+_core_inline :: (fn(state: *(StateCore), inline_parser: ParserInline, html_enabled: bool) -> unit)({
   (len : i32) = i32(state.*.tokens.len());
   (i : i32) = i32(0);
 
@@ -77,7 +77,7 @@ _core_inline :: (fn(state: *(StateCore), inline_parser: ParserInline) -> unit)({
     (token : Token) = state.*.tokens.get(usize(i)).unwrap();
     if((token.type_name == `inline`), {
       (children : ArrayList(Token)) = ArrayList(Token).new();
-      inline_parser.parse(token.content, state.*.env, children);
+      inline_parser.parse(token.content, state.*.env, children, html_enabled);
       token.children = .Some(children);
       state.*.tokens.set(usize(i), token);
     });
@@ -96,7 +96,7 @@ impl(MarkdownIt,
     // 2. Block parse
     _core_block((&state), self.block, self.options.html);
     // 3. Inline parse
-    _core_inline((&state), self.inline_parser);
+    _core_inline((&state), self.inline_parser, self.options.html);
     // 4. Text join
     text_join((&state));
 

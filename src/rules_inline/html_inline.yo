@@ -1,0 +1,81 @@
+// Ported from: lib/rules_inline/html_inline.mjs (markdown-it v14.1.1)
+//
+// Process inline HTML tags.
+
+open import "std/string";
+{ ArrayList } :: import "std/collections/array_list";
+{ Regex } :: import "std/regex";
+{ StateInline } :: import "./state_inline.yo";
+{ state_push } :: import "./inline_helpers.yo";
+{ Token } :: import "../token.yo";
+{ HtmlRegexPatterns, html_re } :: import "../common/html_re.yo";
+
+_is_letter :: (fn(ch: i32) -> bool)({
+  (lc : i32) = (ch | i32(0x20));
+  ((lc >= i32(0x61)) && (lc <= i32(0x7A)))
+});
+
+_is_link_open :: (fn(s: String) -> bool)({
+  (re : Regex) = Regex.new(`^<a[>\\s]`, `i`).unwrap();
+  match(re.exec(s.to_lowercase()),
+    .Some(_) => true,
+    .None => false
+  )
+});
+
+_is_link_close :: (fn(s: String) -> bool)({
+  (re : Regex) = Regex.new(`^</a\\s*>`, `i`).unwrap();
+  match(re.exec(s.to_lowercase()),
+    .Some(_) => true,
+    .None => false
+  )
+});
+
+html_inline :: (fn(state: *(StateInline), silent: bool) -> bool)({
+  // HTML option must be enabled
+  if(!(state.*.html_enabled), { return false; });
+
+  (pos : i32) = state.*.pos;
+  (max : i32) = state.*.pos_max;
+
+  // Must start with '<'
+  if((i32(state.*._src_bytes.get(usize(pos)).unwrap()) != i32(0x3C)), {
+    return false;
+  });
+
+  if(((pos + i32(2)) >= max), { return false; });
+
+  // Quick fail on second char
+  (ch : i32) = i32(state.*._src_bytes.get(usize((pos + i32(1)))).unwrap());
+  if((((ch != i32(0x21)) && (ch != i32(0x3F))) && ((ch != i32(0x2F)) && !(_is_letter(ch)))), {
+    return false;
+  });
+
+  // Try to match HTML tag regex
+  (remaining_bytes : ArrayList(u8)) = state.*._src_bytes.slice(usize(pos), usize(max)).unwrap();
+  (remaining : String) = String.from_bytes(remaining_bytes);
+  (patterns : HtmlRegexPatterns) = html_re();
+  (re : Regex) = Regex.new(patterns.HTML_TAG_RE_STR, ``).unwrap();
+
+  match(re.exec(remaining),
+    .Some(m) => {
+      if(!(silent), {
+        (tok : Token) = state_push(state, `html_inline`, ``, i32(0));
+        tok.content = m.value();
+        state.*.tokens.set(usize((i32(state.*.tokens.len()) - i32(1))), tok);
+
+        if(_is_link_open(m.value()), {
+          state.*.link_level = (state.*.link_level + i32(1));
+        });
+        if(_is_link_close(m.value()), {
+          state.*.link_level = (state.*.link_level - i32(1));
+        });
+      });
+      state.*.pos = (pos + i32(m.value().len()));
+      true
+    },
+    .None => false
+  )
+});
+
+export html_inline;

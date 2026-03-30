@@ -1,0 +1,100 @@
+// Ported from: lib/rules_inline/autolink.mjs (markdown-it v14.1.1)
+//
+// Process autolinks '<protocol:...>' and '<email@example.com>'
+
+open import "std/string";
+{ ArrayList } :: import "std/collections/array_list";
+{ Regex } :: import "std/regex";
+{ StateInline } :: import "./state_inline.yo";
+{ state_push } :: import "./inline_helpers.yo";
+{ Token, StringPair } :: import "../token.yo";
+{ validate_link, normalize_link, normalize_link_text } :: import "../common/link_utils.yo";
+
+// Autolink URI pattern: <scheme:path>
+// Original uses \x00-\x20 to exclude control chars + space; we use \s and explicit control char check
+_is_autolink_uri :: (fn(url: String) -> bool)({
+  (re : Regex) = Regex.new(`^([a-zA-Z][a-zA-Z0-9+.\\-]{1,31}):([^\\s<>]*)$`, ``).unwrap();
+  match(re.exec(url),
+    .Some(_) => true,
+    .None => false
+  )
+});
+
+// Email pattern
+_is_email :: (fn(url: String) -> bool)({
+  (re : Regex) = Regex.new(`^([a-zA-Z0-9.!#$%&'*+/=?^_\x60{|}~\\-]+@[a-zA-Z0-9](?:[a-zA-Z0-9\\-]{0,61}[a-zA-Z0-9])?(?:\\.[a-zA-Z0-9](?:[a-zA-Z0-9\\-]{0,61}[a-zA-Z0-9])?)*)$`, ``).unwrap();
+  match(re.exec(url),
+    .Some(_) => true,
+    .None => false
+  )
+});
+
+// Helper to emit autolink tokens
+_emit_autolink :: (fn(state: *(StateInline), full_url: String, display_text: String) -> unit)({
+  (token_o : Token) = state_push(state, `link_open`, `a`, i32(1));
+  (attrs : ArrayList(StringPair)) = ArrayList(StringPair).new();
+  _ := attrs.push(StringPair(name: `href`, value: full_url));
+  token_o.attrs = .Some(attrs);
+  token_o.markup = `autolink`;
+  token_o.info = `auto`;
+  state.*.tokens.set(usize((i32(state.*.tokens.len()) - i32(1))), token_o);
+
+  (token_t : Token) = state_push(state, `text`, ``, i32(0));
+  token_t.content = display_text;
+  state.*.tokens.set(usize((i32(state.*.tokens.len()) - i32(1))), token_t);
+
+  _ := state_push(state, `link_close`, `a`, i32(-1));
+});
+
+autolink :: (fn(state: *(StateInline), silent: bool) -> bool)({
+  (pos : i32) = state.*.pos;
+  (max : i32) = state.*.pos_max;
+
+  // Must start with '<'
+  if((i32(state.*._src_bytes.get(usize(pos)).unwrap()) != i32(0x3C)), {
+    return false;
+  });
+
+  // Scan for '>', bail on '<'
+  (scan : i32) = (pos + i32(1));
+  (found_close : bool) = false;
+  while (((scan < max) && !(found_close))), {
+    (ch : i32) = i32(state.*._src_bytes.get(usize(scan)).unwrap());
+    if((ch == i32(0x3C)), { return false; });
+    if((ch == i32(0x3E)), {
+      found_close = true;
+    }, {
+      scan = (scan + i32(1));
+    });
+  };
+
+  if(!(found_close), { return false; });
+
+  // Extract URL between < and >
+  (url_bytes : ArrayList(u8)) = state.*._src_bytes.slice(usize((pos + i32(1))), usize(scan)).unwrap();
+  (url : String) = String.from_bytes(url_bytes);
+
+  if(_is_autolink_uri(url), {
+    (full_url : String) = normalize_link(url);
+    if(!(validate_link(full_url)), { return false; });
+    if(!(silent), {
+      _emit_autolink(state, full_url, normalize_link_text(url));
+    });
+    state.*.pos = (scan + i32(1));
+    return true;
+  });
+
+  if(_is_email(url), {
+    (full_url : String) = normalize_link(`mailto:${url}`);
+    if(!(validate_link(full_url)), { return false; });
+    if(!(silent), {
+      _emit_autolink(state, full_url, normalize_link_text(url));
+    });
+    state.*.pos = (scan + i32(1));
+    return true;
+  });
+
+  false
+});
+
+export autolink;

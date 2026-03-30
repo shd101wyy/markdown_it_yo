@@ -1,0 +1,127 @@
+// Ported from: lib/rules_inline/link.mjs (markdown-it v14.1.1)
+//
+// Process [link](url "title") and [link][ref]
+
+open import "std/string";
+{ ArrayList } :: import "std/collections/array_list";
+{ Token, StringPair } :: import "../token.yo";
+{ StateInline } :: import "./state_inline.yo";
+{ state_push } :: import "./inline_helpers.yo";
+{ isSpace } :: import "../common/utils.yo";
+{ validate_link, normalize_link } :: import "../common/link_utils.yo";
+{ parse_link_label } :: import "../helpers/parse_link_label.yo";
+{ LinkDestResult, parse_link_destination } :: import "../helpers/parse_link_destination.yo";
+{ LinkTitleResult, parse_link_title } :: import "../helpers/parse_link_title.yo";
+
+link_rule :: (fn(state: *(StateInline), silent: bool) -> bool)({
+  (pos : i32) = state.*.pos;
+  (max : i32) = state.*.pos_max;
+
+  // Must start with '['
+  if((i32(state.*._src_bytes.get(usize(pos)).unwrap()) != i32(0x5B)), {
+    return false;
+  });
+
+  (label_start : i32) = (pos + i32(1));
+  (label_end : i32) = parse_link_label(state.*._src_bytes, pos, max, true);
+
+  // Parser failed to find ']', not a valid link
+  if((label_end < i32(0)), { return false; });
+
+  (href : String) = ``;
+  (title : String) = ``;
+  pos = (label_end + i32(1));
+
+  (parse_reference : bool) = true;
+
+  // Try inline link: [text](url "title")
+  if(((pos < max) && (i32(state.*._src_bytes.get(usize(pos)).unwrap()) == i32(0x28))), {
+    parse_reference = false;
+    // Skip spaces after '('
+    pos = (pos + i32(1));
+    while (((pos < max) && (isSpace(i32(state.*._src_bytes.get(usize(pos)).unwrap())) || (i32(state.*._src_bytes.get(usize(pos)).unwrap()) == i32(0x0A))))), {
+      pos = (pos + i32(1));
+    };
+    if((pos >= max), { return false; });
+
+    // Parse link destination
+    (start : i32) = pos;
+    (dest_result : LinkDestResult) = parse_link_destination(state.*.src, pos, max);
+    if(dest_result.ok, {
+      (normalized : String) = normalize_link(dest_result.str);
+      if(validate_link(normalized), {
+        href = normalized;
+        pos = dest_result.pos;
+      });
+
+      // Skip spaces after destination
+      start = pos;
+      while (((pos < max) && (isSpace(i32(state.*._src_bytes.get(usize(pos)).unwrap())) || (i32(state.*._src_bytes.get(usize(pos)).unwrap()) == i32(0x0A))))), {
+        pos = (pos + i32(1));
+      };
+
+      // Parse link title
+      (title_result : LinkTitleResult) = parse_link_title(state.*.src, pos, max, .None);
+      if((((pos < max) && (start != pos)) && title_result.ok), {
+        title = title_result.str;
+        pos = title_result.pos;
+
+        // Skip spaces after title
+        while (((pos < max) && (isSpace(i32(state.*._src_bytes.get(usize(pos)).unwrap())) || (i32(state.*._src_bytes.get(usize(pos)).unwrap()) == i32(0x0A))))), {
+          pos = (pos + i32(1));
+        };
+      });
+    });
+
+    if(((pos >= max) || (i32(state.*._src_bytes.get(usize(pos)).unwrap()) != i32(0x29))), {
+      // Failed to parse inline link, fallback to reference
+      parse_reference = true;
+    }, {
+      pos = (pos + i32(1));
+    });
+  });
+
+  // Reference links not yet supported
+  if(parse_reference, {
+    return false;
+  });
+
+  // Emit tokens
+  if(!(silent), {
+    state.*.pos = label_start;
+    state.*.pos_max = label_end;
+
+    // link_open
+    (token_o : Token) = state_push(state, `link_open`, `a`, i32(1));
+    (attrs : ArrayList(StringPair)) = ArrayList(StringPair).new();
+    _ := attrs.push(StringPair(name: `href`, value: href));
+    if((title.len() > usize(0)), {
+      _ := attrs.push(StringPair(name: `title`, value: title));
+    });
+    token_o.attrs = .Some(attrs);
+    token_o.markup = `[`;
+    state.*.tokens.set(usize((i32(state.*.tokens.len()) - i32(1))), token_o);
+
+    state.*.link_level = (state.*.link_level + i32(1));
+
+    // Emit label content as text token (simplified: no recursive inline parsing)
+    (label_bytes : ArrayList(u8)) = state.*._src_bytes.slice(usize(label_start), usize(label_end)).unwrap();
+    (label_text : String) = String.from_bytes(label_bytes);
+    if((label_text.len() > usize(0)), {
+      (text_tok : Token) = state_push(state, `text`, ``, i32(0));
+      text_tok.content = label_text;
+      state.*.tokens.set(usize((i32(state.*.tokens.len()) - i32(1))), text_tok);
+    });
+
+    state.*.link_level = (state.*.link_level - i32(1));
+
+    // link_close
+    _ := state_push(state, `link_close`, `a`, i32(-1));
+  });
+
+  state.*.pos = pos;
+  state.*.pos_max = max;
+  true
+});
+
+export link_rule;

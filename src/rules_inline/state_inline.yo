@@ -34,7 +34,6 @@ ScanDelimsResult :: struct(
 // Inline parser state
 StateInline :: struct(
   src : String,
-  // md field: added in Phase 5 when MarkdownIt type is defined
   env : *(void),
   tokens : ArrayList(Token),
   tokens_meta : ArrayList(Option(TokenMeta)),
@@ -61,12 +60,15 @@ StateInline :: struct(
   // Counter for disabling linkify inside <a> and markdown links
   link_level : i32,
 
+  // Options pushed down from MarkdownIt
+  html_enabled : bool,
+
   // Cached bytes for fast access
   _src_bytes : ArrayList(u8)
 );
 
 // Create a new StateInline
-new_state_inline :: (fn(src: String, env: *(void), out_tokens: ArrayList(Token)) -> StateInline)(
+new_state_inline :: (fn(src: String, env: *(void), out_tokens: ArrayList(Token), html_enabled: bool) -> StateInline)(
   {
     (bytes : ArrayList(u8)) = src.as_bytes();
     (pos_max : i32) = i32(bytes.len());
@@ -87,6 +89,7 @@ new_state_inline :: (fn(src: String, env: *(void), out_tokens: ArrayList(Token))
       backticks: HashMap(i32, i32).new(),
       backticks_scanned: false,
       link_level: i32(0),
+      html_enabled: html_enabled,
       _src_bytes: bytes
     )
   }

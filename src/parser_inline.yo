@@ -17,6 +17,10 @@ open import "std/string";
 { strikethrough_tokenize, strikethrough_post_process } :: import "./rules_inline/strikethrough.yo";
 { emphasis_tokenize, emphasis_post_process } :: import "./rules_inline/emphasis.yo";
 { entity } :: import "./rules_inline/entity.yo";
+{ link_rule } :: import "./rules_inline/link.yo";
+{ image_rule } :: import "./rules_inline/image.yo";
+{ autolink } :: import "./rules_inline/autolink.yo";
+{ html_inline } :: import "./rules_inline/html_inline.yo";
 
 // Post-processing rules
 { process_delimiters, link_pairs } :: import "./rules_inline/balance_pairs.yo";
@@ -45,7 +49,10 @@ impl(ParserInline,
       if(!(ok), { ok = backtick(state, false); });
       if(!(ok), { ok = strikethrough_tokenize(state, false); });
       if(!(ok), { ok = emphasis_tokenize(state, false); });
-      // TODO: link, image, autolink, html_inline (need state.md)
+      if(!(ok), { ok = link_rule(state, false); });
+      if(!(ok), { ok = image_rule(state, false); });
+      if(!(ok), { ok = autolink(state, false); });
+      if(!(ok), { ok = html_inline(state, false); });
       if(!(ok), { ok = entity(state, false); });
 
       if(!(ok), {
@@ -66,8 +73,8 @@ impl(ParserInline,
   }),
 
   // Parse inline content: tokenize then run post-processing rules.
-  parse : (fn(self: Self, src: String, env: *(void), out_tokens: ArrayList(Token)) -> unit)({
-    (state : StateInline) = new_state_inline(src, env, out_tokens);
+  parse : (fn(self: Self, src: String, env: *(void), out_tokens: ArrayList(Token), html_enabled: bool) -> unit)({
+    (state : StateInline) = new_state_inline(src, env, out_tokens, html_enabled);
     self.tokenize((&state));
 
     // Post-processing (ruler2) rules in order:

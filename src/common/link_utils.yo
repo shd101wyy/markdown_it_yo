@@ -1,0 +1,50 @@
+// Link validation and normalization utilities.
+// Simplified versions of markdown-it's normalizeLink/validateLink/normalizeLinkText.
+
+open import "std/string";
+
+// Bad protocol patterns for link validation
+_is_bad_protocol :: (fn(url: String) -> bool)({
+  (lower : String) = url.to_lowercase();
+  cond(
+    lower.starts_with(`vbscript:`) => true,
+    lower.starts_with(`javascript:`) => true,
+    lower.starts_with(`file:`) => true,
+    lower.starts_with(`data:`) => {
+      // Allow safe data URIs (images only)
+      if(lower.starts_with(`data:image/gif;`), {
+        return false;
+      });
+      if(lower.starts_with(`data:image/png;`), {
+        return false;
+      });
+      if(lower.starts_with(`data:image/jpeg;`), {
+        return false;
+      });
+      if(lower.starts_with(`data:image/webp;`), {
+        return false;
+      });
+      true
+    },
+    true => false
+  )
+});
+
+// Validate a link URL. Returns true if the link is safe.
+validate_link :: (fn(url: String) -> bool)(
+  !(_is_bad_protocol(url))
+);
+
+// Normalize a link URL. For now, returns the URL as-is.
+// TODO: Full URL encoding/normalization (mdurl equivalent)
+normalize_link :: (fn(url: String) -> String)(
+  url
+);
+
+// Normalize link text for display. For now, returns as-is.
+// TODO: Punycode decoding for hostnames
+normalize_link_text :: (fn(url: String) -> String)(
+  url
+);
+
+export validate_link, normalize_link, normalize_link_text;

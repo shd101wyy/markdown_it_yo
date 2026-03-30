@@ -140,7 +140,7 @@ _render_image :: (fn(tokens: ArrayList(Token), idx: i32, options: *(Options)) ->
   (token : Token) = tokens.get(usize(idx)).unwrap();
   // TODO: renderInlineAsText for alt attribute from children
   (alt_text : String) = token.content;
-  (result : String) = `<img src=""${render_attrs(token)} alt="${escapeHtml(alt_text)}"`;
+  (result : String) = `<img${render_attrs(token)} alt="${escapeHtml(alt_text)}"`;
   if(options.*.xhtml_out, {
     result = `${result} /`;
   });
