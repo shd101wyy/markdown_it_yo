@@ -1,0 +1,202 @@
+// Ported from: lib/rules_inline/state_inline.mjs (markdown-it v14.1.1)
+//
+// Inline parser state — tracks position, delimiter stacks, and produces tokens.
+
+open import "std/string";
+{ ArrayList } :: import "std/collections/array_list";
+{ HashMap } :: import "std/collections/hash_map";
+{ Token } :: import "../token.yo";
+{ isWhiteSpace, isPunctChar, isMdAsciiPunct } :: import "../common/utils.yo";
+{ isValidEntityCode, fromCodePoint } :: import "../common/char_utils.yo";
+
+// Emphasis-like delimiter
+Delimiter :: struct(
+  marker : i32,
+  length : i32,
+  token_idx : i32,
+  end : i32,
+  open : bool,
+  close : bool
+);
+
+// Token metadata — stores delimiter reference for emphasis processing
+TokenMeta :: struct(
+  delimiters : ArrayList(Delimiter)
+);
+
+// Result of scanDelims
+ScanDelimsResult :: struct(
+  can_open : bool,
+  can_close : bool,
+  length : i32
+);
+
+// Inline parser state
+StateInline :: struct(
+  src : String,
+  // md field: added in Phase 5 when MarkdownIt type is defined
+  env : *(void),
+  tokens : ArrayList(Token),
+  tokens_meta : ArrayList(Option(TokenMeta)),
+
+  pos : i32,
+  pos_max : i32,
+  level : i32,
+  pending : String,
+  pending_level : i32,
+
+  // Stores { start: end } pairs for backtrack optimization
+  cache : HashMap(i32, i32),
+
+  // List of emphasis-like delimiters for current tag
+  delimiters : ArrayList(Delimiter),
+
+  // Stack of delimiter lists for upper level tags
+  _prev_delimiters : ArrayList(ArrayList(Delimiter)),
+
+  // Backtick length => last seen position
+  backticks : HashMap(i32, i32),
+  backticks_scanned : bool,
+
+  // Counter for disabling linkify inside <a> and markdown links
+  link_level : i32,
+
+  // Cached bytes for fast access
+  _src_bytes : ArrayList(u8)
+);
+
+// Create a new StateInline
+new_state_inline :: (fn(src: String, env: *(void), out_tokens: ArrayList(Token)) -> StateInline)(
+  {
+    (bytes : ArrayList(u8)) = src.as_bytes();
+    (pos_max : i32) = i32(bytes.len());
+
+    StateInline(
+      src: src,
+      env: env,
+      tokens: out_tokens,
+      tokens_meta: ArrayList(Option(TokenMeta)).new(),
+      pos: i32(0),
+      pos_max: pos_max,
+      level: i32(0),
+      pending: ``,
+      pending_level: i32(0),
+      cache: HashMap(i32, i32).new(),
+      delimiters: ArrayList(Delimiter).new(),
+      _prev_delimiters: ArrayList(ArrayList(Delimiter)).new(),
+      backticks: HashMap(i32, i32).new(),
+      backticks_scanned: false,
+      link_level: i32(0),
+      _src_bytes: bytes
+    )
+  }
+);
+
+impl(StateInline,
+  // Flush pending text as a text token
+  push_pending : (fn(self: Self) -> Token)({
+    (token : Token) = Token(
+      type_name: `text`,
+      tag: ``,
+      nesting: i32(0),
+      attrs: .None,
+      map: .None,
+      children: .None,
+      content: self.pending,
+      markup: ``,
+      info: ``,
+      block: false,
+      hidden: false,
+      level: self.pending_level
+    );
+    _ := self.tokens.push(token);
+    self.pending = ``;
+    token
+  }),
+
+  // Push a new token to the stream. Flushes pending text first.
+  push : (fn(self: Self, type_name: String, tag: String, nesting: i32) -> Token)({
+    if((self.pending.len() > usize(0)), {
+      _ := self.push_pending();
+    });
+
+    (token : Token) = Token(
+      type_name: type_name,
+      tag: tag,
+      nesting: nesting,
+      attrs: .None,
+      map: .None,
+      children: .None,
+      content: ``,
+      markup: ``,
+      info: ``,
+      block: false,
+      hidden: false,
+      level: i32(0)
+    );
+    (token_meta : Option(TokenMeta)) = .None;
+
+    if((nesting < i32(0)), {
+      self.level = (self.level - i32(1));
+      // Pop prev delimiters
+      if((self._prev_delimiters.len() > usize(0)), {
+        self.delimiters = self._prev_delimiters.pop().unwrap();
+      });
+    });
+
+    token.level = self.level;
+
+    if((nesting > i32(0)), {
+      self.level = (self.level + i32(1));
+      _ := self._prev_delimiters.push(self.delimiters);
+      self.delimiters = ArrayList(Delimiter).new();
+      token_meta = .Some(TokenMeta(delimiters: self.delimiters));
+    });
+
+    self.pending_level = self.level;
+    _ := self.tokens.push(token);
+    _ := self.tokens_meta.push(token_meta);
+    token
+  }),
+
+  // Scan a sequence of emphasis-like markers and determine if it can
+  // start or end an emphasis sequence.
+  scan_delims : (fn(self: Self, start: i32, can_split_word: bool) -> ScanDelimsResult)({
+    (max : i32) = self.pos_max;
+    (marker : i32) = i32(self._src_bytes.get(usize(start)).unwrap());
+
+    // Treat beginning of line as whitespace
+    (last_char : i32) = cond(
+      (start > i32(0)) => i32(self._src_bytes.get(usize((start - i32(1)))).unwrap()),
+      true => i32(0x20)
+    );
+
+    (pos : i32) = start;
+    while ((pos < max) && (i32(self._src_bytes.get(usize(pos)).unwrap()) == marker)), {
+      pos = (pos + i32(1));
+    };
+    (count : i32) = (pos - start);
+
+    // Treat end of line as whitespace
+    (next_char : i32) = cond(
+      (pos < max) => i32(self._src_bytes.get(usize(pos)).unwrap()),
+      true => i32(0x20)
+    );
+
+    (is_last_punct : bool) = (isMdAsciiPunct(last_char) || isPunctChar(last_char));
+    (is_next_punct : bool) = (isMdAsciiPunct(next_char) || isPunctChar(next_char));
+
+    (is_last_ws : bool) = isWhiteSpace(last_char);
+    (is_next_ws : bool) = isWhiteSpace(next_char);
+
+    (left_flanking : bool) = (!(is_next_ws) && (!(is_next_punct) || (is_last_ws || is_last_punct)));
+    (right_flanking : bool) = (!(is_last_ws) && (!(is_last_punct) || (is_next_ws || is_next_punct)));
+
+    (can_open : bool) = (left_flanking && (can_split_word || (!(right_flanking) || is_last_punct)));
+    (can_close : bool) = (right_flanking && (can_split_word || (!(left_flanking) || is_next_punct)));
+
+    ScanDelimsResult(can_open: can_open, can_close: can_close, length: count)
+  })
+);
+
+export StateInline, new_state_inline, Delimiter, TokenMeta, ScanDelimsResult;

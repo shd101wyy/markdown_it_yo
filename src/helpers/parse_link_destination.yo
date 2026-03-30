@@ -1,0 +1,134 @@
+// Ported from: lib/helpers/parse_link_destination.mjs (markdown-it v14.1.1)
+//
+// Parse link destination from markdown source.
+
+open import "std/string";
+{ ArrayList } :: import "std/collections/array_list";
+{ unescapeAll } :: import "../common/utils.yo";
+
+// Result of parsing a link destination
+LinkDestResult :: struct(
+  ok : bool,
+  pos : i32,
+  str : String
+);
+
+// Parse link destination.
+// Assumes the string starts at position `start`. Returns a result struct.
+//
+// - `<url>` form: angles are required, no spaces/newlines inside
+// - bare form: balanced parentheses, no spaces/control chars
+parse_link_destination :: (fn(input: String, start: i32, max: i32) -> LinkDestResult)(
+  {
+    (bytes : ArrayList(u8)) = input.as_bytes();
+    (pos : i32) = start;
+    (result : LinkDestResult) = LinkDestResult(ok: false, pos: i32(0), str: ``);
+
+    if((pos >= max), {
+      return result;
+    });
+
+    (code : u8) = bytes.get(usize(pos)).unwrap();
+
+    // Parse <url> form
+    if((code == u8(0x3C)), {
+      pos = (pos + i32(1));
+      while (pos < max), {
+        code = bytes.get(usize(pos)).unwrap();
+        cond(
+          // \n - not allowed inside <...>
+          (code == u8(0x0A)) => {
+            return result;
+          },
+          // < - not allowed inside <...>
+          (code == u8(0x3C)) => {
+            return result;
+          },
+          // > - closing angle bracket
+          (code == u8(0x3E)) => {
+            (slice_bytes : ArrayList(u8)) = bytes.slice(usize((start + i32(1))), usize(pos)).unwrap();
+            result = LinkDestResult(
+              ok: true,
+              pos: (pos + i32(1)),
+              str: unescapeAll(String.from_bytes(slice_bytes))
+            );
+            return result;
+          },
+          // backslash escape
+          ((code == u8(0x5C)) && ((pos + i32(1)) < max)) => {
+            pos = (pos + i32(2));
+          },
+          true => {
+            pos = (pos + i32(1));
+          }
+        );
+      };
+
+      // no closing '>'
+      return result;
+    });
+
+    // Parse bare url form
+    (level : i32) = i32(0);
+    (done : bool) = false;
+    while ((pos < max) && !(done)), {
+      code = bytes.get(usize(pos)).unwrap();
+
+      cond(
+        // space - end of url
+        (code == u8(0x20)) => {
+          done = true;
+        },
+        // ascii control characters
+        ((i32(code) < i32(0x20)) || (code == u8(0x7F))) => {
+          done = true;
+        },
+        // backslash escape
+        ((code == u8(0x5C)) && ((pos + i32(1)) < max)) => {
+          if((bytes.get(usize((pos + i32(1)))).unwrap() == u8(0x20)), {
+            done = true;
+          }, {
+            pos = (pos + i32(2));
+          });
+        },
+        // opening paren
+        (code == u8(0x28)) => {
+          level = (level + i32(1));
+          if((level > i32(32)), {
+            return result;
+          });
+          pos = (pos + i32(1));
+        },
+        // closing paren
+        (code == u8(0x29)) => {
+          if((level == i32(0)), {
+            done = true;
+          }, {
+            level = (level - i32(1));
+            pos = (pos + i32(1));
+          });
+        },
+        true => {
+          pos = (pos + i32(1));
+        }
+      );
+    };
+
+    if((start == pos), {
+      return result;
+    });
+    if((level != i32(0)), {
+      return result;
+    });
+
+    (slice_bytes : ArrayList(u8)) = bytes.slice(usize(start), usize(pos)).unwrap();
+    result = LinkDestResult(
+      ok: true,
+      pos: pos,
+      str: unescapeAll(String.from_bytes(slice_bytes))
+    );
+    result
+  }
+);
+
+export LinkDestResult, parse_link_destination;

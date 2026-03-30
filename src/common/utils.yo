@@ -5,37 +5,8 @@
 open import "std/string";
 { ArrayList } :: import "std/collections/array_list";
 { Regex, RegexMatch } :: import "std/regex";
-
-// ============================================================================
-// isValidEntityCode
-// ============================================================================
-
-// Check if a Unicode codepoint is a valid HTML entity value.
-isValidEntityCode :: (fn(c: i32) -> bool)(
-  cond(
-    ((c >= i32(0xD800)) && (c <= i32(0xDFFF))) => false,
-    ((c >= i32(0xFDD0)) && (c <= i32(0xFDEF))) => false,
-    (((c & i32(0xFFFF)) == i32(0xFFFF)) || ((c & i32(0xFFFF)) == i32(0xFFFE))) => false,
-    ((c >= i32(0x00)) && (c <= i32(0x08))) => false,
-    (c == i32(0x0B)) => false,
-    ((c >= i32(0x0E)) && (c <= i32(0x1F))) => false,
-    ((c >= i32(0x7F)) && (c <= i32(0x9F))) => false,
-    (c > i32(0x10FFFF)) => false,
-    true => true
-  )
-);
-
-// ============================================================================
-// fromCodePoint
-// ============================================================================
-
-// Convert a Unicode codepoint to a String.
-fromCodePoint :: (fn(c: i32) -> String)(
-  {
-    (r : rune) = rune(u32(c));
-    `${r}`
-  }
-);
+{ isValidEntityCode, fromCodePoint } :: import "./char_utils.yo";
+{ decodeHTML } :: import "./entities.yo";
 
 // ============================================================================
 // escapeHtml
@@ -195,5 +166,203 @@ arrayReplaceAt :: (fn(forall(T : Type), src: ArrayList(T), pos: i32, newElements
   }
 );
 
+// ============================================================================
+// isPunctChar
+// ============================================================================
+
+// Ported from: uc.micro — checks if a character is a Unicode punctuation or symbol.
+// Unicode General Categories: Pc, Pd, Pe, Pf, Pi, Po, Ps, Sc, Sk, Sm, So
+//
+// Instead of porting the full uc.micro regex (which is huge), we check the
+// Unicode ranges directly. This covers the same codepoints as uc.micro P and S.
+isPunctChar :: (fn(ch: i32) -> bool)(
+  cond(
+    // ASCII punctuation (common case, fast path)
+    ((ch >= i32(0x21)) && (ch <= i32(0x2F))) => true,
+    ((ch >= i32(0x3A)) && (ch <= i32(0x40))) => true,
+    ((ch >= i32(0x5B)) && (ch <= i32(0x60))) => true,
+    ((ch >= i32(0x7B)) && (ch <= i32(0x7E))) => true,
+    // Latin-1 Supplement punctuation/symbols
+    ((ch >= i32(0xA1)) && (ch <= i32(0xA7))) => true,
+    (ch == i32(0xA9)) => true,
+    ((ch >= i32(0xAB)) && (ch <= i32(0xAC))) => true,
+    (ch == i32(0xAE)) => true,
+    ((ch >= i32(0xB0)) && (ch <= i32(0xB1))) => true,
+    (ch == i32(0xB6)) => true,
+    (ch == i32(0xBB)) => true,
+    (ch == i32(0xBF)) => true,
+    (ch == i32(0xD7)) => true,
+    (ch == i32(0xF7)) => true,
+    // General Punctuation block
+    ((ch >= i32(0x2010)) && (ch <= i32(0x2027))) => true,
+    ((ch >= i32(0x2030)) && (ch <= i32(0x205E))) => true,
+    // Supplemental Punctuation
+    ((ch >= i32(0x2E00)) && (ch <= i32(0x2E52))) => true,
+    // CJK Symbols and Punctuation
+    ((ch >= i32(0x3001)) && (ch <= i32(0x3003))) => true,
+    ((ch >= i32(0x3008)) && (ch <= i32(0x3011))) => true,
+    ((ch >= i32(0x3014)) && (ch <= i32(0x301F))) => true,
+    (ch == i32(0x3030)) => true,
+    // Fullwidth punctuation
+    (ch == i32(0xFF01)) => true,
+    ((ch >= i32(0xFF05)) && (ch <= i32(0xFF0A))) => true,
+    ((ch >= i32(0xFF0C)) && (ch <= i32(0xFF0F))) => true,
+    ((ch >= i32(0xFF1A)) && (ch <= i32(0xFF1B))) => true,
+    ((ch >= i32(0xFF1F)) && (ch <= i32(0xFF20))) => true,
+    ((ch >= i32(0xFF3B)) && (ch <= i32(0xFF3D))) => true,
+    (ch == i32(0xFF3F)) => true,
+    (ch == i32(0xFF5B)) => true,
+    (ch == i32(0xFF5D)) => true,
+    ((ch >= i32(0xFF5F)) && (ch <= i32(0xFF65))) => true,
+    // Currency Symbols (Sc)
+    ((ch >= i32(0x20A0)) && (ch <= i32(0x20CF))) => true,
+    // Math Symbols (Sm) common ranges
+    ((ch >= i32(0x2200)) && (ch <= i32(0x22FF))) => true,
+    // Misc Symbols (So)
+    ((ch >= i32(0x2300)) && (ch <= i32(0x23FF))) => true,
+    ((ch >= i32(0x2600)) && (ch <= i32(0x26FF))) => true,
+    ((ch >= i32(0x2700)) && (ch <= i32(0x27BF))) => true,
+    // Arrows
+    ((ch >= i32(0x2190)) && (ch <= i32(0x21FF))) => true,
+    // Misc Technical
+    ((ch >= i32(0x2300)) && (ch <= i32(0x23FF))) => true,
+    // Box Drawing, Block Elements
+    ((ch >= i32(0x2500)) && (ch <= i32(0x259F))) => true,
+    // Geometric Shapes
+    ((ch >= i32(0x25A0)) && (ch <= i32(0x25FF))) => true,
+    // Dingbats
+    ((ch >= i32(0x2700)) && (ch <= i32(0x27BF))) => true,
+    // Modifier letter/symbol ranges
+    ((ch >= i32(0x02C2)) && (ch <= i32(0x02C5))) => true,
+    ((ch >= i32(0x02D2)) && (ch <= i32(0x02DF))) => true,
+    ((ch >= i32(0x02E5)) && (ch <= i32(0x02EB))) => true,
+    (ch == i32(0x02ED)) => true,
+    ((ch >= i32(0x02EF)) && (ch <= i32(0x02FF))) => true,
+    true => false
+  )
+);
+
+// ============================================================================
+// unescapeAll
+// ============================================================================
+
+// Ported from: lib/common/utils.mjs — unescapeAll
+// Unescapes both markdown backslash escapes (\*) AND HTML entities (&amp; &#x26; etc.)
+_is_md_punct_char :: (fn(ch: u8) -> bool)(
+  cond(
+    (ch == u8(0x21)) => true, // !
+    (ch == u8(0x22)) => true, // "
+    (ch == u8(0x23)) => true, // #
+    (ch == u8(0x24)) => true, // $
+    (ch == u8(0x25)) => true, // %
+    (ch == u8(0x26)) => true, // &
+    (ch == u8(0x27)) => true, // '
+    (ch == u8(0x28)) => true, // (
+    (ch == u8(0x29)) => true, // )
+    (ch == u8(0x2A)) => true, // *
+    (ch == u8(0x2B)) => true, // +
+    (ch == u8(0x2C)) => true, // ,
+    (ch == u8(0x2D)) => true, // -
+    (ch == u8(0x2E)) => true, // .
+    (ch == u8(0x2F)) => true, // /
+    (ch == u8(0x3A)) => true, // :
+    (ch == u8(0x3B)) => true, // ;
+    (ch == u8(0x3C)) => true, // <
+    (ch == u8(0x3D)) => true, // =
+    (ch == u8(0x3E)) => true, // >
+    (ch == u8(0x3F)) => true, // ?
+    (ch == u8(0x40)) => true, // @
+    (ch == u8(0x5B)) => true, // [
+    (ch == u8(0x5C)) => true, // backslash
+    (ch == u8(0x5D)) => true, // ]
+    (ch == u8(0x5E)) => true, // ^
+    (ch == u8(0x5F)) => true, // _
+    (ch == u8(0x60)) => true, // `
+    (ch == u8(0x7B)) => true, // {
+    (ch == u8(0x7C)) => true, // |
+    (ch == u8(0x7D)) => true, // }
+    (ch == u8(0x7E)) => true, // ~
+    true => false
+  )
+);
+
+unescapeAll :: (fn(input: String) -> String)(
+  {
+    // Fast path: no backslash or ampersand means nothing to unescape
+    if((!(input.contains(`\\`)) && !(input.contains(`&`))), {
+      return input;
+    });
+
+    (bytes : ArrayList(u8)) = input.as_bytes();
+    (result : String) = ``;
+    (i : usize) = usize(0);
+    (len : usize) = bytes.len();
+
+    while (i < len), {
+      (ch : u8) = bytes.get(i).unwrap();
+
+      cond(
+        // Backslash escape: \X where X is a markdown punctuation char
+        ((ch == u8(0x5C)) && ((i + usize(1)) < len)) => {
+          (next : u8) = bytes.get((i + usize(1))).unwrap();
+          if(_is_md_punct_char(next), {
+            result = `${result}${fromCodePoint(i32(next))}`;
+            i = (i + usize(2));
+          }, {
+            result = `${result}\\`;
+            i = (i + usize(1));
+          });
+        },
+
+        // Ampersand: try to decode HTML entity
+        (ch == u8(0x26)) => {
+          // Find the extent of the potential entity: &...;
+          // Collect from & to ; (max 32 chars for entity name)
+          (entity_start : usize) = i;
+          (j : usize) = (i + usize(1));
+          (found_semi : bool) = false;
+          (max_entity : usize) = cond(
+            ((i + usize(34)) < len) => (i + usize(34)),
+            true => len
+          );
+
+          while ((j < max_entity) && !(found_semi)), {
+            (ech : u8) = bytes.get(j).unwrap();
+            if((ech == u8(0x3B)), {
+              found_semi = true;
+            }, {
+              j = (j + usize(1));
+            });
+          };
+
+          if(found_semi, {
+            // Extract the entity substring including & and ;
+            (entity_str : String) = input.substring(entity_start, (j + usize(1)));
+            (decoded : String) = decodeHTML(entity_str);
+            // If decodeHTML changed the string, it was a valid entity
+            if(!(decoded == entity_str), {
+              result = `${result}${decoded}`;
+              i = (j + usize(1));
+            }, {
+              result = `${result}&`;
+              i = (i + usize(1));
+            });
+          }, {
+            result = `${result}&`;
+            i = (i + usize(1));
+          });
+        },
+
+        true => {
+          result = `${result}${fromCodePoint(i32(ch))}`;
+          i = (i + usize(1));
+        }
+      );
+    };
+
+    result
+  }
+);
+
 export isValidEntityCode, fromCodePoint, escapeHtml, isSpace, isWhiteSpace,
-       isMdAsciiPunct, unescapeMd, normalizeReference, arrayReplaceAt;
+       isMdAsciiPunct, isPunctChar, unescapeMd, unescapeAll, normalizeReference, arrayReplaceAt;

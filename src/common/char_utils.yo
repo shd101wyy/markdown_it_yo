@@ -1,0 +1,29 @@
+// Shared character utility functions used by both utils.yo and entities.yo
+// to avoid circular imports.
+
+open import "std/string";
+
+// Check if a Unicode codepoint is a valid HTML entity value.
+isValidEntityCode :: (fn(c: i32) -> bool)(
+  cond(
+    ((c >= i32(0xD800)) && (c <= i32(0xDFFF))) => false,
+    ((c >= i32(0xFDD0)) && (c <= i32(0xFDEF))) => false,
+    (((c & i32(0xFFFF)) == i32(0xFFFF)) || ((c & i32(0xFFFF)) == i32(0xFFFE))) => false,
+    ((c >= i32(0x00)) && (c <= i32(0x08))) => false,
+    (c == i32(0x0B)) => false,
+    ((c >= i32(0x0E)) && (c <= i32(0x1F))) => false,
+    ((c >= i32(0x7F)) && (c <= i32(0x9F))) => false,
+    (c > i32(0x10FFFF)) => false,
+    true => true
+  )
+);
+
+// Convert a Unicode codepoint to a String.
+fromCodePoint :: (fn(c: i32) -> String)(
+  {
+    (r : rune) = rune(u32(c));
+    `${r}`
+  }
+);
+
+export isValidEntityCode, fromCodePoint;

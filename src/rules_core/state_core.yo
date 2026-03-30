@@ -1,0 +1,30 @@
+// Ported from: lib/rules_core/state_core.mjs (markdown-it v14.1.1)
+//
+// Core state object — container for the token stream and parser context.
+
+open import "std/string";
+{ ArrayList } :: import "std/collections/array_list";
+{ Token } :: import "../token.yo";
+
+// Core parser state
+StateCore :: struct(
+  src : String,
+  tokens : ArrayList(Token),
+  inline_mode : bool,
+  // md field will be added in Phase 5 when MarkdownIt type is defined
+  // env is a generic "environment" (used for references, etc.)
+  // For now we store env as an opaque pointer; it will be typed later.
+  env : *(void)
+);
+
+// Create a new StateCore
+new_state_core :: (fn(src: String, env: *(void)) -> StateCore)(
+  StateCore(
+    src: src,
+    tokens: ArrayList(Token).new(),
+    inline_mode: false,
+    env: env
+  )
+);
+
+export StateCore, new_state_core;

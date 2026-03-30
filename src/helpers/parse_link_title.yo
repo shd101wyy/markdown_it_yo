@@ -1,0 +1,118 @@
+// Ported from: lib/helpers/parse_link_title.mjs (markdown-it v14.1.1)
+//
+// Parse link title from markdown source.
+// Supports multi-line titles for reference links via prev_state continuation.
+
+open import "std/string";
+{ ArrayList } :: import "std/collections/array_list";
+{ unescapeAll } :: import "../common/utils.yo";
+
+// Result of parsing a link title
+LinkTitleResult :: struct(
+  ok : bool,
+  can_continue : bool,
+  pos : i32,
+  str : String,
+  marker : i32
+);
+
+// Create a default (failed) result
+_default_title_result :: (fn() -> LinkTitleResult)(
+  LinkTitleResult(ok: false, can_continue: false, pos: i32(0), str: ``, marker: i32(0))
+);
+
+// Parse link title within `input` in [start, max] range.
+// If `prev_state` is .Some(state), this is a continuation from a previous call
+// (used in reference links that span multiple lines).
+parse_link_title :: (fn(input: String, start_param: i32, max: i32, prev_state: Option(LinkTitleResult)) -> LinkTitleResult)(
+  {
+    (bytes : ArrayList(u8)) = input.as_bytes();
+    (start : i32) = start_param;
+    (pos : i32) = start;
+    (state : LinkTitleResult) = _default_title_result();
+
+    match(prev_state,
+      .Some(prev) => {
+        state = LinkTitleResult(
+          ok: false,
+          can_continue: false,
+          pos: i32(0),
+          str: prev.str,
+          marker: prev.marker
+        );
+      },
+      .None => {
+        if((pos >= max), {
+          return state;
+        });
+
+        (marker_byte : u8) = bytes.get(usize(pos)).unwrap();
+        (marker : i32) = i32(marker_byte);
+
+        // Must start with ", ', or (
+        if(((marker != i32(0x22)) && ((marker != i32(0x27)) && (marker != i32(0x28)))), {
+          return state;
+        });
+
+        start = (start + i32(1));
+        pos = (pos + i32(1));
+
+        // if opening marker is "(", switch to closing marker ")"
+        if((marker == i32(0x28)), {
+          marker = i32(0x29);
+        });
+
+        state = LinkTitleResult(
+          ok: false,
+          can_continue: false,
+          pos: i32(0),
+          str: ``,
+          marker: marker
+        );
+      }
+    );
+
+    while (pos < max), {
+      (code : u8) = bytes.get(usize(pos)).unwrap();
+
+      cond(
+        // Found closing marker
+        (i32(code) == state.marker) => {
+          (slice_bytes : ArrayList(u8)) = bytes.slice(usize(start), usize(pos)).unwrap();
+          state = LinkTitleResult(
+            ok: true,
+            can_continue: false,
+            pos: (pos + i32(1)),
+            str: `${state.str}${unescapeAll(String.from_bytes(slice_bytes))}`,
+            marker: state.marker
+          );
+          return state;
+        },
+        // ( inside ) pair — not allowed
+        ((code == u8(0x28)) && (state.marker == i32(0x29))) => {
+          return state;
+        },
+        // Backslash escape
+        ((code == u8(0x5C)) && ((pos + i32(1)) < max)) => {
+          pos = (pos + i32(2));
+        },
+        true => {
+          pos = (pos + i32(1));
+        }
+      );
+    };
+
+    // No closing marker found, but this title may continue on next line (for references)
+    (slice_bytes : ArrayList(u8)) = bytes.slice(usize(start), usize(pos)).unwrap();
+    state = LinkTitleResult(
+      ok: false,
+      can_continue: true,
+      pos: i32(0),
+      str: `${state.str}${unescapeAll(String.from_bytes(slice_bytes))}`,
+      marker: state.marker
+    );
+    state
+  }
+);
+
+export LinkTitleResult, parse_link_title;
