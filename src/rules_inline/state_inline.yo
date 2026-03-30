@@ -68,11 +68,15 @@ StateInline :: struct(
   _src_bytes : ArrayList(u8),
 
   // Function pointer for recursive inline tokenization (avoids circular imports)
-  _tokenize_fn : (fn(state: *(Self)) -> unit)
+  _tokenize_fn : (fn(state: *(Self)) -> unit),
+
+  // Function pointer for full inline parse (tokenize + post-processing).
+  // Used by image rule to parse alt text children.
+  _parse_fn : (fn(state: *(Self)) -> unit)
 );
 
 // Create a new StateInline
-new_state_inline :: (fn(src: String, env: *(Env), out_tokens: ArrayList(Token), html_enabled: bool, tokenize_fn: (fn(state: *(StateInline)) -> unit)) -> StateInline)(
+new_state_inline :: (fn(src: String, env: *(Env), out_tokens: ArrayList(Token), html_enabled: bool, tokenize_fn: (fn(state: *(StateInline)) -> unit), parse_fn: (fn(state: *(StateInline)) -> unit)) -> StateInline)(
   {
     (bytes : ArrayList(u8)) = src.as_bytes();
     (pos_max : i32) = i32(bytes.len());
@@ -95,7 +99,8 @@ new_state_inline :: (fn(src: String, env: *(Env), out_tokens: ArrayList(Token), 
       link_level: i32(0),
       html_enabled: html_enabled,
       _src_bytes: bytes,
-      _tokenize_fn: tokenize_fn
+      _tokenize_fn: tokenize_fn,
+      _parse_fn: parse_fn
     )
   }
 );

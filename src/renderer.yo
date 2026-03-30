@@ -144,10 +144,46 @@ _render_fence :: (fn(tokens: ArrayList(Token), idx: i32, options: *(Options)) ->
   })
 });
 
+// Special kludge for image alt attributes to conform CommonMark spec.
+// Renders inline token children as plain text, stripping all markup.
+render_inline_as_text :: (fn(tokens: ArrayList(Token)) -> String)({
+  (result : String) = ``;
+  (i : i32) = i32(0);
+  while (i < i32(tokens.len())), {
+    (tok : Token) = tokens.get(usize(i)).unwrap();
+    (tn : String) = tok.type_name;
+    cond(
+      (tn == `text`) => { result = `${result}${tok.content}`; },
+      (tn == `image`) => {
+        match(tok.children,
+          .Some(children) => {
+            (child_text : String) = recur(children);
+            result = `${result}${child_text}`;
+          },
+          .None => ()
+        );
+      },
+      ((tn == `html_inline`) || (tn == `html_block`)) => {
+        result = `${result}${tok.content}`;
+      },
+      ((tn == `softbreak`) || (tn == `hardbreak`)) => {
+        result = `${result}\n`;
+      },
+      true => ()
+    );
+    i = (i + i32(1));
+  };
+  result
+});
+
 _render_image :: (fn(tokens: ArrayList(Token), idx: i32, options: *(Options)) -> String)({
   (token : Token) = tokens.get(usize(idx)).unwrap();
-  // Set alt attribute value from content (like JS renderInlineAsText)
-  (alt_text : String) = escapeHtml(token.content);
+  // Alt text: strip markdown from children (renderInlineAsText)
+  // render_token will escapeHtml the attribute value
+  (alt_text : String) = match(token.children,
+    .Some(children) => render_inline_as_text(children),
+    .None => token.content
+  );
   // Find and update the alt attribute
   match(token.attrs,
     .Some(attrs) => {

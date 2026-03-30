@@ -5,7 +5,7 @@
 open import "std/string";
 { ArrayList } :: import "std/collections/array_list";
 { Token, StringPair } :: import "../token.yo";
-{ StateInline } :: import "./state_inline.yo";
+{ StateInline, new_state_inline } :: import "./state_inline.yo";
 { state_push } :: import "./inline_helpers.yo";
 { isSpace, normalizeReference } :: import "../common/utils.yo";
 { validate_link, normalize_link } :: import "../common/link_utils.yo";
@@ -129,6 +129,11 @@ image_rule :: (fn(state: *(StateInline), silent: bool) -> bool)({
     (label_bytes : ArrayList(u8)) = state.*._src_bytes.slice(usize(label_start), usize(label_end)).unwrap();
     (content : String) = String.from_bytes(label_bytes);
 
+    // Parse alt text content through the full inline parser to get child tokens
+    (children_tokens : ArrayList(Token)) = ArrayList(Token).new();
+    (sub_state : StateInline) = new_state_inline(content, state.*.env, children_tokens, state.*.html_enabled, state.*._tokenize_fn, state.*._parse_fn);
+    state.*._parse_fn((&sub_state));
+
     (token : Token) = state_push(state, `image`, `img`, i32(0));
     (attrs : ArrayList(StringPair)) = ArrayList(StringPair).new();
     _ := attrs.push(StringPair(name: `src`, value: href));
@@ -137,7 +142,7 @@ image_rule :: (fn(state: *(StateInline), silent: bool) -> bool)({
       _ := attrs.push(StringPair(name: `title`, value: title));
     });
     token.attrs = .Some(attrs);
-    token.children = .Some(ArrayList(Token).new());
+    token.children = .Some(children_tokens);
     token.content = content;
     state.*.tokens.set(usize((i32(state.*.tokens.len()) - i32(1))), token);
   });
