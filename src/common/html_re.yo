@@ -7,7 +7,7 @@ open import "std/string";
 // HTML regex pattern components.
 // Base patterns (compile-time strings):
 attr_name :: "([a-zA-Z_:][a-zA-Z0-9:._-]*)";
-unquoted :: "([^\"'=<>`\\0- ]+)";
+unquoted :: "([^\"'=<>`\\x00-\\x20]+)";
 single_quoted :: "('[^']*')";
 double_quoted :: "(\"[^\"]*\")";
 
