@@ -6,7 +6,7 @@ open import "std/string";
 { ArrayList } :: import "std/collections/array_list";
 { Token, StringPair } :: import "./token.yo";
 { Options } :: import "./options.yo";
-{ escapeHtml } :: import "./common/utils.yo";
+{ escapeHtml, unescapeAll } :: import "./common/utils.yo";
 
 // Render attributes of a token as an HTML attribute string.
 // Returns a string like ` class="foo" id="bar"`.
@@ -105,7 +105,10 @@ _render_code_block :: (fn(tokens: ArrayList(Token), idx: i32, options: *(Options
 
 _render_fence :: (fn(tokens: ArrayList(Token), idx: i32, options: *(Options)) -> String)({
   (token : Token) = tokens.get(usize(idx)).unwrap();
-  (info : String) = token.info;
+  (info : String) = cond(
+    (token.info.len() > usize(0)) => unescapeAll(token.info).trim(),
+    true => ``
+  );
 
   // Extract language name (first word of info string)
   (lang_name : String) = ``;

@@ -24,8 +24,43 @@ open import "std/string";
 { html_inline } :: import "./rules_inline/html_inline.yo";
 
 // Post-processing rules
-{ process_delimiters, link_pairs } :: import "./rules_inline/balance_pairs.yo";
+{ link_pairs } :: import "./rules_inline/balance_pairs.yo";
 { fragments_join } :: import "./rules_inline/fragments_join.yo";
+
+// Standalone inline tokenize function — stored in StateInline._tokenize_fn
+// to allow recursive calls from link/image rules without circular imports.
+_inline_tokenize :: (fn(state: *(StateInline)) -> unit)({
+  while (state.*.pos < state.*.pos_max), {
+    // Try inline rules in order (same as markdown-it default preset)
+    (ok : bool) = false;
+    if(!(ok), { ok = text(state, false); });
+    if(!(ok), { ok = newline(state, false); });
+    if(!(ok), { ok = escape_rule(state, false); });
+    if(!(ok), { ok = backtick(state, false); });
+    if(!(ok), { ok = strikethrough_tokenize(state, false); });
+    if(!(ok), { ok = emphasis_tokenize(state, false); });
+    if(!(ok), { ok = link_rule(state, false); });
+    if(!(ok), { ok = image_rule(state, false); });
+    if(!(ok), { ok = autolink(state, false); });
+    if(!(ok), { ok = html_inline(state, false); });
+    if(!(ok), { ok = entity(state, false); });
+
+    if(!(ok), {
+      // No rule matched — consume character as pending text
+      (ch_byte : u8) = state.*._src_bytes.get(usize(state.*.pos)).unwrap();
+      (ch_bytes : ArrayList(u8)) = ArrayList(u8).new();
+      _ := ch_bytes.push(ch_byte);
+      (ch_str : String) = String.from_bytes(ch_bytes);
+      state.*.pending = `${state.*.pending}${ch_str}`;
+      state.*.pos = (state.*.pos + i32(1));
+    });
+  };
+
+  // Flush remaining pending text
+  if((state.*.pending.len() > usize(0)), {
+    flush_pending(state);
+  });
+});
 
 // Inline parser
 ParserInline :: struct(
@@ -37,50 +72,13 @@ new_parser_inline :: (fn() -> ParserInline)(
 );
 
 impl(ParserInline,
-  // Tokenize inline content. Tries each inline rule in order at each position.
-  tokenize : (fn(self: Self, state: *(StateInline)) -> unit)({
-    (max_nesting : i32) = i32(100);
-
-    while (state.*.pos < state.*.pos_max), {
-      // Try inline rules in order (same as markdown-it default preset)
-      (ok : bool) = false;
-      if(!(ok), { ok = text(state, false); });
-      if(!(ok), { ok = newline(state, false); });
-      if(!(ok), { ok = escape_rule(state, false); });
-      if(!(ok), { ok = backtick(state, false); });
-      if(!(ok), { ok = strikethrough_tokenize(state, false); });
-      if(!(ok), { ok = emphasis_tokenize(state, false); });
-      if(!(ok), { ok = link_rule(state, false); });
-      if(!(ok), { ok = image_rule(state, false); });
-      if(!(ok), { ok = autolink(state, false); });
-      if(!(ok), { ok = html_inline(state, false); });
-      if(!(ok), { ok = entity(state, false); });
-
-      if(!(ok), {
-        // No rule matched — consume character as pending text
-        (ch_byte : u8) = state.*._src_bytes.get(usize(state.*.pos)).unwrap();
-        (ch_bytes : ArrayList(u8)) = ArrayList(u8).new();
-        _ := ch_bytes.push(ch_byte);
-        (ch_str : String) = String.from_bytes(ch_bytes);
-        state.*.pending = `${state.*.pending}${ch_str}`;
-        state.*.pos = (state.*.pos + i32(1));
-      });
-    };
-
-    // Flush remaining pending text
-    if((state.*.pending.len() > usize(0)), {
-      flush_pending(state);
-    });
-  }),
-
   // Parse inline content: tokenize then run post-processing rules.
   parse : (fn(self: Self, src: String, env: *(Env), out_tokens: ArrayList(Token), html_enabled: bool) -> unit)({
-    (state : StateInline) = new_state_inline(src, env, out_tokens, html_enabled);
-    self.tokenize((&state));
+    (state : StateInline) = new_state_inline(src, env, out_tokens, html_enabled, _inline_tokenize);
+    _inline_tokenize((&state));
 
     // Post-processing (ruler2) rules in order:
     // 1. balance_pairs — match delimiter pairs
-    process_delimiters(state.delimiters);
     link_pairs((&state));
     // 2. strikethrough post-process
     strikethrough_post_process((&state));

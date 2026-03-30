@@ -144,13 +144,12 @@ main :: (fn() -> unit)({
     assert((result == `<p><a href="http://a.com">a</a> and <a href="http://b.com">b</a></p>\n`), "multi-link");
   };
 
-  // Test 17: Emphasis inside link (simplified — no recursive inline yet)
+  // Test 17: Emphasis inside link
   {
     (md : MarkdownIt) = new_markdown_it();
     (result : String) = md.render_src(`[*text*](http://example.com)`);
     println(`Test 17 (link+emphasis): '${result}'`);
-    // Without recursive inline parsing, emphasis markers stay as literal chars
-    assert((result == `<p><a href="http://example.com">*text*</a></p>\n`), "link with emphasis");
+    assert((result == `<p><a href="http://example.com"><em>text</em></a></p>\n`), "link with emphasis");
   };
 
   // Test 18: Escaped chars

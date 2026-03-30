@@ -168,14 +168,8 @@ link_rule :: (fn(state: *(StateInline), silent: bool) -> bool)({
 
     state.*.link_level = (state.*.link_level + i32(1));
 
-    // Emit label content as text token (simplified: no recursive inline parsing)
-    (label_bytes : ArrayList(u8)) = state.*._src_bytes.slice(usize(label_start), usize(label_end)).unwrap();
-    (label_text : String) = String.from_bytes(label_bytes);
-    if((label_text.len() > usize(0)), {
-      (text_tok : Token) = state_push(state, `text`, ``, i32(0));
-      text_tok.content = label_text;
-      state.*.tokens.set(usize((i32(state.*.tokens.len()) - i32(1))), text_tok);
-    });
+    // Recursively tokenize the link label content (processes escapes, emphasis, etc.)
+    state.*._tokenize_fn(state);
 
     state.*.link_level = (state.*.link_level - i32(1));
 

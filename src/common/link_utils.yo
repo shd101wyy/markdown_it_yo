@@ -1,7 +1,8 @@
 // Link validation and normalization utilities.
-// Simplified versions of markdown-it's normalizeLink/validateLink/normalizeLinkText.
+// Ported from markdown-it's normalizeLink/validateLink/normalizeLinkText.
 
 open import "std/string";
+{ ArrayList } :: import "std/collections/array_list";
 
 // Bad protocol patterns for link validation
 _is_bad_protocol :: (fn(url: String) -> bool)({
@@ -35,10 +36,104 @@ validate_link :: (fn(url: String) -> bool)(
   !(_is_bad_protocol(url))
 );
 
-// Normalize a link URL. For now, returns the URL as-is.
-// TODO: Full URL encoding/normalization (mdurl equivalent)
+// Check if a byte is a hex digit
+_is_hex_digit :: (fn(b: u8) -> bool)(
+  cond(
+    ((b >= u8(0x30)) && (b <= u8(0x39))) => true,
+    ((b >= u8(0x41)) && (b <= u8(0x46))) => true,
+    ((b >= u8(0x61)) && (b <= u8(0x66))) => true,
+    true => false
+  )
+);
+
+// Check if a byte is URL-safe (should NOT be percent-encoded).
+// Matches mdurl's encode: preserves ;/?:@&=+$,-_.!~*'()# and alphanumeric
+_is_url_safe :: (fn(b: u8) -> bool)(
+  cond(
+    ((b >= u8(0x41)) && (b <= u8(0x5A))) => true,
+    ((b >= u8(0x61)) && (b <= u8(0x7A))) => true,
+    ((b >= u8(0x30)) && (b <= u8(0x39))) => true,
+    (b == u8(0x3B)) => true,
+    (b == u8(0x2F)) => true,
+    (b == u8(0x3F)) => true,
+    (b == u8(0x3A)) => true,
+    (b == u8(0x40)) => true,
+    (b == u8(0x26)) => true,
+    (b == u8(0x3D)) => true,
+    (b == u8(0x2B)) => true,
+    (b == u8(0x24)) => true,
+    (b == u8(0x2C)) => true,
+    (b == u8(0x2D)) => true,
+    (b == u8(0x5F)) => true,
+    (b == u8(0x2E)) => true,
+    (b == u8(0x21)) => true,
+    (b == u8(0x7E)) => true,
+    (b == u8(0x2A)) => true,
+    (b == u8(0x27)) => true,
+    (b == u8(0x28)) => true,
+    (b == u8(0x29)) => true,
+    (b == u8(0x23)) => true,
+    true => false
+  )
+);
+
+// Convert a nibble (0-15) to a hex character
+_to_hex_char :: (fn(n: u8) -> u8)(
+  cond(
+    (n < u8(10)) => (n + u8(0x30)),
+    true => ((n - u8(10)) + u8(0x41))
+  )
+);
+
+// Check if position i starts an already-encoded %XX sequence
+_is_encoded_seq :: (fn(bytes: *(ArrayList(u8)), i: usize, len: usize) -> bool)({
+  if(!(((i + usize(2)) < len)), {
+    return false;
+  });
+  (b0 : u8) = bytes.*.get(i).unwrap();
+  if(!((b0 == u8(0x25))), {
+    return false;
+  });
+  (b1 : u8) = bytes.*.get((i + usize(1))).unwrap();
+  (b2 : u8) = bytes.*.get((i + usize(2))).unwrap();
+  (_is_hex_digit(b1) && _is_hex_digit(b2))
+});
+
+// Percent-encode a URL string. Matches mdurl.encode behavior:
+// - Preserves URL-safe characters and already-encoded %XX sequences
+// - Encodes everything else as %XX (UTF-8 bytes)
+_percent_encode :: (fn(url: String) -> String)({
+  (bytes : ArrayList(u8)) = url.as_bytes();
+  (result : ArrayList(u8)) = ArrayList(u8).with_capacity(bytes.len());
+  (i : usize) = usize(0);
+  (len : usize) = bytes.len();
+
+  while (i < len), {
+    (b : u8) = bytes.get(i).unwrap();
+
+    if(_is_encoded_seq(&(bytes), i, len), {
+      _ := result.push(b);
+      _ := result.push(bytes.get((i + usize(1))).unwrap());
+      _ := result.push(bytes.get((i + usize(2))).unwrap());
+      i = (i + usize(3));
+    }, if(_is_url_safe(b), {
+      _ := result.push(b);
+      i = (i + usize(1));
+    }, {
+      _ := result.push(u8(0x25));
+      _ := result.push(_to_hex_char((b / u8(16))));
+      _ := result.push(_to_hex_char((b % u8(16))));
+      i = (i + usize(1));
+    }));
+  };
+
+  String.from_bytes(result)
+});
+
+// Normalize a link URL. Percent-encodes unsafe characters.
+// Simplified version of markdown-it's normalizeLink (no punycode).
 normalize_link :: (fn(url: String) -> String)(
-  url
+  _percent_encode(url)
 );
 
 // Normalize link text for display. For now, returns as-is.
