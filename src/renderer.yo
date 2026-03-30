@@ -6,7 +6,7 @@ open import "std/string";
 { ArrayList } :: import "std/collections/array_list";
 { Token, StringPair } :: import "./token.yo";
 { Options } :: import "./options.yo";
-{ escapeHtml, unescapeAll } :: import "./common/utils.yo";
+{ escapeHtml, unescapeAll, isWhiteSpace } :: import "./common/utils.yo";
 
 // Render attributes of a token as an HTML attribute string.
 // Returns a string like ` class="foo" id="bar"`.
@@ -119,7 +119,7 @@ _render_fence :: (fn(tokens: ArrayList(Token), idx: i32, options: *(Options)) ->
     (found_space : bool) = false;
     while (((space_pos < i32(info_bytes.len())) && !(found_space))), {
       (b : i32) = i32(info_bytes.get(usize(space_pos)).unwrap());
-      if((((b == i32(0x20)) || (b == i32(0x09))) || (b == i32(0x0A))), {
+      if(((((b == i32(0x20)) || (b == i32(0x09))) || ((b == i32(0x0A)) || (b == i32(0x0B)))) || ((b == i32(0x0C)) || (b == i32(0x0D)))), {
         found_space = true;
       }, {
         space_pos = (space_pos + i32(1));
