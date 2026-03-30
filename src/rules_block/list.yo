@@ -1,0 +1,378 @@
+// Ported from: lib/rules_block/list.mjs (markdown-it v14.1.1)
+//
+// Lists (bullet and ordered)
+
+open import "std/string";
+{ ArrayList } :: import "std/collections/array_list";
+{ Token, StringPair } :: import "../token.yo";
+{ StateBlock, BlockTokenizeFn, block_push_token } :: import "./state_block.yo";
+{ isSpace } :: import "../common/utils.yo";
+
+// Search [-+*][\n ], returns next pos after marker on success, or -1 on fail.
+skip_bullet_list_marker :: (fn(state: *(StateBlock), start_line: i32) -> i32)({
+  (max : i32) = state.*.e_marks.get(usize(start_line)).unwrap();
+  (pos : i32) = (state.*.b_marks.get(usize(start_line)).unwrap() + state.*.t_shift.get(usize(start_line)).unwrap());
+
+  if((pos >= max), { return i32(-1); });
+
+  (marker : i32) = i32(state.*._src_bytes.get(usize(pos)).unwrap());
+  pos = (pos + i32(1));
+
+  // Check bullet: *, -, +
+  if((((marker != i32(0x2A)) && (marker != i32(0x2D))) && (marker != i32(0x2B))), {
+    return i32(-1);
+  });
+
+  if((pos < max), {
+    (ch : i32) = i32(state.*._src_bytes.get(usize(pos)).unwrap());
+    if(!(isSpace(ch)), {
+      return i32(-1);
+    });
+  });
+
+  pos
+});
+
+// Search \d+[.)][\n ], returns next pos after marker on success, or -1 on fail.
+skip_ordered_list_marker :: (fn(state: *(StateBlock), start_line: i32) -> i32)({
+  (start : i32) = (state.*.b_marks.get(usize(start_line)).unwrap() + state.*.t_shift.get(usize(start_line)).unwrap());
+  (max : i32) = state.*.e_marks.get(usize(start_line)).unwrap();
+  (pos : i32) = start;
+
+  // List marker should have at least 2 chars (digit + dot)
+  if(((pos + i32(1)) >= max), { return i32(-1); });
+
+  (ch : i32) = i32(state.*._src_bytes.get(usize(pos)).unwrap());
+  pos = (pos + i32(1));
+
+  if(((ch < i32(0x30)) || (ch > i32(0x39))), { return i32(-1); });
+
+  (found_end : bool) = false;
+  while !(found_end), {
+    if((pos >= max), { return i32(-1); });
+
+    ch = i32(state.*._src_bytes.get(usize(pos)).unwrap());
+    pos = (pos + i32(1));
+
+    if(((ch >= i32(0x30)) && (ch <= i32(0x39))), {
+      // List marker should have no more than 9 digits
+      if(((pos - start) >= i32(10)), { return i32(-1); });
+    }, if(((ch == i32(0x29)) || (ch == i32(0x2E))), {
+      found_end = true;
+    }, {
+      return i32(-1);
+    }));
+  };
+
+  if((pos < max), {
+    ch = i32(state.*._src_bytes.get(usize(pos)).unwrap());
+    if(!(isSpace(ch)), { return i32(-1); });
+  });
+
+  pos
+});
+
+// Mark paragraph tokens as hidden for tight lists.
+mark_tight_paragraphs :: (fn(state: *(StateBlock), idx: usize) -> unit)({
+  (level : i32) = (state.*.level + i32(2));
+  (i : i32) = (i32(idx) + i32(2));
+  (l : i32) = (i32(state.*.tokens.len()) - i32(2));
+
+  while (i < l), {
+    (tok : Token) = state.*.tokens.get(usize(i)).unwrap();
+    if(((tok.level == level) && (tok.type_name == `paragraph_open`)), {
+      tok.hidden = true;
+      state.*.tokens.set(usize(i), tok);
+
+      (next : Token) = state.*.tokens.get(usize((i + i32(2)))).unwrap();
+      next.hidden = true;
+      state.*.tokens.set(usize((i + i32(2))), next);
+
+      i = (i + i32(2));
+    });
+    i = (i + i32(1));
+  };
+});
+
+// Parse ordered list start value from source bytes.
+parse_ordered_value :: (fn(state: *(StateBlock), start: i32, end: i32) -> i32)({
+  (marker_value : i32) = i32(0);
+  (parse_pos : i32) = start;
+  while (parse_pos < end), {
+    (digit : i32) = (i32(state.*._src_bytes.get(usize(parse_pos)).unwrap()) - i32(0x30));
+    marker_value = ((marker_value * i32(10)) + digit);
+    parse_pos = (parse_pos + i32(1));
+  };
+  marker_value
+});
+
+list :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: bool) -> bool)({
+  (next_line : i32) = start_line;
+  (tight : bool) = true;
+
+  // If indented more than 3 spaces, it should be a code block
+  if(((state.*.s_count.get(usize(next_line)).unwrap() - state.*.blk_indent) >= i32(4)), {
+    return false;
+  });
+
+  // Special case:
+  //  - item 1
+  //   - item 2
+  //    - item 3
+  //     - item 4
+  //      - this one is a paragraph continuation
+  if(((state.*.list_indent >= i32(0)) && (((state.*.s_count.get(usize(next_line)).unwrap() - state.*.list_indent) >= i32(4)) && (state.*.s_count.get(usize(next_line)).unwrap() < state.*.blk_indent))), {
+    return false;
+  });
+
+  (is_terminating_paragraph : bool) = false;
+
+  // Limit conditions when list can interrupt a paragraph (validation mode only)
+  if((silent && (state.*.parent_type == `paragraph`)), {
+    if((state.*.s_count.get(usize(next_line)).unwrap() >= state.*.blk_indent), {
+      is_terminating_paragraph = true;
+    });
+  });
+
+  // Detect list type and position after marker
+  (is_ordered : bool) = false;
+  (marker_value : i32) = i32(0);
+  (pos_after_marker : i32) = skip_ordered_list_marker(state, next_line);
+  (start : i32) = i32(0);
+
+  if((pos_after_marker >= i32(0)), {
+    is_ordered = true;
+    start = (state.*.b_marks.get(usize(next_line)).unwrap() + state.*.t_shift.get(usize(next_line)).unwrap());
+    marker_value = parse_ordered_value(state, start, (pos_after_marker - i32(1)));
+
+    // If we're starting a new ordered list right after a paragraph, it should start with 1.
+    if((is_terminating_paragraph && (marker_value != i32(1))), {
+      return false;
+    });
+  }, {
+    pos_after_marker = skip_bullet_list_marker(state, next_line);
+    if((pos_after_marker < i32(0)), { return false; });
+  });
+
+  // If we're starting a new unordered list right after a paragraph,
+  // first line should not be empty.
+  if(is_terminating_paragraph, {
+    if((state.*.skip_spaces(pos_after_marker) >= state.*.e_marks.get(usize(next_line)).unwrap()), {
+      return false;
+    });
+  });
+
+  // For validation mode we can terminate immediately
+  if(silent, { return true; });
+
+  // We should terminate list on style change. Remember first one to compare.
+  (marker_char_code : i32) = i32(state.*._src_bytes.get(usize((pos_after_marker - i32(1)))).unwrap());
+
+  // Build markup string from marker char
+  (markup_str : String) = cond(
+    (marker_char_code == i32(0x2A)) => `*`,
+    (marker_char_code == i32(0x2D)) => `-`,
+    (marker_char_code == i32(0x2B)) => `+`,
+    (marker_char_code == i32(0x2E)) => `.`,
+    (marker_char_code == i32(0x29)) => `)`,
+    true => ``
+  );
+
+  // Start list
+  (list_tok_idx : usize) = state.*.tokens.len();
+
+  (list_tag : String) = cond(is_ordered => `ol`, true => `ul`);
+  (list_type_open : String) = cond(is_ordered => `ordered_list_open`, true => `bullet_list_open`);
+
+  // Create list open token
+  (list_open : Token) = Token.new(list_type_open, list_tag, i32(1));
+  list_open.block = true;
+  list_open.markup = markup_str;
+  (list_lines : ArrayList(i32)) = ArrayList(i32).new();
+  _ := list_lines.push(next_line);
+  _ := list_lines.push(i32(0));
+  list_open.map = .Some(list_lines);
+
+  if((is_ordered && (marker_value != i32(1))), {
+    (attrs : ArrayList(StringPair)) = ArrayList(StringPair).new();
+    _ := attrs.push(StringPair(name: `start`, value: `${marker_value}`));
+    list_open.attrs = .Some(attrs);
+  });
+
+  block_push_token(state, list_open);
+
+  //
+  // Iterate list items
+  //
+  (prev_empty_end : bool) = false;
+  (old_parent_type : String) = state.*.parent_type;
+  state.*.parent_type = `list`;
+
+  (list_done : bool) = false;
+  while ((next_line < end_line) && !(list_done)), {
+    (pos : i32) = pos_after_marker;
+    (max : i32) = state.*.e_marks.get(usize(next_line)).unwrap();
+
+    (initial : i32) = ((state.*.s_count.get(usize(next_line)).unwrap() + pos_after_marker) - (state.*.b_marks.get(usize(next_line)).unwrap() + state.*.t_shift.get(usize(next_line)).unwrap()));
+    (offset : i32) = initial;
+
+    // Skip whitespace after marker to find content start
+    (ws_done : bool) = false;
+    while ((pos < max) && !(ws_done)), {
+      (ch : i32) = i32(state.*._src_bytes.get(usize(pos)).unwrap());
+      cond(
+        (ch == i32(0x09)) => {
+          offset = (offset + (i32(4) - ((offset + state.*.bs_count.get(usize(next_line)).unwrap()) % i32(4))));
+        },
+        (ch == i32(0x20)) => {
+          offset = (offset + i32(1));
+        },
+        true => {
+          ws_done = true;
+        }
+      );
+      if(!(ws_done), { pos = (pos + i32(1)); });
+    };
+
+    (content_start : i32) = pos;
+    (indent_after_marker : i32) = cond(
+      (content_start >= max) => i32(1),
+      true => (offset - initial)
+    );
+
+    // If we have more than 4 spaces, the indent is 1
+    // (the rest is just indented code block)
+    if((indent_after_marker > i32(4)), { indent_after_marker = i32(1); });
+
+    // "  -  test"
+    //  ^^^^^ - calculating total length of this thing
+    (indent : i32) = (initial + indent_after_marker);
+
+    // Run subparser & write tokens
+    (item_open : Token) = Token.new(`list_item_open`, `li`, i32(1));
+    item_open.block = true;
+    item_open.markup = markup_str;
+    (item_lines : ArrayList(i32)) = ArrayList(i32).new();
+    _ := item_lines.push(next_line);
+    _ := item_lines.push(i32(0));
+    item_open.map = .Some(item_lines);
+    if(is_ordered, {
+      item_open.info = state.*.src.substring(usize(start), usize((pos_after_marker - i32(1))));
+    });
+
+    block_push_token(state, item_open);
+
+    // change current state, then restore it after parser subcall
+    (old_tight : bool) = state.*.tight;
+    (old_t_shift : i32) = state.*.t_shift.get(usize(next_line)).unwrap();
+    (old_s_count : i32) = state.*.s_count.get(usize(next_line)).unwrap();
+    (old_list_indent : i32) = state.*.list_indent;
+
+    state.*.list_indent = state.*.blk_indent;
+    state.*.blk_indent = indent;
+    state.*.tight = true;
+    state.*.t_shift.set(usize(next_line), (content_start - state.*.b_marks.get(usize(next_line)).unwrap()));
+    state.*.s_count.set(usize(next_line), offset);
+
+    if(((content_start >= max) && state.*.is_empty((next_line + i32(1)))), {
+      // workaround for this case
+      // (list item is empty, list terminates before "foo"):
+      // ~~~~~~~~
+      //   -
+      //
+      //     foo
+      // ~~~~~~~~
+      (new_line : i32) = (state.*.line + i32(2));
+      if((new_line > end_line), { new_line = end_line; });
+      state.*.line = new_line;
+    }, {
+      // Recursive tokenize
+      (tokenize : BlockTokenizeFn) = state.*._tokenize_fn;
+      tokenize(state, next_line, end_line);
+    });
+
+    // If any of list item is tight, mark list as tight
+    if((!(state.*.tight) || prev_empty_end), {
+      tight = false;
+    });
+
+    // Item become loose if finish with empty line,
+    // but we should filter last element, because it means list finish
+    prev_empty_end = (((state.*.line - next_line) > i32(1)) && state.*.is_empty((state.*.line - i32(1))));
+
+    // Restore state
+    state.*.blk_indent = state.*.list_indent;
+    state.*.list_indent = old_list_indent;
+    state.*.t_shift.set(usize(next_line), old_t_shift);
+    state.*.s_count.set(usize(next_line), old_s_count);
+    state.*.tight = old_tight;
+
+    // Close list item
+    (item_close : Token) = Token.new(`list_item_close`, `li`, i32(-1));
+    item_close.block = true;
+    item_close.markup = markup_str;
+    block_push_token(state, item_close);
+
+    next_line = state.*.line;
+    item_lines.set(usize(1), next_line);
+
+    if((next_line >= end_line), { list_done = true; });
+
+    if(!(list_done), {
+      if((state.*.s_count.get(usize(next_line)).unwrap() < state.*.blk_indent), {
+        list_done = true;
+      });
+    });
+
+    if(!(list_done), {
+      if(((state.*.s_count.get(usize(next_line)).unwrap() - state.*.blk_indent) >= i32(4)), {
+        list_done = true;
+      });
+    });
+
+    // No terminator rules check (getRules('list') returns empty in markdown-it default preset)
+
+    if(!(list_done), {
+      // Check for next list item with same marker style
+      if(is_ordered, {
+        pos_after_marker = skip_ordered_list_marker(state, next_line);
+        if((pos_after_marker < i32(0)), {
+          list_done = true;
+        }, {
+          start = (state.*.b_marks.get(usize(next_line)).unwrap() + state.*.t_shift.get(usize(next_line)).unwrap());
+        });
+      }, {
+        pos_after_marker = skip_bullet_list_marker(state, next_line);
+        if((pos_after_marker < i32(0)), { list_done = true; });
+      });
+    });
+
+    if(!(list_done), {
+      // Check marker style hasn't changed
+      if((marker_char_code != i32(state.*._src_bytes.get(usize((pos_after_marker - i32(1)))).unwrap())), {
+        list_done = true;
+      });
+    });
+  };
+
+  // Close list
+  (list_type_close : String) = cond(is_ordered => `ordered_list_close`, true => `bullet_list_close`);
+  (list_close : Token) = Token.new(list_type_close, list_tag, i32(-1));
+  list_close.block = true;
+  list_close.markup = markup_str;
+  block_push_token(state, list_close);
+
+  list_lines.set(usize(1), next_line);
+  state.*.line = next_line;
+
+  state.*.parent_type = old_parent_type;
+
+  // mark paragraphs tight if needed
+  if(tight, {
+    mark_tight_paragraphs(state, list_tok_idx);
+  });
+
+  true
+});
+
+export list;

@@ -5,7 +5,7 @@
 open import "std/string";
 { ArrayList } :: import "std/collections/array_list";
 { Token, StringPair } :: import "../token.yo";
-{ StateBlock } :: import "./state_block.yo";
+{ StateBlock, block_push_token } :: import "./state_block.yo";
 { BlockRuleFn } :: import "./lheading.yo";
 { isSpace } :: import "../common/utils.yo";
 { table_get_line, escaped_split } :: import "./table_helpers.yo";
@@ -181,7 +181,7 @@ table :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: bool,
   _ := table_lines.push(start_line);
   _ := table_lines.push(i32(0));
   token_to.map = .Some(table_lines);
-  state.*.push_token(token_to);
+  block_push_token(state, token_to);
 
   // thead_open
   (token_tho : Token) = Token.new(`thead_open`, `thead`, i32(1));
@@ -189,7 +189,7 @@ table :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: bool,
   _ := thead_map.push(start_line);
   _ := thead_map.push((start_line + i32(1)));
   token_tho.map = .Some(thead_map);
-  state.*.push_token(token_tho);
+  block_push_token(state, token_tho);
 
   // tr_open
   (token_htro : Token) = Token.new(`tr_open`, `tr`, i32(1));
@@ -197,7 +197,7 @@ table :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: bool,
   _ := tr_map.push(start_line);
   _ := tr_map.push((start_line + i32(1)));
   token_htro.map = .Some(tr_map);
-  state.*.push_token(token_htro);
+  block_push_token(state, token_htro);
 
   // header cells
   (hi : i32) = i32(0);
@@ -207,19 +207,19 @@ table :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: bool,
     if((align_val.len() > usize(0)), {
       token_ho.attrPush(StringPair(name: `style`, value: `text-align:${align_val}`));
     });
-    state.*.push_token(token_ho);
+    block_push_token(state, token_ho);
 
     (token_il : Token) = Token.new(`inline`, ``, i32(0));
     token_il.content = header_columns.get(usize(hi)).unwrap().trim();
     token_il.children = .Some(ArrayList(Token).new());
-    state.*.push_token(token_il);
+    block_push_token(state, token_il);
 
-    state.*.push_token(Token.new(`th_close`, `th`, i32(-1)));
+    block_push_token(state, Token.new(`th_close`, `th`, i32(-1)));
     hi = (hi + i32(1));
   };
 
-  state.*.push_token(Token.new(`tr_close`, `tr`, i32(-1)));
-  state.*.push_token(Token.new(`thead_close`, `thead`, i32(-1)));
+  block_push_token(state, Token.new(`tr_close`, `tr`, i32(-1)));
+  block_push_token(state, Token.new(`thead_close`, `thead`, i32(-1)));
 
   // Body rows
   (tbody_opened : bool) = false;
@@ -272,7 +272,7 @@ table :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: bool,
                 _ := tbody_map.push(tbody_start_line);
                 _ := tbody_map.push(i32(0));
                 token_tbo.map = .Some(tbody_map);
-                state.*.push_token(token_tbo);
+                block_push_token(state, token_tbo);
                 tbody_opened = true;
               });
 
@@ -281,7 +281,7 @@ table :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: bool,
               _ := tro_map.push(next_line);
               _ := tro_map.push((next_line + i32(1)));
               token_tro.map = .Some(tro_map);
-              state.*.push_token(token_tro);
+              block_push_token(state, token_tro);
 
               (ri : i32) = i32(0);
               while (ri < column_count), {
@@ -290,7 +290,7 @@ table :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: bool,
                 if((a_val.len() > usize(0)), {
                   token_tdo.attrPush(StringPair(name: `style`, value: `text-align:${a_val}`));
                 });
-                state.*.push_token(token_tdo);
+                block_push_token(state, token_tdo);
 
                 (token_il : Token) = Token.new(`inline`, ``, i32(0));
                 if((ri < i32(row_columns.len())), {
@@ -299,13 +299,13 @@ table :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: bool,
                   token_il.content = ``;
                 });
                 token_il.children = .Some(ArrayList(Token).new());
-                state.*.push_token(token_il);
+                block_push_token(state, token_il);
 
-                state.*.push_token(Token.new(`td_close`, `td`, i32(-1)));
+                block_push_token(state, Token.new(`td_close`, `td`, i32(-1)));
                 ri = (ri + i32(1));
               };
 
-              state.*.push_token(Token.new(`tr_close`, `tr`, i32(-1)));
+              block_push_token(state, Token.new(`tr_close`, `tr`, i32(-1)));
               next_line = (next_line + i32(1));
             });
           });
@@ -315,12 +315,12 @@ table :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: bool,
   };
 
   if(tbody_opened, {
-    state.*.push_token(Token.new(`tbody_close`, `tbody`, i32(-1)));
+    block_push_token(state, Token.new(`tbody_close`, `tbody`, i32(-1)));
     // Update tbody_map end line — we can't easily update in-place through the token list,
     // so we skip this for now (it's only used for source map)
   });
 
-  state.*.push_token(Token.new(`table_close`, `table`, i32(-1)));
+  block_push_token(state, Token.new(`table_close`, `table`, i32(-1)));
   // Update table_lines end line — same caveat as above
 
   state.*.parent_type = old_parent_type;

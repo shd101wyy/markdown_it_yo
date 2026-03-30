@@ -6,7 +6,7 @@ open import "std/string";
 { ArrayList } :: import "std/collections/array_list";
 { Regex } :: import "std/regex";
 { Token } :: import "../token.yo";
-{ StateBlock } :: import "./state_block.yo";
+{ StateBlock, block_push_token } :: import "./state_block.yo";
 { html_blocks } :: import "../common/html_blocks.yo";
 { html_re, HtmlRegexPatterns } :: import "../common/html_re.yo";
 
@@ -194,7 +194,7 @@ html_block :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: 
   _ := map.push(start_line);
   _ := map.push(next_line);
   token.map = .Some(map);
-  state.*.push_token(token);
+  block_push_token(state, token);
 
   true
 });

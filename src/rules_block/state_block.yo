@@ -44,6 +44,22 @@ StateBlock :: struct(
 // Function pointer type for recursive block tokenization
 BlockTokenizeFn :: (fn(state: *(StateBlock), start: i32, end: i32) -> unit);
 
+// Push a block-level token via pointer, correctly maintaining nesting level.
+// Use this instead of the push_token method which has a by-value self bug.
+block_push_token :: (fn(state: *(StateBlock), tok: Token) -> unit)({
+  (token : Token) = tok;
+
+  if((token.nesting < i32(0)), {
+    state.*.level = (state.*.level - i32(1));
+  });
+  token.level = state.*.level;
+  if((token.nesting > i32(0)), {
+    state.*.level = (state.*.level + i32(1));
+  });
+
+  _ := state.*.tokens.push(token);
+});
+
 // Create a new StateBlock and precompute line markers
 new_state_block :: (fn(src: String, env: *(Env), tokens: ArrayList(Token), html_enabled: bool, tokenize_fn: BlockTokenizeFn) -> StateBlock)(
   {
@@ -322,4 +338,4 @@ impl(StateBlock,
   })
 );
 
-export StateBlock, new_state_block, BlockTokenizeFn;
+export StateBlock, new_state_block, BlockTokenizeFn, block_push_token;

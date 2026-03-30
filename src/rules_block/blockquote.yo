@@ -5,7 +5,7 @@
 open import "std/string";
 { ArrayList } :: import "std/collections/array_list";
 { Token } :: import "../token.yo";
-{ StateBlock, BlockTokenizeFn } :: import "./state_block.yo";
+{ StateBlock, BlockTokenizeFn, block_push_token } :: import "./state_block.yo";
 { isSpace } :: import "../common/utils.yo";
 { BlockRuleFn } :: import "./lheading.yo";
 
@@ -178,13 +178,8 @@ blockquote :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: 
   _ := map_arr.push(start_line);
   _ := map_arr.push(i32(0));
   token_o.map = .Some(map_arr);
-
-  // Manual level tracking since push_token is by-value
-  (open_level : i32) = state.*.level;
-  token_o.level = open_level;
-  state.*.level = (state.*.level + i32(1));
   (open_token_idx : usize) = state.*.tokens.len();
-  _ := state.*.tokens.push(token_o);
+  block_push_token(state, token_o);
 
   // Recursively tokenize nested content
   (tokenize : BlockTokenizeFn) = state.*._tokenize_fn;
@@ -194,9 +189,7 @@ blockquote :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: 
   (token_c : Token) = Token.new(`blockquote_close`, `blockquote`, i32(-1));
   token_c.markup = `>`;
   token_c.block = true;
-  state.*.level = (state.*.level - i32(1));
-  token_c.level = state.*.level;
-  _ := state.*.tokens.push(token_c);
+  block_push_token(state, token_c);
 
   // Update map_end on the open token
   (updated_open : Token) = state.*.tokens.get(open_token_idx).unwrap();
