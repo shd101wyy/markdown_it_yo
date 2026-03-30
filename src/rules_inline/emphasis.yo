@@ -1,0 +1,134 @@
+// Ported from: lib/rules_inline/emphasis.mjs (markdown-it v14.1.1)
+//
+// Process *this* and _that_
+
+open import "std/string";
+{ ArrayList } :: import "std/collections/array_list";
+{ Token } :: import "../token.yo";
+{ fromCodePoint } :: import "../common/char_utils.yo";
+{ StateInline, Delimiter, TokenMeta, ScanDelimsResult } :: import "./state_inline.yo";
+{ flush_pending, inline_push_token } :: import "./inline_helpers.yo";
+
+// Insert each marker as a separate text token, and add it to delimiter list
+emphasis_tokenize :: (fn(state: *(StateInline), silent: bool) -> bool)({
+  (start : i32) = state.*.pos;
+  (marker : i32) = i32(state.*._src_bytes.get(usize(start)).unwrap());
+
+  if(silent, {
+    return false;
+  });
+
+  if(((marker != i32(0x5F)) && (marker != i32(0x2A))), {
+    return false;
+  });
+
+  (scanned : ScanDelimsResult) = state.*.scan_delims(state.*.pos, (marker == i32(0x2A)));
+  (marker_str : String) = fromCodePoint(marker);
+
+  (i : i32) = i32(0);
+  while (i < scanned.length), {
+    (token : Token) = Token.new(`text`, ``, i32(0));
+    token.content = marker_str;
+    token.level = state.*.level;
+    inline_push_token(state, token);
+
+    (delim : Delimiter) = Delimiter(
+      marker: marker,
+      length: scanned.length,
+      token_idx: (i32(state.*.tokens.len()) - i32(1)),
+      end: i32(-1),
+      open: scanned.can_open,
+      close: scanned.can_close
+    );
+    _ := state.*.delimiters.push(delim);
+
+    i = (i + i32(1));
+  };
+
+  state.*.pos = (state.*.pos + scanned.length);
+  true
+});
+
+// Walk through delimiter list and replace text tokens with tags
+_post_process_emphasis :: (fn(tokens: ArrayList(Token), delimiters: ArrayList(Delimiter)) -> unit)({
+  (max : i32) = i32(delimiters.len());
+
+  (i : i32) = (max - i32(1));
+  while (i >= i32(0)), {
+    (start_delim : Delimiter) = delimiters.get(usize(i)).unwrap();
+
+    if((((start_delim.marker == i32(0x5F)) || (start_delim.marker == i32(0x2A)))
+        && (start_delim.end != i32(-1))), {
+      (end_delim : Delimiter) = delimiters.get(usize(start_delim.end)).unwrap();
+
+      // Check if previous delimiter is adjacent → strong emphasis
+      (is_strong : bool) = false;
+      if((i > i32(0)), {
+        (prev : Delimiter) = delimiters.get(usize((i - i32(1)))).unwrap();
+        if(((prev.end == (start_delim.end + i32(1))) && (prev.marker == start_delim.marker)), {
+          if((prev.token_idx == (start_delim.token_idx - i32(1))), {
+            (next_end : Delimiter) = delimiters.get(usize((start_delim.end + i32(1)))).unwrap();
+            if((next_end.token_idx == (end_delim.token_idx + i32(1))), {
+              is_strong = true;
+            });
+          });
+        });
+      });
+
+      (ch : String) = fromCodePoint(start_delim.marker);
+
+      // Opening token
+      (token_o : Token) = tokens.get(usize(start_delim.token_idx)).unwrap();
+      token_o.type_name = cond(is_strong => `strong_open`, true => `em_open`);
+      token_o.tag = cond(is_strong => `strong`, true => `em`);
+      token_o.nesting = i32(1);
+      token_o.markup = cond(is_strong => `${ch}${ch}`, true => ch);
+      token_o.content = ``;
+      tokens.set(usize(start_delim.token_idx), token_o);
+
+      // Closing token
+      (token_c : Token) = tokens.get(usize(end_delim.token_idx)).unwrap();
+      token_c.type_name = cond(is_strong => `strong_close`, true => `em_close`);
+      token_c.tag = cond(is_strong => `strong`, true => `em`);
+      token_c.nesting = i32(-1);
+      token_c.markup = cond(is_strong => `${ch}${ch}`, true => ch);
+      token_c.content = ``;
+      tokens.set(usize(end_delim.token_idx), token_c);
+
+      // If strong, clear inner delimiter tokens
+      if(is_strong, {
+        (prev_delim : Delimiter) = delimiters.get(usize((i - i32(1)))).unwrap();
+        (tok1 : Token) = tokens.get(usize(prev_delim.token_idx)).unwrap();
+        tok1.content = ``;
+        tokens.set(usize(prev_delim.token_idx), tok1);
+
+        (next_end_delim : Delimiter) = delimiters.get(usize((start_delim.end + i32(1)))).unwrap();
+        (tok2 : Token) = tokens.get(usize(next_end_delim.token_idx)).unwrap();
+        tok2.content = ``;
+        tokens.set(usize(next_end_delim.token_idx), tok2);
+
+        i = (i - i32(1));
+      });
+    });
+
+    i = (i - i32(1));
+  };
+});
+
+emphasis_post_process :: (fn(state: *(StateInline)) -> unit)({
+  _post_process_emphasis(state.*.tokens, state.*.delimiters);
+
+  (tokens_meta : ArrayList(Option(TokenMeta))) = state.*.tokens_meta;
+  (max : i32) = i32(tokens_meta.len());
+
+  (curr : i32) = i32(0);
+  while (curr < max), {
+    match(tokens_meta.get(usize(curr)).unwrap(),
+      .Some(tm) => _post_process_emphasis(state.*.tokens, tm.delimiters),
+      .None => ()
+    );
+    curr = (curr + i32(1));
+  };
+});
+
+export emphasis_tokenize, emphasis_post_process;

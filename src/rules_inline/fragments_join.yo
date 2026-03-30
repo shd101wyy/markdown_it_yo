@@ -1,0 +1,62 @@
+// Ported from: lib/rules_inline/fragments_join.mjs (markdown-it v14.1.1)
+//
+// Clean up tokens after emphasis and strikethrough postprocessing:
+// merge adjacent text nodes into one and re-calculate all token levels.
+
+open import "std/string";
+{ ArrayList } :: import "std/collections/array_list";
+{ Token } :: import "../token.yo";
+{ StateInline } :: import "./state_inline.yo";
+
+fragments_join :: (fn(state: *(StateInline)) -> unit)({
+  (level : i32) = i32(0);
+  (tokens : ArrayList(Token)) = state.*.tokens;
+  (max : i32) = i32(tokens.len());
+
+  (curr : i32) = i32(0);
+  (last : i32) = i32(0);
+
+  while (curr < max), {
+    (tok : Token) = tokens.get(usize(curr)).unwrap();
+
+    // re-calculate levels
+    if((tok.nesting < i32(0)), {
+      level = (level - i32(1));
+    });
+    tok.level = level;
+    tokens.set(usize(curr), tok);
+    if((tok.nesting > i32(0)), {
+      level = (level + i32(1));
+    });
+
+    if(((tok.type_name == `text`) && ((curr + i32(1)) < max)), {
+      (next_tok : Token) = tokens.get(usize((curr + i32(1)))).unwrap();
+      if((next_tok.type_name == `text`), {
+        // collapse two adjacent text nodes
+        next_tok.content = `${tok.content}${next_tok.content}`;
+        tokens.set(usize((curr + i32(1))), next_tok);
+      }, {
+        if((curr != last), {
+          tokens.set(usize(last), tok);
+        });
+        last = (last + i32(1));
+      });
+    }, {
+      if((curr != last), {
+        tokens.set(usize(last), tok);
+      });
+      last = (last + i32(1));
+    });
+
+    curr = (curr + i32(1));
+  };
+
+  // Truncate tokens to `last` length
+  if((curr != last), {
+    while (i32(tokens.len()) > last), {
+      _ := tokens.pop();
+    };
+  });
+});
+
+export fragments_join;

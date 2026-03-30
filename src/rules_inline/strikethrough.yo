@@ -1,0 +1,142 @@
+// Ported from: lib/rules_inline/strikethrough.mjs (markdown-it v14.1.1)
+//
+// ~~strike through~~
+
+open import "std/string";
+{ ArrayList } :: import "std/collections/array_list";
+{ Token } :: import "../token.yo";
+{ fromCodePoint } :: import "../common/char_utils.yo";
+{ StateInline, Delimiter, TokenMeta, ScanDelimsResult } :: import "./state_inline.yo";
+{ flush_pending, inline_push_token } :: import "./inline_helpers.yo";
+
+// Insert each marker as a separate text token, and add it to delimiter list
+strikethrough_tokenize :: (fn(state: *(StateInline), silent: bool) -> bool)({
+  (start : i32) = state.*.pos;
+  (marker : i32) = i32(state.*._src_bytes.get(usize(start)).unwrap());
+
+  if(silent, {
+    return false;
+  });
+
+  if((marker != i32(0x7E)), {
+    return false;
+  });
+
+  (scanned : ScanDelimsResult) = state.*.scan_delims(state.*.pos, true);
+  (len : i32) = scanned.length;
+  (ch_str : String) = fromCodePoint(marker);
+
+  if((len < i32(2)), {
+    return false;
+  });
+
+  // If odd count, push one single marker text token and reduce len
+  if(((len % i32(2)) != i32(0)), {
+    (token : Token) = Token.new(`text`, ``, i32(0));
+    token.content = ch_str;
+    token.level = state.*.level;
+    inline_push_token(state, token);
+    len = (len - i32(1));
+  });
+
+  // Push pairs of markers as text tokens + delimiters
+  (i : i32) = i32(0);
+  while (i < len), {
+    (token : Token) = Token.new(`text`, ``, i32(0));
+    token.content = `${ch_str}${ch_str}`;
+    token.level = state.*.level;
+    inline_push_token(state, token);
+
+    (delim : Delimiter) = Delimiter(
+      marker: marker,
+      length: i32(0),
+      token_idx: (i32(state.*.tokens.len()) - i32(1)),
+      end: i32(-1),
+      open: scanned.can_open,
+      close: scanned.can_close
+    );
+    _ := state.*.delimiters.push(delim);
+
+    i = (i + i32(2));
+  };
+
+  state.*.pos = (state.*.pos + scanned.length);
+  true
+});
+
+// Walk through delimiter list and replace text tokens with tags
+_post_process_strikethrough :: (fn(tokens: ArrayList(Token), delimiters: ArrayList(Delimiter)) -> unit)({
+  (lone_markers : ArrayList(i32)) = ArrayList(i32).new();
+  (max : i32) = i32(delimiters.len());
+
+  (i : i32) = i32(0);
+  while (i < max), {
+    (start_delim : Delimiter) = delimiters.get(usize(i)).unwrap();
+
+    if(((start_delim.marker == i32(0x7E)) && (start_delim.end != i32(-1))), {
+      (end_delim : Delimiter) = delimiters.get(usize(start_delim.end)).unwrap();
+
+      // Opening token
+      (token_o : Token) = tokens.get(usize(start_delim.token_idx)).unwrap();
+      token_o.type_name = `s_open`;
+      token_o.tag = `s`;
+      token_o.nesting = i32(1);
+      token_o.markup = `~~`;
+      token_o.content = ``;
+      tokens.set(usize(start_delim.token_idx), token_o);
+
+      // Closing token
+      (token_c : Token) = tokens.get(usize(end_delim.token_idx)).unwrap();
+      token_c.type_name = `s_close`;
+      token_c.tag = `s`;
+      token_c.nesting = i32(-1);
+      token_c.markup = `~~`;
+      token_c.content = ``;
+      tokens.set(usize(end_delim.token_idx), token_c);
+
+      // Check for lone marker before closing token
+      if(((end_delim.token_idx - i32(1)) >= i32(0)), {
+        (prev_tok : Token) = tokens.get(usize((end_delim.token_idx - i32(1)))).unwrap();
+        if(((prev_tok.type_name == `text`) && (prev_tok.content == `~`)), {
+          _ := lone_markers.push((end_delim.token_idx - i32(1)));
+        });
+      });
+    });
+
+    i = (i + i32(1));
+  };
+
+  // Move lone markers after subsequent s_close tags
+  while (lone_markers.len() > usize(0)), {
+    (idx : i32) = lone_markers.pop().unwrap();
+    (j : i32) = (idx + i32(1));
+    while (((j < i32(tokens.len())) && (tokens.get(usize(j)).unwrap().type_name == `s_close`))), {
+      j = (j + i32(1));
+    };
+    j = (j - i32(1));
+    if((idx != j), {
+      (tok_j : Token) = tokens.get(usize(j)).unwrap();
+      (tok_i : Token) = tokens.get(usize(idx)).unwrap();
+      tokens.set(usize(j), tok_i);
+      tokens.set(usize(idx), tok_j);
+    });
+  };
+});
+
+strikethrough_post_process :: (fn(state: *(StateInline)) -> unit)({
+  _post_process_strikethrough(state.*.tokens, state.*.delimiters);
+
+  (tokens_meta : ArrayList(Option(TokenMeta))) = state.*.tokens_meta;
+  (max : i32) = i32(tokens_meta.len());
+
+  (curr : i32) = i32(0);
+  while (curr < max), {
+    match(tokens_meta.get(usize(curr)).unwrap(),
+      .Some(tm) => _post_process_strikethrough(state.*.tokens, tm.delimiters),
+      .None => ()
+    );
+    curr = (curr + i32(1));
+  };
+});
+
+export strikethrough_tokenize, strikethrough_post_process;

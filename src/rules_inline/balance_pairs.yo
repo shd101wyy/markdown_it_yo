@@ -1,0 +1,133 @@
+// Ported from: lib/rules_inline/balance_pairs.mjs (markdown-it v14.1.1)
+//
+// For each opening emphasis-like marker find a matching closing one
+
+open import "std/string";
+{ ArrayList } :: import "std/collections/array_list";
+{ HashMap } :: import "std/collections/hash_map";
+{ StateInline, Delimiter, TokenMeta } :: import "./state_inline.yo";
+
+process_delimiters :: (fn(delimiters: ArrayList(Delimiter)) -> unit)({
+  (max : i32) = i32(delimiters.len());
+  if((max == i32(0)), {
+    return ();
+  });
+
+  // openersBottom: for each marker, stores 6 lower bounds
+  // indices: [close%0, close%1, close%2, open%0, open%1, open%2]
+  (openers_bottom : HashMap(i32, ArrayList(i32))) = HashMap(i32, ArrayList(i32)).new();
+
+  // headerIdx is the first delimiter of the current delimiter run
+  (header_idx : i32) = i32(0);
+  (last_token_idx : i32) = i32(-2);
+  (jumps : ArrayList(i32)) = ArrayList(i32).new();
+
+  (closer_idx : i32) = i32(0);
+  while (closer_idx < max), {
+    (closer : Delimiter) = delimiters.get(usize(closer_idx)).unwrap();
+    _ := jumps.push(i32(0));
+
+    // markers belong to same delimiter run if adjacent tokens and same marker
+    (hdr : Delimiter) = delimiters.get(usize(header_idx)).unwrap();
+    if(((hdr.marker != closer.marker) || (last_token_idx != (closer.token_idx - i32(1)))), {
+      header_idx = closer_idx;
+    });
+
+    last_token_idx = closer.token_idx;
+
+    if(closer.close, {
+      // Get or create openers_bottom entry for this marker
+      (need_init : bool) = match(openers_bottom.get(closer.marker),
+        .None => true,
+        .Some(_) => false
+      );
+      if(need_init, {
+        (bottom : ArrayList(i32)) = ArrayList(i32).new();
+        _ := bottom.push(i32(-1));
+        _ := bottom.push(i32(-1));
+        _ := bottom.push(i32(-1));
+        _ := bottom.push(i32(-1));
+        _ := bottom.push(i32(-1));
+        _ := bottom.push(i32(-1));
+        openers_bottom.set(closer.marker, bottom);
+      });
+
+      (bottom_arr : ArrayList(i32)) = openers_bottom.get(closer.marker).unwrap();
+      (bottom_idx : i32) = cond(
+        closer.open => (i32(3) + (closer.length % i32(3))),
+        true => (closer.length % i32(3))
+      );
+      (min_opener_idx : i32) = bottom_arr.get(usize(bottom_idx)).unwrap();
+
+      (opener_idx : i32) = ((header_idx - jumps.get(usize(header_idx)).unwrap()) - i32(1));
+      (new_min_opener_idx : i32) = opener_idx;
+      (found_match : bool) = false;
+
+      while (((opener_idx > min_opener_idx) && (found_match == false))), {
+        (opener : Delimiter) = delimiters.get(usize(opener_idx)).unwrap();
+
+        if(((opener.marker == closer.marker) && (opener.open && (opener.end < i32(0)))), {
+          (is_odd_match : bool) = false;
+
+          if((opener.close || closer.open), {
+            if((((opener.length + closer.length) % i32(3)) == i32(0)), {
+              if((((opener.length % i32(3)) != i32(0)) || ((closer.length % i32(3)) != i32(0))), {
+                is_odd_match = true;
+              });
+            });
+          });
+
+          if((is_odd_match == false), {
+            (last_jump : i32) = cond(
+              ((opener_idx > i32(0)) && (delimiters.get(usize((opener_idx - i32(1)))).unwrap().open == false))
+                => (jumps.get(usize((opener_idx - i32(1)))).unwrap() + i32(1)),
+              true => i32(0)
+            );
+
+            jumps.set(usize(closer_idx), ((closer_idx - opener_idx) + last_jump));
+            jumps.set(usize(opener_idx), last_jump);
+
+            closer.open = false;
+            delimiters.set(usize(closer_idx), closer);
+
+            opener.end = closer_idx;
+            opener.close = false;
+            delimiters.set(usize(opener_idx), opener);
+
+            new_min_opener_idx = i32(-1);
+            last_token_idx = i32(-2);
+            found_match = true;
+          });
+        });
+
+        if((found_match == false), {
+          opener_idx = ((opener_idx - jumps.get(usize(opener_idx)).unwrap()) - i32(1));
+        });
+      };
+
+      if((new_min_opener_idx != i32(-1)), {
+        bottom_arr.set(usize(bottom_idx), new_min_opener_idx);
+      });
+    });
+
+    closer_idx = (closer_idx + i32(1));
+  };
+});
+
+link_pairs :: (fn(state: *(StateInline)) -> unit)({
+  (tokens_meta : ArrayList(Option(TokenMeta))) = state.*.tokens_meta;
+  (max : i32) = i32(tokens_meta.len());
+
+  process_delimiters(state.*.delimiters);
+
+  (curr : i32) = i32(0);
+  while (curr < max), {
+    match(tokens_meta.get(usize(curr)).unwrap(),
+      .Some(tm) => process_delimiters(tm.delimiters),
+      .None => ()
+    );
+    curr = (curr + i32(1));
+  };
+});
+
+export process_delimiters, link_pairs;
