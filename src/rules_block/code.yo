@@ -29,6 +29,8 @@ code :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: bool) 
     });
   };
 
+  if(silent, return true);
+
   state.*.line = last;
 
   (token : Token) = Token.new(`code_block`, `code`, i32(0));
