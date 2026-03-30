@@ -7,6 +7,7 @@ open import "std/string";
 { format } :: import "../mdurl/format.yo";
 { encode, ENCODE_DEFAULT_CHARS } :: import "../mdurl/encode.yo";
 { decode, DECODE_DEFAULT_CHARS } :: import "../mdurl/decode.yo";
+{ to_unicode, to_ascii } :: import "./punycode.yo";
 
 // Protocols for which we recode hostnames (punycode)
 RECODE_HOSTNAME_FOR :: "http:,https:,mailto:";
@@ -47,21 +48,17 @@ validate_link :: (fn(url: String) -> bool)(
 normalize_link :: (fn(url: String) -> String)({
   (parsed : Url) = parse(url, true);
 
-  // If hostname exists, check if we should recode it
-  // (punycode not implemented yet — skip for now)
+  // If hostname exists, encode to punycode ASCII form
   match(parsed.hostname,
-    .Some(_h) => {
+    .Some(h) => {
       (has_proto : bool) = match(parsed.protocol, .Some(_p) => true, .None => false);
       if(!(has_proto), {
-        // No protocol — would recode hostname
-        // TODO: punycode.to_ascii(hostname) when punycode is ported
-        ();
+        parsed.hostname = .Some(to_ascii(h));
       }, {
         match(parsed.protocol,
           .Some(p) => {
             if(_should_recode_hostname(&(p)), {
-              // TODO: punycode.to_ascii(hostname) when punycode is ported
-              ();
+              parsed.hostname = .Some(to_ascii(h));
             });
           },
           .None => ()
@@ -80,21 +77,17 @@ normalize_link :: (fn(url: String) -> String)({
 normalize_link_text :: (fn(url: String) -> String)({
   (parsed : Url) = parse(url, true);
 
-  // If hostname exists, check if we should recode it
-  // (punycode not implemented yet — skip for now)
+  // If hostname exists, decode punycode for display
   match(parsed.hostname,
-    .Some(_h) => {
+    .Some(h) => {
       (has_proto : bool) = match(parsed.protocol, .Some(_p) => true, .None => false);
       if(!(has_proto), {
-        // No protocol — would recode hostname
-        // TODO: punycode.to_unicode(hostname) when punycode is ported
-        ();
+        parsed.hostname = .Some(to_unicode(h));
       }, {
         match(parsed.protocol,
           .Some(p) => {
             if(_should_recode_hostname(&(p)), {
-              // TODO: punycode.to_unicode(hostname) when punycode is ported
-              ();
+              parsed.hostname = .Some(to_unicode(h));
             });
           },
           .None => ()

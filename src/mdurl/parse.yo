@@ -33,6 +33,15 @@ impl(Url,
   )
 );
 
+// Byte-based substring: extract bytes by byte positions and create String.
+// Used because scan positions are byte-based but String.substring uses char positions.
+_byte_substr :: (fn(s: *(String), start: usize, end: usize) -> String)(
+  match(s.*.as_bytes().slice(start, end),
+    .Ok(sub) => String.from_bytes(sub),
+    .Err(_e) => ``
+  )
+);
+
 // String helper: indexOf for String, returns -1 if not found
 _index_of :: (fn(s: *(String), ch: u8) -> i32)({
   (bytes : ArrayList(u8)) = s.*.as_bytes();
@@ -173,7 +182,7 @@ _hostname_part_start :: (fn(part: *(String)) -> Option(String))({
     );
     if(!(valid), {
       if((i > usize(0)), {
-        return .Some(part.*.substring(usize(0), i));
+        return .Some(_byte_substr(part, usize(0), i));
       }, {
         return .None;
       });
@@ -181,7 +190,7 @@ _hostname_part_start :: (fn(part: *(String)) -> Option(String))({
     i = (i + usize(1));
   };
   if((i > usize(0)), {
-    .Some(part.*.substring(usize(0), i))
+    .Some(_byte_substr(part, usize(0), i))
   }, {
     .None
   })
@@ -195,12 +204,12 @@ _split_dot :: (fn(s: *(String)) -> ArrayList(String))({
   (i : usize) = usize(0);
   while (i < bytes.len()), {
     if((bytes.get(i).unwrap() == u8(0x2E)), {
-      parts.push(s.*.substring(start, i));
+      parts.push(_byte_substr(s, start, i));
       start = (i + usize(1));
     });
     i = (i + usize(1));
   };
-  parts.push(s.*.substring(start, bytes.len()));
+  parts.push(_byte_substr(s, start, bytes.len()));
   parts
 });
 
@@ -241,16 +250,16 @@ _parse_host :: (fn(url: *(Url), host: String) -> unit)({
   };
 
   if((port_start >= i32(0)), {
-    (port_str : String) = host.substring(usize((port_start + i32(1))), usize(bytes.len()));
-    if((port_str.len() > usize(0)), {
+    (port_str : String) = _byte_substr(&(host), usize((port_start + i32(1))), bytes.len());
+    if((port_str.as_bytes().len() > usize(0)), {
       url.*.port = .Some(port_str);
     });
-    (h : String) = host.substring(usize(0), usize(port_start));
-    if((h.len() > usize(0)), {
+    (h : String) = _byte_substr(&(host), usize(0), usize(port_start));
+    if((h.as_bytes().len() > usize(0)), {
       url.*.hostname = .Some(h);
     });
   }, {
-    if((host.len() > usize(0)), {
+    if((host.as_bytes().len() > usize(0)), {
       url.*.hostname = .Some(host);
     });
   });
@@ -296,11 +305,11 @@ parse :: (fn(url_str: String, slashes_denote_host: bool) -> Url)({
       (qm : i32) = _index_of(&(rest), u8(0x3F));
       if((qm >= i32(0)), {
         // Has ?query but no space before it in path
-        (path_part : String) = rest.substring(usize(0), usize(qm));
+        (path_part : String) = _byte_substr(&(rest), usize(0), usize(qm));
         (has_space : bool) = (_index_of(&(path_part), u8(0x20)) >= i32(0));
         if(!(has_space), {
           u.pathname = .Some(path_part);
-          u.search = .Some(rest.substring(usize(qm), usize(rest_bytes.len())));
+          u.search = .Some(_byte_substr(&(rest), usize(qm), rest_bytes.len()));
           return u;
         });
       }, {
@@ -337,12 +346,12 @@ parse :: (fn(url_str: String, slashes_denote_host: bool) -> Url)({
       cond(
         (b == u8(0x3A)) => {
           if((pi > usize(0)), {
-            (p : String) = rest.substring(usize(0), (pi + usize(1)));
+            (p : String) = _byte_substr(&(rest), usize(0), (pi + usize(1)));
             (lp : String) = p.to_lowercase();
             proto = .Some(p);
             lower_proto = .Some(lp);
             u.protocol = proto;
-            rest = rest.substring((pi + usize(1)), usize(rest_bytes2.len()));
+            rest = _byte_substr(&(rest), (pi + usize(1)), rest_bytes2.len());
           });
           found_colon = true;
         },
@@ -382,7 +391,7 @@ parse :: (fn(url_str: String, slashes_denote_host: bool) -> Url)({
     if(starts_slashes, {
       (is_hostless : bool) = match(proto, .Some(p) => _is_hostless(&(p)), .None => false);
       if(!(is_hostless), {
-        rest = rest.substring(usize(2), usize(rest_bytes3.len()));
+        rest = _byte_substr(&(rest), usize(2), rest_bytes3.len());
         u.slashes = true;
         slashes = true;
       });
@@ -407,8 +416,8 @@ parse :: (fn(url_str: String, slashes_denote_host: bool) -> Url)({
 
     // Extract auth
     if((at_sign >= i32(0)), {
-      u.auth = .Some(rest.substring(usize(0), usize(at_sign)));
-      rest = rest.substring(usize((at_sign + i32(1))), usize(rest_bytes4.len()));
+      u.auth = .Some(_byte_substr(&(rest), usize(0), usize(at_sign)));
+      rest = _byte_substr(&(rest), usize((at_sign + i32(1))), rest_bytes4.len());
     });
 
     // Find first non-host char
@@ -424,8 +433,8 @@ parse :: (fn(url_str: String, slashes_denote_host: bool) -> Url)({
       host_end = (host_end - i32(1));
     });
 
-    (host : String) = rest.substring(usize(0), usize(host_end));
-    rest = rest.substring(usize(host_end), usize(rest_bytes5.len()));
+    (host : String) = _byte_substr(&(rest), usize(0), usize(host_end));
+    rest = _byte_substr(&(rest), usize(host_end), rest_bytes5.len());
 
     // Parse host for port
     _parse_host(&(u), host);
@@ -451,7 +460,7 @@ parse :: (fn(url_str: String, slashes_denote_host: bool) -> Url)({
       (done : bool) = false;
       while ((pi2 < parts.len()) && !(done)), {
         (part : String) = parts.get(pi2).unwrap();
-        if((part.len() > usize(0)), {
+        if((part.as_bytes().len() > usize(0)), {
           if(!(_valid_hostname_part(&(part))), {
             // Check if it's just non-ASCII chars causing issues
             (part_bytes : ArrayList(u8)) = part.as_bytes();
@@ -486,8 +495,8 @@ parse :: (fn(url_str: String, slashes_denote_host: bool) -> Url)({
               match(_hostname_part_start(&(part)),
                 .Some(bit) => {
                   valid_parts.push(bit);
-                  (remainder : String) = part.substring(bit.len(), usize(part_bytes.len()));
-                  if((remainder.len() > usize(0)), {
+                  (remainder : String) = _byte_substr(&(part), bit.as_bytes().len(), part_bytes.len());
+                  if((remainder.as_bytes().len() > usize(0)), {
                     // Prepend remainder to not_host
                     (new_not_host : ArrayList(String)) = ArrayList(String).new();
                     new_not_host.push(remainder);
@@ -518,7 +527,7 @@ parse :: (fn(url_str: String, slashes_denote_host: bool) -> Url)({
     // Hostname max length check
     match(u.hostname,
       .Some(h2) => {
-        if((h2.len() > usize(255)), {
+        if((h2.as_bytes().len() > usize(255)), {
           u.hostname = .Some(``);
         });
       },
@@ -529,7 +538,7 @@ parse :: (fn(url_str: String, slashes_denote_host: bool) -> Url)({
     if(is_ipv6, {
       match(u.hostname,
         .Some(h3) => {
-          u.hostname = .Some(h3.substring(usize(1), (h3.len() - usize(1))));
+          u.hostname = .Some(_byte_substr(&(h3), usize(1), (h3.as_bytes().len() - usize(1))));
         },
         .None => ()
       );
@@ -541,8 +550,8 @@ parse :: (fn(url_str: String, slashes_denote_host: bool) -> Url)({
     (hash_pos : i32) = _index_of(&(rest), u8(0x23));
     if((hash_pos >= i32(0)), {
       (rest_bytes6 : ArrayList(u8)) = rest.as_bytes();
-      u.hash = .Some(rest.substring(usize(hash_pos), usize(rest_bytes6.len())));
-      rest = rest.substring(usize(0), usize(hash_pos));
+      u.hash = .Some(_byte_substr(&(rest), usize(hash_pos), rest_bytes6.len()));
+      rest = _byte_substr(&(rest), usize(0), usize(hash_pos));
     });
   };
 
@@ -551,13 +560,13 @@ parse :: (fn(url_str: String, slashes_denote_host: bool) -> Url)({
     (qm_pos : i32) = _index_of(&(rest), u8(0x3F));
     if((qm_pos >= i32(0)), {
       (rest_bytes7 : ArrayList(u8)) = rest.as_bytes();
-      u.search = .Some(rest.substring(usize(qm_pos), usize(rest_bytes7.len())));
-      rest = rest.substring(usize(0), usize(qm_pos));
+      u.search = .Some(_byte_substr(&(rest), usize(qm_pos), rest_bytes7.len()));
+      rest = _byte_substr(&(rest), usize(0), usize(qm_pos));
     });
   };
 
   // Remaining is pathname
-  if((rest.len() > usize(0)), {
+  if((rest.as_bytes().len() > usize(0)), {
     u.pathname = .Some(rest);
   });
 
