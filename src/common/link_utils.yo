@@ -3,32 +3,38 @@
 
 open import "std/string";
 { ArrayList } :: import "std/collections/array_list";
+{ Url, parse } :: import "../mdurl/parse.yo";
+{ format } :: import "../mdurl/format.yo";
+{ encode, ENCODE_DEFAULT_CHARS } :: import "../mdurl/encode.yo";
+{ decode, DECODE_DEFAULT_CHARS } :: import "../mdurl/decode.yo";
+
+// Protocols for which we recode hostnames (punycode)
+RECODE_HOSTNAME_FOR :: "http:,https:,mailto:";
+
+// Check if a protocol string is in the recode list
+_should_recode_hostname :: (fn(protocol: *(String)) -> bool)({
+  (lower : String) = protocol.*.to_lowercase();
+  if((lower == `http:`), { return true; });
+  if((lower == `https:`), { return true; });
+  if((lower == `mailto:`), { return true; });
+  false
+});
 
 // Bad protocol patterns for link validation
 _is_bad_protocol :: (fn(url: String) -> bool)({
   (lower : String) = url.to_lowercase();
-  cond(
-    lower.starts_with(`vbscript:`) => true,
-    lower.starts_with(`javascript:`) => true,
-    lower.starts_with(`file:`) => true,
-    lower.starts_with(`data:`) => {
-      // Allow safe data URIs (images only)
-      if(lower.starts_with(`data:image/gif;`), {
-        return false;
-      });
-      if(lower.starts_with(`data:image/png;`), {
-        return false;
-      });
-      if(lower.starts_with(`data:image/jpeg;`), {
-        return false;
-      });
-      if(lower.starts_with(`data:image/webp;`), {
-        return false;
-      });
-      true
-    },
-    true => false
-  )
+  if(lower.starts_with(`vbscript:`), { return true; });
+  if(lower.starts_with(`javascript:`), { return true; });
+  if(lower.starts_with(`file:`), { return true; });
+  if(lower.starts_with(`data:`), {
+    // Allow safe data URIs (images only)
+    if(lower.starts_with(`data:image/gif;`), { return false; });
+    if(lower.starts_with(`data:image/png;`), { return false; });
+    if(lower.starts_with(`data:image/jpeg;`), { return false; });
+    if(lower.starts_with(`data:image/webp;`), { return false; });
+    return true;
+  });
+  false
 });
 
 // Validate a link URL. Returns true if the link is safe.
@@ -36,110 +42,72 @@ validate_link :: (fn(url: String) -> bool)(
   !(_is_bad_protocol(url))
 );
 
-// Check if a byte is a hex digit
-_is_hex_digit :: (fn(b: u8) -> bool)(
-  cond(
-    ((b >= u8(0x30)) && (b <= u8(0x39))) => true,
-    ((b >= u8(0x41)) && (b <= u8(0x46))) => true,
-    ((b >= u8(0x61)) && (b <= u8(0x66))) => true,
-    true => false
-  )
-);
+// Normalize a link URL. Parse, optionally recode hostname, format, then encode.
+// Matches markdown-it's normalizeLink behavior.
+normalize_link :: (fn(url: String) -> String)({
+  (parsed : Url) = parse(url, true);
 
-// Check if a byte is URL-safe (should NOT be percent-encoded).
-// Matches mdurl's encode: preserves ;/?:@&=+$,-_.!~*'()# and alphanumeric
-_is_url_safe :: (fn(b: u8) -> bool)(
-  cond(
-    ((b >= u8(0x41)) && (b <= u8(0x5A))) => true,
-    ((b >= u8(0x61)) && (b <= u8(0x7A))) => true,
-    ((b >= u8(0x30)) && (b <= u8(0x39))) => true,
-    (b == u8(0x3B)) => true,
-    (b == u8(0x2F)) => true,
-    (b == u8(0x3F)) => true,
-    (b == u8(0x3A)) => true,
-    (b == u8(0x40)) => true,
-    (b == u8(0x26)) => true,
-    (b == u8(0x3D)) => true,
-    (b == u8(0x2B)) => true,
-    (b == u8(0x24)) => true,
-    (b == u8(0x2C)) => true,
-    (b == u8(0x2D)) => true,
-    (b == u8(0x5F)) => true,
-    (b == u8(0x2E)) => true,
-    (b == u8(0x21)) => true,
-    (b == u8(0x7E)) => true,
-    (b == u8(0x2A)) => true,
-    (b == u8(0x27)) => true,
-    (b == u8(0x28)) => true,
-    (b == u8(0x29)) => true,
-    (b == u8(0x23)) => true,
-    true => false
-  )
-);
+  // If hostname exists, check if we should recode it
+  // (punycode not implemented yet — skip for now)
+  match(parsed.hostname,
+    .Some(_h) => {
+      (has_proto : bool) = match(parsed.protocol, .Some(_p) => true, .None => false);
+      if(!(has_proto), {
+        // No protocol — would recode hostname
+        // TODO: punycode.toASCII(hostname) when punycode is ported
+        ();
+      }, {
+        match(parsed.protocol,
+          .Some(p) => {
+            if(_should_recode_hostname(&(p)), {
+              // TODO: punycode.toASCII(hostname) when punycode is ported
+              ();
+            });
+          },
+          .None => ()
+        );
+      });
+    },
+    .None => ()
+  );
 
-// Convert a nibble (0-15) to a hex character
-_to_hex_char :: (fn(n: u8) -> u8)(
-  cond(
-    (n < u8(10)) => (n + u8(0x30)),
-    true => ((n - u8(10)) + u8(0x41))
-  )
-);
-
-// Check if position i starts an already-encoded %XX sequence
-_is_encoded_seq :: (fn(bytes: *(ArrayList(u8)), i: usize, len: usize) -> bool)({
-  if(!(((i + usize(2)) < len)), {
-    return false;
-  });
-  (b0 : u8) = bytes.*.get(i).unwrap();
-  if(!((b0 == u8(0x25))), {
-    return false;
-  });
-  (b1 : u8) = bytes.*.get((i + usize(1))).unwrap();
-  (b2 : u8) = bytes.*.get((i + usize(2))).unwrap();
-  (_is_hex_digit(b1) && _is_hex_digit(b2))
+  (formatted : String) = format(&(parsed));
+  encode(formatted, ENCODE_DEFAULT_CHARS, true)
 });
 
-// Percent-encode a URL string. Matches mdurl.encode behavior:
-// - Preserves URL-safe characters and already-encoded %XX sequences
-// - Encodes everything else as %XX (UTF-8 bytes)
-_percent_encode :: (fn(url: String) -> String)({
-  (bytes : ArrayList(u8)) = url.as_bytes();
-  (result : ArrayList(u8)) = ArrayList(u8).with_capacity(bytes.len());
-  (i : usize) = usize(0);
-  (len : usize) = bytes.len();
+// Normalize link text for display.
+// Parse, optionally recode hostname to unicode, format, then decode.
+normalize_link_text :: (fn(url: String) -> String)({
+  (parsed : Url) = parse(url, true);
 
-  while (i < len), {
-    (b : u8) = bytes.get(i).unwrap();
+  // If hostname exists, check if we should recode it
+  // (punycode not implemented yet — skip for now)
+  match(parsed.hostname,
+    .Some(_h) => {
+      (has_proto : bool) = match(parsed.protocol, .Some(_p) => true, .None => false);
+      if(!(has_proto), {
+        // No protocol — would recode hostname
+        // TODO: punycode.toUnicode(hostname) when punycode is ported
+        ();
+      }, {
+        match(parsed.protocol,
+          .Some(p) => {
+            if(_should_recode_hostname(&(p)), {
+              // TODO: punycode.toUnicode(hostname) when punycode is ported
+              ();
+            });
+          },
+          .None => ()
+        );
+      });
+    },
+    .None => ()
+  );
 
-    if(_is_encoded_seq(&(bytes), i, len), {
-      _ := result.push(b);
-      _ := result.push(bytes.get((i + usize(1))).unwrap());
-      _ := result.push(bytes.get((i + usize(2))).unwrap());
-      i = (i + usize(3));
-    }, if(_is_url_safe(b), {
-      _ := result.push(b);
-      i = (i + usize(1));
-    }, {
-      _ := result.push(u8(0x25));
-      _ := result.push(_to_hex_char((b / u8(16))));
-      _ := result.push(_to_hex_char((b % u8(16))));
-      i = (i + usize(1));
-    }));
-  };
-
-  String.from_bytes(result)
+  (formatted : String) = format(&(parsed));
+  // add '%' to exclude list because of https://github.com/markdown-it/markdown-it/issues/720
+  (exclude : String) = (`${DECODE_DEFAULT_CHARS}` + `%`);
+  decode(formatted, exclude.as_str())
 });
-
-// Normalize a link URL. Percent-encodes unsafe characters.
-// Simplified version of markdown-it's normalizeLink (no punycode).
-normalize_link :: (fn(url: String) -> String)(
-  _percent_encode(url)
-);
-
-// Normalize link text for display. For now, returns as-is.
-// TODO: Punycode decoding for hostnames
-normalize_link_text :: (fn(url: String) -> String)(
-  url
-);
 
 export validate_link, normalize_link, normalize_link_text;

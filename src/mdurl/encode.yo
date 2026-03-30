@@ -1,0 +1,112 @@
+// Ported from: mdurl/lib/encode.mjs
+//
+// Percent-encode unsafe characters in a URL string.
+
+open import "std/string";
+{ ArrayList } :: import "std/collections/array_list";
+
+// Characters that are safe in encodeURI (default):
+// ;/?:@&=+$,-_.!~*'()# plus alphanumeric
+ENCODE_DEFAULT_CHARS :: ";/?:@&=+$,-_.!~*'()#";
+
+// Characters that are safe in encodeURIComponent:
+// -_.!~*'() plus alphanumeric
+ENCODE_COMPONENT_CHARS :: "-_.!~*'()";
+
+// Check if a byte is a hex digit
+_is_hex_digit :: (fn(b: u8) -> bool)(
+  cond(
+    ((b >= u8(0x30)) && (b <= u8(0x39))) => true,
+    ((b >= u8(0x41)) && (b <= u8(0x46))) => true,
+    ((b >= u8(0x61)) && (b <= u8(0x66))) => true,
+    true => false
+  )
+);
+
+// Convert a nibble (0-15) to uppercase hex character
+_to_hex_upper :: (fn(n: u8) -> u8)(
+  cond(
+    (n < u8(10)) => (n + u8(0x30)),
+    true => ((n - u8(10)) + u8(0x41))
+  )
+);
+
+// Check if a character code should be kept unencoded.
+// Returns true if the character is alphanumeric or in the exclude string.
+_is_safe_char :: (fn(code: u8, exclude: str) -> bool)({
+  // Always allow alphanumeric
+  if(((code >= u8(0x30)) && (code <= u8(0x39))), { return true; });
+  if(((code >= u8(0x41)) && (code <= u8(0x5A))), { return true; });
+  if(((code >= u8(0x61)) && (code <= u8(0x7A))), { return true; });
+
+  // Check exclude list
+  (j : usize) = usize(0);
+  while (j < exclude.len()), {
+    if((exclude.bytes(j) == code), { return true; });
+    j = (j + usize(1));
+  };
+
+  false
+});
+
+// Encode unsafe characters with percent-encoding, skipping already
+// encoded sequences.
+//
+// - input:        string to encode
+// - exclude:      characters to keep unencoded (in addition to a-zA-Z0-9)
+// - keep_escaped: don't encode '%' in a correct escape sequence (default: true)
+encode :: (fn(input: String, exclude: str, keep_escaped: bool) -> String)({
+  (bytes : ArrayList(u8)) = input.as_bytes();
+  (result : ArrayList(u8)) = ArrayList(u8).with_capacity(bytes.len());
+  (i : usize) = usize(0);
+  (len : usize) = bytes.len();
+
+  while (i < len), {
+    (b : u8) = bytes.get(i).unwrap();
+
+    // Check for already-encoded %XX sequence
+    if(((keep_escaped && (b == u8(0x25))) && ((i + usize(2)) < len)), {
+      (h1 : u8) = bytes.get((i + usize(1))).unwrap();
+      (h2 : u8) = bytes.get((i + usize(2))).unwrap();
+      if((_is_hex_digit(h1) && _is_hex_digit(h2)), {
+        result.push(b);
+        result.push(h1);
+        result.push(h2);
+        i = (i + usize(3));
+      }, {
+        // % not followed by valid hex — encode the %
+        result.push(u8(0x25));
+        result.push(_to_hex_upper(u8(2)));
+        result.push(_to_hex_upper(u8(5)));
+        i = (i + usize(1));
+      });
+    }, if((b < u8(128)), {
+      // ASCII character — check if safe
+      if(_is_safe_char(b, exclude), {
+        result.push(b);
+      }, {
+        result.push(u8(0x25));
+        result.push(_to_hex_upper((b / u8(16))));
+        result.push(_to_hex_upper((b % u8(16))));
+      });
+      i = (i + usize(1));
+    }, {
+      // Non-ASCII byte — encode as %XX
+      // Yo strings are UTF-8, so multi-byte chars are already encoded as
+      // individual bytes. Just percent-encode each byte.
+      result.push(u8(0x25));
+      result.push(_to_hex_upper((b / u8(16))));
+      result.push(_to_hex_upper((b % u8(16))));
+      i = (i + usize(1));
+    }));
+  };
+
+  String.from_bytes(result)
+});
+
+// Convenience: encode with default chars and keep_escaped=true
+encode_default :: (fn(input: String) -> String)(
+  encode(input, ENCODE_DEFAULT_CHARS, true)
+);
+
+export encode, encode_default, ENCODE_DEFAULT_CHARS, ENCODE_COMPONENT_CHARS;

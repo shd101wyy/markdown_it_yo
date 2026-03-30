@@ -1,0 +1,69 @@
+// Ported from: mdurl/lib/format.mjs
+//
+// Reconstruct URL string from parsed Url object.
+
+open import "std/string";
+{ Url } :: import "./parse.yo";
+
+// Format a Url object back into a URL string.
+format :: (fn(url: *(Url)) -> String)({
+  (result : String) = ``;
+
+  match(url.*.protocol,
+    .Some(p) => { result = (result + p); },
+    .None => ()
+  );
+
+  if(url.*.slashes, {
+    result = (result + `//`);
+  });
+
+  match(url.*.auth,
+    .Some(a) => {
+      result = (result + a);
+      result = (result + `@`);
+    },
+    .None => ()
+  );
+
+  match(url.*.hostname,
+    .Some(h) => {
+      // IPv6 address: wrap in brackets
+      if(h.contains(`:`), {
+        result = (result + `[`);
+        result = (result + h);
+        result = (result + `]`);
+      }, {
+        result = (result + h);
+      });
+    },
+    .None => ()
+  );
+
+  match(url.*.port,
+    .Some(p) => {
+      result = (result + `:`);
+      result = (result + p);
+    },
+    .None => ()
+  );
+
+  match(url.*.pathname,
+    .Some(p) => { result = (result + p); },
+    .None => ()
+  );
+
+  match(url.*.search,
+    .Some(s) => { result = (result + s); },
+    .None => ()
+  );
+
+  match(url.*.hash,
+    .Some(h) => { result = (result + h); },
+    .None => ()
+  );
+
+  result
+});
+
+export format;
