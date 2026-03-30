@@ -11,12 +11,49 @@ open import "std/string";
 { LinkDestResult, parse_link_destination } :: import "../helpers/parse_link_destination.yo";
 { LinkTitleResult, parse_link_title } :: import "../helpers/parse_link_title.yo";
 { Reference, Env } :: import "../env.yo";
+{ BlockRuleFn } :: import "./lheading.yo";
 
-// Try to append content from the next line to `buf`.
-// Returns true if a line was appended, false otherwise.
-_try_append_next_line :: (fn(state: *(StateBlock), buf: *(String), str_max: *(i32), next_line: *(i32)) -> bool)({
+RuleList :: ArrayList(BlockRuleFn);
+
+// Try to get next line for multi-line continuation.
+// Returns false if at EOF, empty line, or a terminator rule matches.
+// Matches JS getNextLine() including lazy continuation and terminator checks.
+_try_get_next_line :: (fn(state: *(StateBlock), buf: *(String), str_max: *(i32), next_line: *(i32),
+                         terminator_rules: *(RuleList)) -> bool)({
   if((next_line.* >= state.*.line_max), { return false; });
   if(state.*.is_empty(next_line.*), { return false; });
+
+  (is_continuation : bool) = false;
+
+  // Code block indentation = lazy continuation after paragraph
+  if(((state.*.s_count.get(usize(next_line.*)).unwrap() - state.*.blk_indent) > i32(3)), {
+    is_continuation = true;
+  });
+
+  // Quirk for blockquotes
+  if((state.*.s_count.get(usize(next_line.*)).unwrap() < i32(0)), {
+    is_continuation = true;
+  });
+
+  if(!(is_continuation), {
+    // Check if any terminator rule matches this line
+    (old_parent_type : String) = state.*.parent_type;
+    state.*.parent_type = `reference`;
+
+    (terminate : bool) = false;
+    (ti : usize) = usize(0);
+    (tlen : usize) = terminator_rules.*.len();
+    while ((ti < tlen) && !(terminate)), {
+      (rule : BlockRuleFn) = terminator_rules.*.get(ti).unwrap();
+      if(rule(state, next_line.*, state.*.line_max, true), {
+        terminate = true;
+      });
+      ti = (ti + usize(1));
+    };
+
+    state.*.parent_type = old_parent_type;
+    if(terminate, { return false; });
+  });
 
   (line_pos : i32) = (state.*.b_marks.get(usize(next_line.*)).unwrap() + state.*.t_shift.get(usize(next_line.*)).unwrap());
   (line_max : i32) = state.*.e_marks.get(usize(next_line.*)).unwrap();
@@ -27,7 +64,8 @@ _try_append_next_line :: (fn(state: *(StateBlock), buf: *(String), str_max: *(i3
   true
 });
 
-reference :: (fn(state: *(StateBlock), start_line: i32, _end_line: i32, silent: bool) -> bool)({
+reference :: (fn(state: *(StateBlock), start_line: i32, _end_line: i32, silent: bool,
+                terminator_rules: *(RuleList)) -> bool)({
   (pos : i32) = (state.*.b_marks.get(usize(start_line)).unwrap() + state.*.t_shift.get(usize(start_line)).unwrap());
   (max : i32) = state.*.e_marks.get(usize(start_line)).unwrap();
   (next_line : i32) = (start_line + i32(1));
@@ -56,12 +94,12 @@ reference :: (fn(state: *(StateBlock), start_line: i32, _end_line: i32, silent: 
     }, if((ch == i32(0x5D)), {
       label_end = scan;
     }, if((ch == i32(0x0A)), {
-      _ := _try_append_next_line(state, (&buf), (&str_max), (&next_line));
+      _ := _try_get_next_line(state, (&buf), (&str_max), (&next_line), terminator_rules);
       scan = (scan + i32(1));
     }, if((ch == i32(0x5C)), {
       scan = (scan + i32(1));
       if(((scan < str_max) && (i32(buf.as_bytes().get(usize(scan)).unwrap()) == i32(0x0A))), {
-        _ := _try_append_next_line(state, (&buf), (&str_max), (&next_line));
+        _ := _try_get_next_line(state, (&buf), (&str_max), (&next_line), terminator_rules);
       });
       scan = (scan + i32(1));
     }, {
@@ -80,7 +118,7 @@ reference :: (fn(state: *(StateBlock), start_line: i32, _end_line: i32, silent: 
   while ((scan < str_max) && !(skip_done)), {
     (ch : i32) = i32(buf.as_bytes().get(usize(scan)).unwrap());
     if((ch == i32(0x0A)), {
-      _ := _try_append_next_line(state, (&buf), (&str_max), (&next_line));
+      _ := _try_get_next_line(state, (&buf), (&str_max), (&next_line), terminator_rules);
       scan = (scan + i32(1));
     }, if(isSpace(ch), {
       scan = (scan + i32(1));
@@ -108,7 +146,7 @@ reference :: (fn(state: *(StateBlock), start_line: i32, _end_line: i32, silent: 
   while ((pos < str_max) && !(skip_done)), {
     (ch : i32) = i32(buf.as_bytes().get(usize(pos)).unwrap());
     if((ch == i32(0x0A)), {
-      _ := _try_append_next_line(state, (&buf), (&str_max), (&next_line));
+      _ := _try_get_next_line(state, (&buf), (&str_max), (&next_line), terminator_rules);
       pos = (pos + i32(1));
     }, if(isSpace(ch), {
       pos = (pos + i32(1));
@@ -120,16 +158,12 @@ reference :: (fn(state: *(StateBlock), start_line: i32, _end_line: i32, silent: 
   // Parse link title (with multi-line continuation)
   (title_result : LinkTitleResult) = parse_link_title(buf, pos, str_max, .None);
   while (title_result.can_continue), {
-    if(((next_line >= state.*.line_max) || state.*.is_empty(next_line)), {
+    // Save pos before appending — new content starts here
+    (old_str_max : i32) = str_max;
+    if(!(_try_get_next_line(state, (&buf), (&str_max), (&next_line), terminator_rules)), {
       title_result.can_continue = false;
     }, {
-      (line_pos : i32) = (state.*.b_marks.get(usize(next_line)).unwrap() + state.*.t_shift.get(usize(next_line)).unwrap());
-      (line_max : i32) = state.*.e_marks.get(usize(next_line)).unwrap();
-      (line_content : String) = state.*.src.substring(usize(line_pos), usize((line_max + i32(1))));
-      buf = `${buf}${line_content}`;
-      pos = str_max;
-      str_max = i32(buf.len());
-      next_line = (next_line + i32(1));
+      pos = old_str_max;
       title_result = parse_link_title(buf, pos, str_max, .Some(title_result));
     });
   };

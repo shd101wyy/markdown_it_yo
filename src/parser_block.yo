@@ -43,6 +43,17 @@ _block_tokenize :: (fn(state: *(StateBlock), start_line: i32, end_line: i32) -> 
   _ := para_terminators.push(html_block);
   _ := para_terminators.push(heading);
 
+  // Build reference terminator list (rules that can interrupt references)
+  // Matches JS: table, fence, blockquote, hr, list, html_block, heading
+  (ref_terminators : ArrayList(BlockRuleFn)) = ArrayList(BlockRuleFn).new();
+  _ := ref_terminators.push(_table_as_terminator);
+  _ := ref_terminators.push(fence);
+  _ := ref_terminators.push(blockquote);
+  _ := ref_terminators.push(hr);
+  _ := ref_terminators.push(list);
+  _ := ref_terminators.push(html_block);
+  _ := ref_terminators.push(heading);
+
   // Build table terminator list
   (block_terminators : ArrayList(BlockRuleFn)) = ArrayList(BlockRuleFn).new();
   _ := block_terminators.push(code);
@@ -81,7 +92,7 @@ _block_tokenize :: (fn(state: *(StateBlock), start_line: i32, end_line: i32) -> 
     if(!(ok), { ok = blockquote(state, line, end_line, false); });
     if(!(ok), { ok = hr(state, line, end_line, false); });
     if(!(ok), { ok = list(state, line, end_line, false); });
-    if(!(ok), { ok = reference(state, line, end_line, false); });
+    if(!(ok), { ok = reference(state, line, end_line, false, (&ref_terminators)); });
     if(!(ok), { ok = html_block(state, line, end_line, false); });
     if(!(ok), { ok = heading(state, line, end_line, false); });
     if(!(ok), { ok = lheading(state, line, end_line, false, (&para_terminators)); });
