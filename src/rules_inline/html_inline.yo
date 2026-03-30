@@ -71,7 +71,7 @@ html_inline :: (fn(state: *(StateInline), silent: bool) -> bool)({
           state.*.link_level = (state.*.link_level - i32(1));
         });
       });
-      state.*.pos = (pos + i32(m.value().len()));
+      state.*.pos = (pos + i32(m.value().as_bytes().len()));
       true
     },
     .None => false

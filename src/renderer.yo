@@ -6,7 +6,7 @@ open import "std/string";
 { ArrayList } :: import "std/collections/array_list";
 { Token, StringPair } :: import "./token.yo";
 { Options } :: import "./options.yo";
-{ escape_html, unescape_all, is_white_space } :: import "./common/utils.yo";
+{ escape_html, unescape_all, is_white_space, byte_substring } :: import "./common/utils.yo";
 
 // Render attributes of a token as an HTML attribute string.
 // Returns a string like ` class="foo" id="bar"`.
@@ -126,7 +126,7 @@ _render_fence :: (fn(tokens: ArrayList(Token), idx: i32, options: *(Options)) ->
       });
     };
     if(found_space, {
-      lang_name = info.substring(usize(0), usize(space_pos));
+      lang_name = byte_substring(info_bytes, i32(0), space_pos);
     }, {
       lang_name = info;
     });
