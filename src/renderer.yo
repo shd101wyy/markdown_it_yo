@@ -1,0 +1,246 @@
+// Ported from: lib/renderer.mjs (markdown-it v14.1.1)
+//
+// Generates HTML from parsed token stream.
+
+open import "std/string";
+{ ArrayList } :: import "std/collections/array_list";
+{ Token, StringPair } :: import "./token.yo";
+{ Options } :: import "./options.yo";
+{ escapeHtml } :: import "./common/utils.yo";
+
+// Render attributes of a token as an HTML attribute string.
+// Returns a string like ` class="foo" id="bar"`.
+render_attrs :: (fn(token: Token) -> String)(
+  match(token.attrs,
+    .None => ``,
+    .Some(attrs) => {
+      (result : String) = ``;
+      (i : i32) = i32(0);
+      while (i < i32(attrs.len())), {
+        (pair : StringPair) = attrs.get(usize(i)).unwrap();
+        (ek : String) = escapeHtml(pair.name);
+        (ev : String) = escapeHtml(pair.value);
+        result = `${result} ${ek}="${ev}"`;
+        i = (i + i32(1));
+      };
+      result
+    }
+  )
+);
+
+// Render a single token (open or close tag) as HTML.
+// Handles self-closing tags (nesting == -1 with xhtml), and block-level newlines.
+render_token :: (fn(tokens: ArrayList(Token), idx: i32, options: *(Options)) -> String)({
+  (token : Token) = tokens.get(usize(idx)).unwrap();
+  (result : String) = ``;
+
+  // Tight list paragraphs: hide open/close tags
+  if(token.hidden, {
+    return ``;
+  });
+
+  // Insert a newline before this tag if prev token was hidden
+  if(((((token.block) && (token.nesting != i32(-1))) && (idx > i32(0)))), {
+    (prev : Token) = tokens.get(usize((idx - i32(1)))).unwrap();
+    if(prev.hidden, {
+      result = `${result}\n`;
+    });
+  });
+
+  // Build tag
+  if((token.nesting == i32(-1)), {
+    result = `${result}</${token.tag}`;
+  }, {
+    result = `${result}<${token.tag}`;
+  });
+
+  // Render attributes
+  result = `${result}${render_attrs(token)}`;
+
+  // Self-closing tag
+  if(((token.nesting == i32(0)) && options.*.xhtml_out), {
+    result = `${result} /`;
+  });
+
+  result = `${result}>`;
+
+  // Add newline after block-level tags
+  if(token.block, {
+    (need_lf : bool) = true;
+    // Suppress newline after opening tag if next token is inline or hidden
+    if((token.nesting == i32(1)), {
+      if(((idx + i32(1)) < i32(tokens.len())), {
+        (next_token : Token) = tokens.get(usize((idx + i32(1)))).unwrap();
+        if(((next_token.type_name == `inline`) || next_token.hidden), {
+          need_lf = false;
+        });
+      });
+    });
+    if(need_lf, {
+      result = `${result}\n`;
+    });
+  });
+
+  result
+});
+
+// ============================================================================
+// Default render rules
+// ============================================================================
+
+_render_code_inline :: (fn(tokens: ArrayList(Token), idx: i32, options: *(Options)) -> String)({
+  (token : Token) = tokens.get(usize(idx)).unwrap();
+  `<code${render_attrs(token)}>${escapeHtml(token.content)}</code>`
+});
+
+_render_code_block :: (fn(tokens: ArrayList(Token), idx: i32, options: *(Options)) -> String)({
+  (token : Token) = tokens.get(usize(idx)).unwrap();
+  `<pre${render_attrs(token)}><code>${escapeHtml(token.content)}</code></pre>\n`
+});
+
+_render_fence :: (fn(tokens: ArrayList(Token), idx: i32, options: *(Options)) -> String)({
+  (token : Token) = tokens.get(usize(idx)).unwrap();
+  (info : String) = token.info;
+
+  // Extract language name (first word of info string)
+  (lang_name : String) = ``;
+  if((info.len() > usize(0)), {
+    // Split on first space
+    (info_bytes : ArrayList(u8)) = info.as_bytes();
+    (space_pos : i32) = i32(0);
+    (found_space : bool) = false;
+    while (((space_pos < i32(info_bytes.len())) && !(found_space))), {
+      (b : i32) = i32(info_bytes.get(usize(space_pos)).unwrap());
+      if((((b == i32(0x20)) || (b == i32(0x09))) || (b == i32(0x0A))), {
+        found_space = true;
+      }, {
+        space_pos = (space_pos + i32(1));
+      });
+    };
+    if(found_space, {
+      lang_name = info.substring(usize(0), usize(space_pos));
+    }, {
+      lang_name = info;
+    });
+  });
+
+  // TODO: highlight callback support
+  (highlighted : String) = escapeHtml(token.content);
+
+  if((lang_name.len() > usize(0)), {
+    // Add language class
+    (lang_class : String) = `${options.*.lang_prefix}${escapeHtml(lang_name)}`;
+    `<pre><code class="${lang_class}"${render_attrs(token)}>${highlighted}</code></pre>\n`
+  }, {
+    `<pre><code${render_attrs(token)}>${highlighted}</code></pre>\n`
+  })
+});
+
+_render_image :: (fn(tokens: ArrayList(Token), idx: i32, options: *(Options)) -> String)({
+  (token : Token) = tokens.get(usize(idx)).unwrap();
+  // TODO: renderInlineAsText for alt attribute from children
+  (alt_text : String) = token.content;
+  (result : String) = `<img src=""${render_attrs(token)} alt="${escapeHtml(alt_text)}"`;
+  if(options.*.xhtml_out, {
+    result = `${result} /`;
+  });
+  `${result}>`
+});
+
+_render_hardbreak :: (fn(options: *(Options)) -> String)(
+  cond(
+    options.*.xhtml_out => `<br />\n`,
+    true => `<br>\n`
+  )
+);
+
+_render_softbreak :: (fn(options: *(Options)) -> String)(
+  cond(
+    options.*.breaks => cond(
+      options.*.xhtml_out => `<br />\n`,
+      true => `<br>\n`
+    ),
+    true => `\n`
+  )
+);
+
+_render_text :: (fn(token: Token) -> String)(
+  escapeHtml(token.content)
+);
+
+_render_html_block :: (fn(token: Token) -> String)(
+  token.content
+);
+
+_render_html_inline :: (fn(token: Token) -> String)(
+  token.content
+);
+
+// ============================================================================
+// Main render functions
+// ============================================================================
+
+// Render a single token to HTML (dispatches by type).
+_render_one_token :: (fn(tokens: ArrayList(Token), idx: i32, options: *(Options)) -> String)({
+  (token : Token) = tokens.get(usize(idx)).unwrap();
+  (type_name : String) = token.type_name;
+
+  cond(
+    (type_name == `code_inline`) => _render_code_inline(tokens, idx, options),
+    (type_name == `code_block`) => _render_code_block(tokens, idx, options),
+    (type_name == `fence`) => _render_fence(tokens, idx, options),
+    (type_name == `image`) => _render_image(tokens, idx, options),
+    (type_name == `hardbreak`) => _render_hardbreak(options),
+    (type_name == `softbreak`) => _render_softbreak(options),
+    (type_name == `text`) => _render_text(token),
+    (type_name == `html_block`) => _render_html_block(token),
+    (type_name == `html_inline`) => _render_html_inline(token),
+    true => render_token(tokens, idx, options)
+  )
+});
+
+// Render inline token children as HTML.
+render_inline :: (fn(tokens: ArrayList(Token), options: *(Options)) -> String)({
+  (result : String) = ``;
+  (len : i32) = i32(tokens.len());
+  (i : i32) = i32(0);
+
+  while (i < len), {
+    (token : Token) = tokens.get(usize(i)).unwrap();
+    (rendered : String) = _render_one_token(tokens, i, options);
+    result = `${result}${rendered}`;
+    i = (i + i32(1));
+  };
+
+  result
+});
+
+// Main render function: render a token stream to HTML.
+render :: (fn(tokens: ArrayList(Token), options: *(Options)) -> String)({
+  (result : String) = ``;
+  (len : i32) = i32(tokens.len());
+  (i : i32) = i32(0);
+
+  while (i < len), {
+    (token : Token) = tokens.get(usize(i)).unwrap();
+    (type_name : String) = token.type_name;
+
+    if((type_name == `inline`), {
+      // Render inline children
+      match(token.children,
+        .Some(children) => {
+          result = `${result}${render_inline(children, options)}`;
+        },
+        .None => ()
+      );
+    }, {
+      result = `${result}${_render_one_token(tokens, i, options)}`;
+    });
+
+    i = (i + i32(1));
+  };
+
+  result
+});
+
+export render, render_inline, render_token, render_attrs;

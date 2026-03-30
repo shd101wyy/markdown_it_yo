@@ -1,0 +1,26 @@
+// Ported from: lib/rules_core/normalize.mjs (markdown-it v14.1.1)
+//
+// Normalize input string: unify line endings, replace NULL chars.
+
+open import "std/string";
+{ ArrayList } :: import "std/collections/array_list";
+{ Token } :: import "../token.yo";
+{ fromCodePoint } :: import "../common/char_utils.yo";
+{ StateCore } :: import "./state_core.yo";
+
+normalize :: (fn(state: *(StateCore)) -> unit)({
+  (cr : String) = fromCodePoint(i32(0x0D));
+  (lf : String) = fromCodePoint(i32(0x0A));
+  (crlf : String) = `${cr}${lf}`;
+  (null_char : String) = fromCodePoint(i32(0x00));
+  (replacement : String) = fromCodePoint(i32(0xFFFD));
+
+  // Normalize newlines: \r\n → \n, then remaining \r → \n
+  state.*.src = state.*.src.replace_all(crlf, lf);
+  state.*.src = state.*.src.replace_all(cr, lf);
+
+  // Replace NULL characters with U+FFFD
+  state.*.src = state.*.src.replace_all(null_char, replacement);
+});
+
+export normalize;

@@ -1,0 +1,28 @@
+// Options for MarkdownIt parser.
+// Ported from: lib/index.mjs (markdown-it v14.1.1) options handling
+
+open import "std/string";
+
+Options :: struct(
+  html : bool,
+  xhtml_out : bool,
+  breaks : bool,
+  lang_prefix : String,
+  linkify : bool,
+  typographer : bool,
+  max_nesting : i32
+);
+
+default_options :: (fn() -> Options)(
+  Options(
+    html: false,
+    xhtml_out: false,
+    breaks: false,
+    lang_prefix: `language-`,
+    linkify: false,
+    typographer: false,
+    max_nesting: i32(100)
+  )
+);
+
+export Options, default_options;

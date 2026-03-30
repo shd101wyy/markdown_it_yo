@@ -31,12 +31,15 @@ StateBlock :: struct(
   parent_type : String,
   level : i32,
 
+  // Options pushed down from MarkdownIt
+  html_enabled : bool,
+
   // Cached bytes for fast access
   _src_bytes : ArrayList(u8)
 );
 
 // Create a new StateBlock and precompute line markers
-new_state_block :: (fn(src: String, env: *(void), tokens: ArrayList(Token)) -> StateBlock)(
+new_state_block :: (fn(src: String, env: *(void), tokens: ArrayList(Token), html_enabled: bool) -> StateBlock)(
   {
     (bytes : ArrayList(u8)) = src.as_bytes();
     (len : i32) = i32(bytes.len());
@@ -119,6 +122,7 @@ new_state_block :: (fn(src: String, env: *(void), tokens: ArrayList(Token)) -> S
       list_indent: i32(-1),
       parent_type: `root`,
       level: i32(0),
+      html_enabled: html_enabled,
       _src_bytes: bytes
     )
   }

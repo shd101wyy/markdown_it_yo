@@ -1,0 +1,113 @@
+// Ported from: lib/index.mjs (markdown-it v14.1.1)
+//
+// Main MarkdownIt class — orchestrates the parsing and rendering pipeline.
+//
+// Pipeline:
+//   Input → Core.process(state):
+//     1. normalize — fix line endings, null chars
+//     2. block — run block parser, produce block tokens
+//     3. inline — for each 'inline' token, parse its content
+//     4. text_join — merge text tokens
+//   → Renderer.render(tokens) → HTML
+
+open import "std/string";
+{ ArrayList } :: import "std/collections/array_list";
+{ Token } :: import "./token.yo";
+{ Options, default_options } :: import "./options.yo";
+{ StateCore, new_state_core } :: import "./rules_core/state_core.yo";
+{ ParserBlock, new_parser_block } :: import "./parser_block.yo";
+{ ParserInline, new_parser_inline } :: import "./parser_inline.yo";
+
+// Core rules
+{ normalize } :: import "./rules_core/normalize.yo";
+{ text_join } :: import "./rules_core/text_join.yo";
+
+// Renderer
+{ render } :: import "./renderer.yo";
+
+// MarkdownIt — the main parser/renderer class
+MarkdownIt :: struct(
+  options : Options,
+  block : ParserBlock,
+  inline_parser : ParserInline
+);
+
+// Create a new MarkdownIt instance with default options
+new_markdown_it :: (fn() -> MarkdownIt)(
+  MarkdownIt(
+    options: default_options(),
+    block: new_parser_block(),
+    inline_parser: new_parser_inline()
+  )
+);
+
+// Create a new MarkdownIt with custom options
+new_markdown_it_with_options :: (fn(opts: Options) -> MarkdownIt)(
+  MarkdownIt(
+    options: opts,
+    block: new_parser_block(),
+    inline_parser: new_parser_inline()
+  )
+);
+
+// ============================================================================
+// Core rules (defined here because they need MarkdownIt's parsers)
+// ============================================================================
+
+// Core block rule: run the block parser on state.src
+_core_block :: (fn(state: *(StateCore), block_parser: ParserBlock, html_enabled: bool) -> unit)({
+  if((state.*.inline_mode), {
+    // In inline mode, wrap entire source as a single inline token
+    (token : Token) = Token.new(`inline`, ``, i32(0));
+    token.content = state.*.src;
+    token.children = .Some(ArrayList(Token).new());
+    _ := state.*.tokens.push(token);
+  }, {
+    // Run block parser
+    block_parser.parse(state.*.src, state.*.env, state.*.tokens, html_enabled);
+  });
+});
+
+// Core inline rule: for each 'inline' token, parse its content
+_core_inline :: (fn(state: *(StateCore), inline_parser: ParserInline) -> unit)({
+  (len : i32) = i32(state.*.tokens.len());
+  (i : i32) = i32(0);
+
+  while (i < len), {
+    (token : Token) = state.*.tokens.get(usize(i)).unwrap();
+    if((token.type_name == `inline`), {
+      (children : ArrayList(Token)) = ArrayList(Token).new();
+      inline_parser.parse(token.content, state.*.env, children);
+      token.children = .Some(children);
+      state.*.tokens.set(usize(i), token);
+    });
+    i = (i + i32(1));
+  };
+});
+
+impl(MarkdownIt,
+  // Parse markdown source into a token stream.
+  parse : (fn(self: Self, src: String) -> ArrayList(Token))({
+    (state : StateCore) = new_state_core(src, *(void)(&self));
+
+    // Core pipeline
+    // 1. Normalize
+    normalize((&state));
+    // 2. Block parse
+    _core_block((&state), self.block, self.options.html);
+    // 3. Inline parse
+    _core_inline((&state), self.inline_parser);
+    // 4. Text join
+    text_join((&state));
+
+    state.tokens
+  }),
+
+  // Render markdown source to HTML string.
+  render_src : (fn(self: Self, src: String) -> String)({
+    (tokens : ArrayList(Token)) = self.parse(src);
+    render(tokens, (&self.options))
+  })
+);
+
+export MarkdownIt, new_markdown_it, new_markdown_it_with_options;
