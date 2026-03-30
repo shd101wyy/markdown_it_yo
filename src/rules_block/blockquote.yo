@@ -1,0 +1,229 @@
+// Ported from: lib/rules_block/blockquote.mjs (markdown-it v14.1.1)
+//
+// Block quotes: lines starting with >
+
+open import "std/string";
+{ ArrayList } :: import "std/collections/array_list";
+{ Token } :: import "../token.yo";
+{ StateBlock, BlockTokenizeFn } :: import "./state_block.yo";
+{ isSpace } :: import "../common/utils.yo";
+{ BlockRuleFn } :: import "./lheading.yo";
+
+// Blockquote terminator rules — block rules that can interrupt a blockquote.
+// These are called in silent mode to check if a new block element starts.
+_bq_terminator_code :: (fn(state: *(StateBlock), line: i32, end: i32, silent: bool) -> bool)({
+  // Indented code — 4+ spaces relative to blk_indent
+  (pos : i32) = (state.*.b_marks.get(usize(line)).unwrap() + state.*.t_shift.get(usize(line)).unwrap());
+  if((pos >= state.*.e_marks.get(usize(line)).unwrap()), { return false; });
+  ((state.*.s_count.get(usize(line)).unwrap() - state.*.blk_indent) >= i32(4))
+});
+
+blockquote :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: bool) -> bool)({
+  (pos : i32) = (state.*.b_marks.get(usize(start_line)).unwrap() + state.*.t_shift.get(usize(start_line)).unwrap());
+  (max : i32) = state.*.e_marks.get(usize(start_line)).unwrap();
+  (old_line_max : i32) = state.*.line_max;
+
+  // If indented more than 3 spaces, it should be a code block
+  if(((state.*.s_count.get(usize(start_line)).unwrap() - state.*.blk_indent) >= i32(4)), {
+    return false;
+  });
+
+  // Check the block quote marker
+  if((i32(state.*._src_bytes.get(usize(pos)).unwrap()) != i32(0x3E)), {
+    return false;
+  });
+
+  // We know it's a valid blockquote — no point scanning in silent mode
+  if(silent, { return true; });
+
+  // Save old state for restoration
+  (old_b_marks : ArrayList(i32)) = ArrayList(i32).new();
+  (old_bs_count : ArrayList(i32)) = ArrayList(i32).new();
+  (old_s_count : ArrayList(i32)) = ArrayList(i32).new();
+  (old_t_shift : ArrayList(i32)) = ArrayList(i32).new();
+
+  // Build terminator rules (rules that can interrupt blockquote, checked in silent mode)
+  (terminator_rules : ArrayList(BlockRuleFn)) = ArrayList(BlockRuleFn).new();
+  _ := terminator_rules.push(_bq_terminator_code);
+
+  (old_parent_type : String) = state.*.parent_type;
+  state.*.parent_type = `blockquote`;
+  (last_line_empty : bool) = false;
+  (next_line : i32) = start_line;
+
+  // Search the end of the blockquote
+  (bq_done : bool) = false;
+  while ((next_line < end_line) && !(bq_done)), {
+    (is_outdented : bool) = (state.*.s_count.get(usize(next_line)).unwrap() < state.*.blk_indent);
+
+    pos = (state.*.b_marks.get(usize(next_line)).unwrap() + state.*.t_shift.get(usize(next_line)).unwrap());
+    max = state.*.e_marks.get(usize(next_line)).unwrap();
+
+    // Case 1: empty line — break
+    if((pos >= max), {
+      bq_done = true;
+    }, if(((i32(state.*._src_bytes.get(usize(pos)).unwrap()) == i32(0x3E)) && !(is_outdented)), {
+      // This line is inside the blockquote
+      pos = (pos + i32(1));
+
+      // set offset past spaces and ">"
+      (initial : i32) = (state.*.s_count.get(usize(next_line)).unwrap() + i32(1));
+      (space_after_marker : bool) = false;
+      (adjust_tab : bool) = false;
+
+      // Skip one optional space/tab after '>'
+      if((pos < max), {
+        (after_ch : i32) = i32(state.*._src_bytes.get(usize(pos)).unwrap());
+        if((after_ch == i32(0x20)), {
+          pos = (pos + i32(1));
+          initial = (initial + i32(1));
+          adjust_tab = false;
+          space_after_marker = true;
+        }, if((after_ch == i32(0x09)), {
+          space_after_marker = true;
+          if((((state.*.bs_count.get(usize(next_line)).unwrap() + initial) % i32(4)) == i32(3)), {
+            pos = (pos + i32(1));
+            initial = (initial + i32(1));
+            adjust_tab = false;
+          }, {
+            adjust_tab = true;
+          });
+        }, {
+          space_after_marker = false;
+        }));
+      });
+
+      (offset : i32) = initial;
+      _ := old_b_marks.push(state.*.b_marks.get(usize(next_line)).unwrap());
+      state.*.b_marks.set(usize(next_line), pos);
+
+      // Calculate remaining indentation
+      (ws_done : bool) = false;
+      while ((pos < max) && !(ws_done)), {
+        (ch : i32) = i32(state.*._src_bytes.get(usize(pos)).unwrap());
+        if(isSpace(ch), {
+          if((ch == i32(0x09)), {
+            offset = (offset + (i32(4) - (((offset + state.*.bs_count.get(usize(next_line)).unwrap()) + cond(adjust_tab => i32(1), true => i32(0))) % i32(4))));
+          }, {
+            offset = (offset + i32(1));
+          });
+          pos = (pos + i32(1));
+        }, {
+          ws_done = true;
+        });
+      };
+
+      last_line_empty = (pos >= max);
+
+      _ := old_bs_count.push(state.*.bs_count.get(usize(next_line)).unwrap());
+      state.*.bs_count.set(usize(next_line), ((state.*.s_count.get(usize(next_line)).unwrap() + i32(1)) + cond(space_after_marker => i32(1), true => i32(0))));
+
+      _ := old_s_count.push(state.*.s_count.get(usize(next_line)).unwrap());
+      state.*.s_count.set(usize(next_line), (offset - initial));
+
+      _ := old_t_shift.push(state.*.t_shift.get(usize(next_line)).unwrap());
+      state.*.t_shift.set(usize(next_line), (pos - state.*.b_marks.get(usize(next_line)).unwrap()));
+
+      next_line = (next_line + i32(1));
+    }, if(last_line_empty, {
+      // Case 2: line not inside blockquote, last line was empty
+      bq_done = true;
+    }, {
+      // Case 3: another tag found — check terminators
+      (terminate : bool) = false;
+      (ti : i32) = i32(0);
+      (tl : i32) = i32(terminator_rules.len());
+      while ((ti < tl) && !(terminate)), {
+        (rule : BlockRuleFn) = terminator_rules.get(usize(ti)).unwrap();
+        if(rule(state, next_line, end_line, true), {
+          terminate = true;
+        });
+        ti = (ti + i32(1));
+      };
+
+      if(terminate, {
+        // Hard termination: limit lineMax to prevent paragraph continuation
+        state.*.line_max = next_line;
+
+        if((state.*.blk_indent != i32(0)), {
+          _ := old_b_marks.push(state.*.b_marks.get(usize(next_line)).unwrap());
+          _ := old_bs_count.push(state.*.bs_count.get(usize(next_line)).unwrap());
+          _ := old_t_shift.push(state.*.t_shift.get(usize(next_line)).unwrap());
+          _ := old_s_count.push(state.*.s_count.get(usize(next_line)).unwrap());
+          state.*.s_count.set(usize(next_line), (state.*.s_count.get(usize(next_line)).unwrap() - state.*.blk_indent));
+        });
+        bq_done = true;
+      }, {
+        // Paragraph continuation
+        _ := old_b_marks.push(state.*.b_marks.get(usize(next_line)).unwrap());
+        _ := old_bs_count.push(state.*.bs_count.get(usize(next_line)).unwrap());
+        _ := old_t_shift.push(state.*.t_shift.get(usize(next_line)).unwrap());
+        _ := old_s_count.push(state.*.s_count.get(usize(next_line)).unwrap());
+
+        // Negative indentation = paragraph continuation
+        state.*.s_count.set(usize(next_line), i32(-1));
+        next_line = (next_line + i32(1));
+      });
+    })));
+  };
+
+  (old_indent : i32) = state.*.blk_indent;
+  state.*.blk_indent = i32(0);
+
+  // Create blockquote_open token
+  (token_o : Token) = Token.new(`blockquote_open`, `blockquote`, i32(1));
+  token_o.markup = `>`;
+  token_o.block = true;
+  (map_arr : ArrayList(i32)) = ArrayList(i32).new();
+  _ := map_arr.push(start_line);
+  _ := map_arr.push(i32(0));
+  token_o.map = .Some(map_arr);
+
+  // Manual level tracking since push_token is by-value
+  (open_level : i32) = state.*.level;
+  token_o.level = open_level;
+  state.*.level = (state.*.level + i32(1));
+  (open_token_idx : usize) = state.*.tokens.len();
+  _ := state.*.tokens.push(token_o);
+
+  // Recursively tokenize nested content
+  (tokenize : BlockTokenizeFn) = state.*._tokenize_fn;
+  tokenize(state, start_line, next_line);
+
+  // Create blockquote_close token
+  (token_c : Token) = Token.new(`blockquote_close`, `blockquote`, i32(-1));
+  token_c.markup = `>`;
+  token_c.block = true;
+  state.*.level = (state.*.level - i32(1));
+  token_c.level = state.*.level;
+  _ := state.*.tokens.push(token_c);
+
+  // Update map_end on the open token
+  (updated_open : Token) = state.*.tokens.get(open_token_idx).unwrap();
+  match(updated_open.map,
+    .Some(m) => {
+      m.set(usize(1), state.*.line);
+      updated_open.map = .Some(m);
+      state.*.tokens.set(open_token_idx, updated_open);
+    },
+    .None => ()
+  );
+
+  // Restore state
+  state.*.line_max = old_line_max;
+  state.*.parent_type = old_parent_type;
+
+  (i : i32) = i32(0);
+  while (i < i32(old_t_shift.len())), {
+    state.*.b_marks.set(usize((i + start_line)), old_b_marks.get(usize(i)).unwrap());
+    state.*.t_shift.set(usize((i + start_line)), old_t_shift.get(usize(i)).unwrap());
+    state.*.s_count.set(usize((i + start_line)), old_s_count.get(usize(i)).unwrap());
+    state.*.bs_count.set(usize((i + start_line)), old_bs_count.get(usize(i)).unwrap());
+    i = (i + i32(1));
+  };
+  state.*.blk_indent = old_indent;
+
+  true
+});
+
+export blockquote;

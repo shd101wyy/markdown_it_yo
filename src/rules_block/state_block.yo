@@ -35,11 +35,17 @@ StateBlock :: struct(
   html_enabled : bool,
 
   // Cached bytes for fast access
-  _src_bytes : ArrayList(u8)
+  _src_bytes : ArrayList(u8),
+
+  // Function pointer for recursive block tokenization (set by parser_block).
+  _tokenize_fn : (fn(state: *(Self), start: i32, end: i32) -> unit)
 );
 
+// Function pointer type for recursive block tokenization
+BlockTokenizeFn :: (fn(state: *(StateBlock), start: i32, end: i32) -> unit);
+
 // Create a new StateBlock and precompute line markers
-new_state_block :: (fn(src: String, env: *(Env), tokens: ArrayList(Token), html_enabled: bool) -> StateBlock)(
+new_state_block :: (fn(src: String, env: *(Env), tokens: ArrayList(Token), html_enabled: bool, tokenize_fn: BlockTokenizeFn) -> StateBlock)(
   {
     (bytes : ArrayList(u8)) = src.as_bytes();
     (len : i32) = i32(bytes.len());
@@ -123,7 +129,8 @@ new_state_block :: (fn(src: String, env: *(Env), tokens: ArrayList(Token), html_
       parent_type: `root`,
       level: i32(0),
       html_enabled: html_enabled,
-      _src_bytes: bytes
+      _src_bytes: bytes,
+      _tokenize_fn: tokenize_fn
     )
   }
 );
@@ -315,4 +322,4 @@ impl(StateBlock,
   })
 );
 
-export StateBlock, new_state_block;
+export StateBlock, new_state_block, BlockTokenizeFn;
