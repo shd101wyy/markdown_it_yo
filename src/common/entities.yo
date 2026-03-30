@@ -197,7 +197,9 @@ decode_html :: (fn(input: String) -> String)({
                 if(is_valid_entity_code(code), {
                   result = `${result}${from_code_point(code)}`;
                 }, {
-                  result = `${result}${from_code_point(i32(65533))}`;
+                  // Invalid code (e.g., surrogates) — keep original entity text
+                  (orig_hex : String) = input.substring(start, i);
+                  result = `${result}${orig_hex}`;
                 });
               }, {
                 // No hex digits — output literally
@@ -234,7 +236,9 @@ decode_html :: (fn(input: String) -> String)({
                 if(is_valid_entity_code(code), {
                   result = `${result}${from_code_point(code)}`;
                 }, {
-                  result = `${result}${from_code_point(i32(65533))}`;
+                  // Invalid code (e.g., surrogates) — keep original entity text
+                  (orig_dec : String) = input.substring(start, i);
+                  result = `${result}${orig_dec}`;
                 });
               }, {
                 // No decimal digits
