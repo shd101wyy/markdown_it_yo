@@ -7,11 +7,12 @@ open import "std/string";
 { Token, StringPair } :: import "../token.yo";
 { StateInline } :: import "./state_inline.yo";
 { state_push } :: import "./inline_helpers.yo";
-{ isSpace } :: import "../common/utils.yo";
+{ isSpace, normalizeReference } :: import "../common/utils.yo";
 { validate_link, normalize_link } :: import "../common/link_utils.yo";
 { parse_link_label } :: import "../helpers/parse_link_label.yo";
 { LinkDestResult, parse_link_destination } :: import "../helpers/parse_link_destination.yo";
 { LinkTitleResult, parse_link_title } :: import "../helpers/parse_link_title.yo";
+{ Reference, Env } :: import "../env.yo";
 
 image_rule :: (fn(state: *(StateInline), silent: bool) -> bool)({
   (pos : i32) = state.*.pos;
@@ -36,8 +37,11 @@ image_rule :: (fn(state: *(StateInline), silent: bool) -> bool)({
   (title : String) = ``;
   pos = (label_end + i32(1));
 
+  (parse_reference : bool) = true;
+
   // Try inline link: ![alt](url "title")
   if(((pos < max) && (i32(state.*._src_bytes.get(usize(pos)).unwrap()) == i32(0x28))), {
+    parse_reference = false;
     pos = (pos + i32(1));
 
     // Skip spaces
@@ -75,12 +79,78 @@ image_rule :: (fn(state: *(StateInline), silent: bool) -> bool)({
     });
 
     if(((pos >= max) || (i32(state.*._src_bytes.get(usize(pos)).unwrap()) != i32(0x29))), {
-      return false;
+      parse_reference = true;
+    }, {
+      pos = (pos + i32(1));
     });
-    pos = (pos + i32(1));
-  }, {
-    // Reference images not yet supported
-    return false;
+  });
+
+  // Reference image: ![alt][ref] or ![alt][] or ![alt]
+  if(parse_reference, {
+    // ![alt][ref] — full form
+    if(((pos < max) && (i32(state.*._src_bytes.get(usize(pos)).unwrap()) == i32(0x5B))), {
+      (ref_start : i32) = (pos + i32(1));
+      (ref_end : i32) = parse_link_label(state.*._src_bytes, pos, max, false);
+      if((ref_end >= i32(0)), {
+        (ref_label : String) = state.*.src.substring(usize(ref_start), usize(ref_end));
+        (label : String) = normalizeReference(ref_label);
+        if((label.len() > usize(0)), {
+          (env : *(Env)) = state.*.env;
+          (ref_opt : Option(Reference)) = env.*.references.get(label);
+          match(ref_opt,
+            .Some(r) => {
+              href = r.href;
+              title = r.title;
+              pos = (ref_end + i32(1));
+              parse_reference = false;
+            },
+            .None => ()
+          );
+        });
+      });
+    });
+
+    // ![alt][] — collapsed form
+    if(parse_reference, {
+      if(((pos < max) && ((pos + i32(1)) < max)), {
+        if(((i32(state.*._src_bytes.get(usize(pos)).unwrap()) == i32(0x5B)) && (i32(state.*._src_bytes.get(usize((pos + i32(1)))).unwrap()) == i32(0x5D))), {
+          (label : String) = normalizeReference(state.*.src.substring(usize(label_start), usize(label_end)));
+          if((label.len() > usize(0)), {
+            (env : *(Env)) = state.*.env;
+            (ref_opt : Option(Reference)) = env.*.references.get(label);
+            match(ref_opt,
+              .Some(r) => {
+                href = r.href;
+                title = r.title;
+                pos = (pos + i32(2));
+                parse_reference = false;
+              },
+              .None => ()
+            );
+          });
+        });
+      });
+    });
+
+    // ![alt] — shortcut form
+    if(parse_reference, {
+      (label : String) = normalizeReference(state.*.src.substring(usize(label_start), usize(label_end)));
+      if((label.len() > usize(0)), {
+        (env : *(Env)) = state.*.env;
+        (ref_opt : Option(Reference)) = env.*.references.get(label);
+        match(ref_opt,
+          .Some(r) => {
+            href = r.href;
+            title = r.title;
+            pos = (label_end + i32(1));
+            parse_reference = false;
+          },
+          .None => ()
+        );
+      });
+    });
+
+    if(parse_reference, { return false; });
   });
 
   if(!(silent), {

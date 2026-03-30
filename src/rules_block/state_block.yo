@@ -6,12 +6,12 @@ open import "std/string";
 { ArrayList } :: import "std/collections/array_list";
 { Token } :: import "../token.yo";
 { isSpace } :: import "../common/utils.yo";
+{ Env } :: import "../env.yo";
 
 // Block parser state
 StateBlock :: struct(
   src : String,
-  // md field: added in Phase 5 when MarkdownIt type is defined
-  env : *(void),
+  env : *(Env),
   tokens : ArrayList(Token),
 
   // Line marker arrays (precomputed during construction)
@@ -39,7 +39,7 @@ StateBlock :: struct(
 );
 
 // Create a new StateBlock and precompute line markers
-new_state_block :: (fn(src: String, env: *(void), tokens: ArrayList(Token), html_enabled: bool) -> StateBlock)(
+new_state_block :: (fn(src: String, env: *(Env), tokens: ArrayList(Token), html_enabled: bool) -> StateBlock)(
   {
     (bytes : ArrayList(u8)) = src.as_bytes();
     (len : i32) = i32(bytes.len());

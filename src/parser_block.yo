@@ -17,6 +17,8 @@ open import "std/string";
 { html_block } :: import "./rules_block/html_block.yo";
 { paragraph } :: import "./rules_block/paragraph.yo";
 { table } :: import "./rules_block/table.yo";
+{ reference } :: import "./rules_block/reference.yo";
+{ Env } :: import "./env.yo";
 
 // Wrapper: adapts table to BlockRuleFn signature for use as paragraph terminator.
 // Only called in silent mode by the paragraph rule, so the empty terminator_rules
@@ -83,6 +85,7 @@ impl(ParserBlock,
       if(!(ok), { ok = table(state, line, end_line, false, (&block_terminators)); });
       if(!(ok), { ok = code(state, line, end_line, false); });
       if(!(ok), { ok = fence(state, line, end_line, false); });
+      if(!(ok), { ok = reference(state, line, end_line, false); });
       if(!(ok), { ok = hr(state, line, end_line, false); });
       if(!(ok), { ok = html_block(state, line, end_line, false); });
       if(!(ok), { ok = heading(state, line, end_line, false); });
@@ -105,7 +108,7 @@ impl(ParserBlock,
   }),
 
   // Parse block content and fill out_tokens.
-  parse : (fn(self: Self, src: String, env: *(void), out_tokens: ArrayList(Token), html_enabled: bool) -> unit)({
+  parse : (fn(self: Self, src: String, env: *(Env), out_tokens: ArrayList(Token), html_enabled: bool) -> unit)({
     (state : StateBlock) = new_state_block(src, env, out_tokens, html_enabled);
     self.tokenize((&state), i32(0), state.line_max);
   })

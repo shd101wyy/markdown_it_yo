@@ -8,6 +8,7 @@ open import "std/string";
 { Token } :: import "./token.yo";
 { StateInline, new_state_inline } :: import "./rules_inline/state_inline.yo";
 { flush_pending } :: import "./rules_inline/inline_helpers.yo";
+{ Env } :: import "./env.yo";
 
 // Inline tokenize rules
 { text } :: import "./rules_inline/text.yo";
@@ -73,7 +74,7 @@ impl(ParserInline,
   }),
 
   // Parse inline content: tokenize then run post-processing rules.
-  parse : (fn(self: Self, src: String, env: *(void), out_tokens: ArrayList(Token), html_enabled: bool) -> unit)({
+  parse : (fn(self: Self, src: String, env: *(Env), out_tokens: ArrayList(Token), html_enabled: bool) -> unit)({
     (state : StateInline) = new_state_inline(src, env, out_tokens, html_enabled);
     self.tokenize((&state));
 

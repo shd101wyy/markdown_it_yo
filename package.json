@@ -1,5 +1,6 @@
 {
   "devDependencies": {
-    "entities": "^4.5.0"
+    "entities": "^4.5.0",
+    "markdown-it": "^14.1.1"
   }
 }

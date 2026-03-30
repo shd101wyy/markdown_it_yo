@@ -5,20 +5,18 @@
 open import "std/string";
 { ArrayList } :: import "std/collections/array_list";
 { Token } :: import "../token.yo";
+{ Env } :: import "../env.yo";
 
 // Core parser state
 StateCore :: struct(
   src : String,
   tokens : ArrayList(Token),
   inline_mode : bool,
-  // md field will be added in Phase 5 when MarkdownIt type is defined
-  // env is a generic "environment" (used for references, etc.)
-  // For now we store env as an opaque pointer; it will be typed later.
-  env : *(void)
+  env : *(Env)
 );
 
 // Create a new StateCore
-new_state_core :: (fn(src: String, env: *(void)) -> StateCore)(
+new_state_core :: (fn(src: String, env: *(Env)) -> StateCore)(
   StateCore(
     src: src,
     tokens: ArrayList(Token).new(),

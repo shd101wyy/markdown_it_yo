@@ -8,6 +8,7 @@ open import "std/string";
 { Token } :: import "../token.yo";
 { isWhiteSpace, isPunctChar, isMdAsciiPunct } :: import "../common/utils.yo";
 { isValidEntityCode, fromCodePoint } :: import "../common/char_utils.yo";
+{ Env } :: import "../env.yo";
 
 // Emphasis-like delimiter
 Delimiter :: struct(
@@ -34,7 +35,7 @@ ScanDelimsResult :: struct(
 // Inline parser state
 StateInline :: struct(
   src : String,
-  env : *(void),
+  env : *(Env),
   tokens : ArrayList(Token),
   tokens_meta : ArrayList(Option(TokenMeta)),
 
@@ -68,7 +69,7 @@ StateInline :: struct(
 );
 
 // Create a new StateInline
-new_state_inline :: (fn(src: String, env: *(void), out_tokens: ArrayList(Token), html_enabled: bool) -> StateInline)(
+new_state_inline :: (fn(src: String, env: *(Env), out_tokens: ArrayList(Token), html_enabled: bool) -> StateInline)(
   {
     (bytes : ArrayList(u8)) = src.as_bytes();
     (pos_max : i32) = i32(bytes.len());

@@ -1,0 +1,185 @@
+// Ported from: lib/rules_block/reference.mjs (markdown-it v14.1.1)
+//
+// Parse link reference definitions: [label]: destination "title"
+
+open import "std/string";
+{ ArrayList } :: import "std/collections/array_list";
+{ Token } :: import "../token.yo";
+{ StateBlock } :: import "./state_block.yo";
+{ isSpace, normalizeReference } :: import "../common/utils.yo";
+{ validate_link, normalize_link } :: import "../common/link_utils.yo";
+{ LinkDestResult, parse_link_destination } :: import "../helpers/parse_link_destination.yo";
+{ LinkTitleResult, parse_link_title } :: import "../helpers/parse_link_title.yo";
+{ Reference, Env } :: import "../env.yo";
+
+// Try to append content from the next line to `buf`.
+// Returns true if a line was appended, false otherwise.
+_try_append_next_line :: (fn(state: *(StateBlock), buf: *(String), str_max: *(i32), next_line: *(i32)) -> bool)({
+  if((next_line.* >= state.*.line_max), { return false; });
+  if(state.*.is_empty(next_line.*), { return false; });
+
+  (line_pos : i32) = (state.*.b_marks.get(usize(next_line.*)).unwrap() + state.*.t_shift.get(usize(next_line.*)).unwrap());
+  (line_max : i32) = state.*.e_marks.get(usize(next_line.*)).unwrap();
+  (line_content : String) = state.*.src.substring(usize(line_pos), usize((line_max + i32(1))));
+  buf.* = `${buf.*}${line_content}`;
+  str_max.* = i32(buf.*.len());
+  next_line.* = (next_line.* + i32(1));
+  true
+});
+
+reference :: (fn(state: *(StateBlock), start_line: i32, _end_line: i32, silent: bool) -> bool)({
+  (pos : i32) = (state.*.b_marks.get(usize(start_line)).unwrap() + state.*.t_shift.get(usize(start_line)).unwrap());
+  (max : i32) = state.*.e_marks.get(usize(start_line)).unwrap();
+  (next_line : i32) = (start_line + i32(1));
+
+  // If indented more than 3 spaces, it should be a code block
+  if(((state.*.s_count.get(usize(start_line)).unwrap() - state.*.blk_indent) >= i32(4)), {
+    return false;
+  });
+
+  if((i32(state.*._src_bytes.get(usize(pos)).unwrap()) != i32(0x5B)), {
+    return false;
+  });
+
+  // Collect content across multiple lines.
+  // Start with the first line (pos to max+1 to include newline).
+  (buf : String) = state.*.src.substring(usize(pos), usize((max + i32(1))));
+  (str_max : i32) = i32(buf.len());
+
+  // Find label end: scan for unescaped ']'
+  (label_end : i32) = i32(-1);
+  (scan : i32) = i32(1);
+  while ((scan < str_max) && (label_end < i32(0))), {
+    (ch : i32) = i32(buf.as_bytes().get(usize(scan)).unwrap());
+    if((ch == i32(0x5B)), {
+      return false;
+    }, if((ch == i32(0x5D)), {
+      label_end = scan;
+    }, if((ch == i32(0x0A)), {
+      _ := _try_append_next_line(state, (&buf), (&str_max), (&next_line));
+      scan = (scan + i32(1));
+    }, if((ch == i32(0x5C)), {
+      scan = (scan + i32(1));
+      if(((scan < str_max) && (i32(buf.as_bytes().get(usize(scan)).unwrap()) == i32(0x0A))), {
+        _ := _try_append_next_line(state, (&buf), (&str_max), (&next_line));
+      });
+      scan = (scan + i32(1));
+    }, {
+      scan = (scan + i32(1));
+    }))));
+  };
+
+  // No ']' found or no ':' after it
+  if((label_end < i32(0)), { return false; });
+  if(((label_end + i32(1)) >= str_max), { return false; });
+  if((i32(buf.as_bytes().get(usize((label_end + i32(1)))).unwrap()) != i32(0x3A)), { return false; });
+
+  // Skip whitespace after ':'
+  scan = (label_end + i32(2));
+  (skip_done : bool) = false;
+  while ((scan < str_max) && !(skip_done)), {
+    (ch : i32) = i32(buf.as_bytes().get(usize(scan)).unwrap());
+    if((ch == i32(0x0A)), {
+      _ := _try_append_next_line(state, (&buf), (&str_max), (&next_line));
+      scan = (scan + i32(1));
+    }, if(isSpace(ch), {
+      scan = (scan + i32(1));
+    }, {
+      skip_done = true;
+    }));
+  };
+
+  // Parse link destination
+  (dest_result : LinkDestResult) = parse_link_destination(buf, scan, str_max);
+  if(!(dest_result.ok), { return false; });
+
+  (href : String) = normalize_link(dest_result.str);
+  if(!(validate_link(href)), { return false; });
+
+  pos = dest_result.pos;
+
+  // Save cursor state for potential rollback
+  (dest_end_pos : i32) = pos;
+  (dest_end_line_no : i32) = next_line;
+
+  // Skip whitespace between destination and title
+  (start : i32) = pos;
+  skip_done = false;
+  while ((pos < str_max) && !(skip_done)), {
+    (ch : i32) = i32(buf.as_bytes().get(usize(pos)).unwrap());
+    if((ch == i32(0x0A)), {
+      _ := _try_append_next_line(state, (&buf), (&str_max), (&next_line));
+      pos = (pos + i32(1));
+    }, if(isSpace(ch), {
+      pos = (pos + i32(1));
+    }, {
+      skip_done = true;
+    }));
+  };
+
+  // Parse link title (with multi-line continuation)
+  (title_result : LinkTitleResult) = parse_link_title(buf, pos, str_max, .None);
+  while (title_result.can_continue), {
+    if(((next_line >= state.*.line_max) || state.*.is_empty(next_line)), {
+      title_result.can_continue = false;
+    }, {
+      (line_pos : i32) = (state.*.b_marks.get(usize(next_line)).unwrap() + state.*.t_shift.get(usize(next_line)).unwrap());
+      (line_max : i32) = state.*.e_marks.get(usize(next_line)).unwrap();
+      (line_content : String) = state.*.src.substring(usize(line_pos), usize((line_max + i32(1))));
+      buf = `${buf}${line_content}`;
+      pos = str_max;
+      str_max = i32(buf.len());
+      next_line = (next_line + i32(1));
+      title_result = parse_link_title(buf, pos, str_max, .Some(title_result));
+    });
+  };
+
+  (title : String) = ``;
+  if((((pos < str_max) && (start != pos)) && title_result.ok), {
+    title = title_result.str;
+    pos = title_result.pos;
+  }, {
+    pos = dest_end_pos;
+    next_line = dest_end_line_no;
+  });
+
+  // Skip trailing spaces
+  while ((pos < str_max) && isSpace(i32(buf.as_bytes().get(usize(pos)).unwrap()))), {
+    pos = (pos + i32(1));
+  };
+
+  if(((pos < str_max) && (i32(buf.as_bytes().get(usize(pos)).unwrap()) != i32(0x0A))), {
+    if((title.len() > usize(0)), {
+      // Garbage after title — roll back title
+      title = ``;
+      pos = dest_end_pos;
+      next_line = dest_end_line_no;
+      while ((pos < str_max) && isSpace(i32(buf.as_bytes().get(usize(pos)).unwrap()))), {
+        pos = (pos + i32(1));
+      };
+    });
+  });
+
+  if(((pos < str_max) && (i32(buf.as_bytes().get(usize(pos)).unwrap()) != i32(0x0A))), {
+    return false;
+  });
+
+  (label : String) = normalizeReference(buf.substring(usize(1), usize(label_end)));
+  if((label.len() == usize(0)), {
+    return false;
+  });
+
+  if(silent, { return true; });
+
+  // Store reference in env
+  (env : *(Env)) = *(Env)(state.*.env);
+  // Only store first definition (per CommonMark spec)
+  if(!(env.*.references.contains_key(label)), {
+    _ := env.*.references.set(label, Reference(href: href, title: title));
+  });
+
+  state.*.line = next_line;
+  true
+});
+
+export reference;
