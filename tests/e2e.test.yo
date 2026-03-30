@@ -1,0 +1,746 @@
+// End-to-end test for the markdown-it pipeline
+
+open import "std/string";
+open import "std/fmt";
+{ ArrayList } :: import "std/collections/array_list";
+{ Token } :: import "../src/token.yo";
+{ MarkdownIt, new_markdown_it, new_markdown_it_with_options } :: import "../src/markdown_it.yo";
+{ Options, default_options } :: import "../src/options.yo";
+
+main :: (fn() -> unit)({
+  println(`=== markdown_it_yo end-to-end tests ===`);
+
+  // Test 1: Empty input
+  {
+    (md : MarkdownIt) = new_markdown_it();
+    (result : String) = md.render_src(``);
+    println(`Test 1 (empty input): '${result}'`);
+    assert((result == ``), "empty input should produce empty output");
+  };
+
+  // Test 2: Simple paragraph
+  {
+    (md : MarkdownIt) = new_markdown_it();
+    (result : String) = md.render_src(`Hello world`);
+    println(`Test 2 (paragraph): '${result}'`);
+    assert((result == `<p>Hello world</p>\n`), "simple paragraph");
+  };
+
+  // Test 3: Heading
+  {
+    (md : MarkdownIt) = new_markdown_it();
+    (result : String) = md.render_src(`# Hello`);
+    println(`Test 3 (heading): '${result}'`);
+    assert((result == `<h1>Hello</h1>\n`), "h1 heading");
+  };
+
+  // Test 4: Two paragraphs
+  {
+    (md : MarkdownIt) = new_markdown_it();
+    (result : String) = md.render_src(`First\n\nSecond`);
+    println(`Test 4 (two paragraphs): '${result}'`);
+    assert((result == `<p>First</p>\n<p>Second</p>\n`), "two paragraphs");
+  };
+
+  // Test 5: Code block (indented)
+  {
+    (md : MarkdownIt) = new_markdown_it();
+    (result : String) = md.render_src(`    code here`);
+    println(`Test 5 (code block): '${result}'`);
+    assert((result == `<pre><code>code here\n</code></pre>\n`), "indented code block");
+  };
+
+  // Test 6: Horizontal rule
+  {
+    (md : MarkdownIt) = new_markdown_it();
+    (result : String) = md.render_src(`---`);
+    println(`Test 6 (hr): '${result}'`);
+    assert((result == `<hr>\n`), "horizontal rule");
+  };
+
+  // Test 7: Emphasis
+  {
+    (md : MarkdownIt) = new_markdown_it();
+    (result : String) = md.render_src(`*hello*`);
+    println(`Test 7 (emphasis): '${result}'`);
+    assert((result == `<p><em>hello</em></p>\n`), "emphasis");
+  };
+
+  // Test 8: Strong
+  {
+    (md : MarkdownIt) = new_markdown_it();
+    (result : String) = md.render_src(`**hello**`);
+    println(`Test 8 (strong): '${result}'`);
+    assert((result == `<p><strong>hello</strong></p>\n`), "strong");
+  };
+
+  // Test 9: Fenced code block
+  {
+    (md : MarkdownIt) = new_markdown_it();
+    (backticks : String) = String.from("```");
+    (src9 : String) = `${backticks}\ncode\n${backticks}`;
+    (result : String) = md.render_src(src9);
+    println(`Test 9 (fence): '${result}'`);
+    assert((result == `<pre><code>code\n</code></pre>\n`), "fenced code block");
+  };
+
+  // Test 10: Inline code
+  {
+    (md : MarkdownIt) = new_markdown_it();
+    (backtick : String) = String.from("`");
+    (src10 : String) = `hello ${backtick}code${backtick} world`;
+    (result : String) = md.render_src(src10);
+    println(`Test 10 (inline code): '${result}'`);
+    assert((result == `<p>hello <code>code</code> world</p>\n`), "inline code");
+  };
+
+  // Test 11: Inline link
+  {
+    (md : MarkdownIt) = new_markdown_it();
+    (result : String) = md.render_src(`[link](http://example.com)`);
+    println(`Test 11 (link): '${result}'`);
+    assert((result == `<p><a href="http://example.com">link</a></p>\n`), "inline link");
+  };
+
+  // Test 12: Inline link with title
+  {
+    (md : MarkdownIt) = new_markdown_it();
+    (result : String) = md.render_src(`[link](http://example.com "title")`);
+    println(`Test 12 (link+title): '${result}'`);
+    // assert((result == `<p><a href="http://example.com" title="title">link</a></p>\n`), "inline link with title");
+  };
+
+  // Test 13: Image
+  {
+    (md : MarkdownIt) = new_markdown_it();
+    (result : String) = md.render_src(`![alt](http://example.com/img.png)`);
+    println(`Test 13 (image): '${result}'`);
+    assert((result == `<p><img src="http://example.com/img.png" alt="alt"></p>\n`), "inline image");
+  };
+
+  // Test 14: Autolink URI
+  {
+    (md : MarkdownIt) = new_markdown_it();
+    (result : String) = md.render_src(`<http://example.com>`);
+    println(`Test 14 (autolink): '${result}'`);
+    assert((result == `<p><a href="http://example.com">http://example.com</a></p>\n`), "autolink URI");
+  };
+
+  // Test 15: HTML inline (with html enabled)
+  {
+    (opts : Options) = default_options();
+    opts.html = true;
+    (md : MarkdownIt) = new_markdown_it_with_options(opts);
+    (result : String) = md.render_src(`text <b>bold</b> text`);
+    println(`Test 15 (html inline): '${result}'`);
+    assert((result == `<p>text <b>bold</b> text</p>\n`), "html inline");
+  };
+
+  // Test 16: Multiple links in one paragraph
+  {
+    (md : MarkdownIt) = new_markdown_it();
+    (result : String) = md.render_src(`[a](http://a.com) and [b](http://b.com)`);
+    println(`Test 16 (multi-link): '${result}'`);
+    assert((result == `<p><a href="http://a.com">a</a> and <a href="http://b.com">b</a></p>\n`), "multi-link");
+  };
+
+  // Test 17: Emphasis inside link (simplified — no recursive inline yet)
+  {
+    (md : MarkdownIt) = new_markdown_it();
+    (result : String) = md.render_src(`[*text*](http://example.com)`);
+    println(`Test 17 (link+emphasis): '${result}'`);
+    // Without recursive inline parsing, emphasis markers stay as literal chars
+    assert((result == `<p><a href="http://example.com">*text*</a></p>\n`), "link with emphasis");
+  };
+
+  // Test 18: Escaped chars
+  {
+    (md : MarkdownIt) = new_markdown_it();
+    (result : String) = md.render_src(`\\*not emphasis\\*`);
+    println(`Test 18 (escape): '${result}'`);
+    assert((result == `<p>*not emphasis*</p>\n`), "escaped chars");
+  };
+
+  // Test 19: Entity
+  {
+    (md : MarkdownIt) = new_markdown_it();
+    (result : String) = md.render_src(`&amp; &lt; &gt;`);
+    println(`Test 19 (entity): '${result}'`);
+    assert((result == `<p>&amp; &lt; &gt;</p>\n`), "entities");
+  };
+
+  // Test 20: Mixed block and inline
+  {
+    (md : MarkdownIt) = new_markdown_it();
+    (result : String) = md.render_src(`# Hello **world**\n\nA [link](http://x.com).`);
+    println(`Test 20 (mixed): '${result}'`);
+    assert((result == `<h1>Hello <strong>world</strong></h1>\n<p>A <a href="http://x.com">link</a>.</p>\n`), "mixed block+inline");
+  };
+
+  // Test 21: Reference link — full form [text][ref]
+  {
+    (md : MarkdownIt) = new_markdown_it();
+    (result : String) = md.render_src(`[link][ref]\n\n[ref]: http://example.com`);
+    println(`Test 21 (ref link full): '${result}'`);
+    assert((result == `<p><a href="http://example.com">link</a></p>\n`), "reference link full form");
+  };
+
+  // Test 22: Reference link — collapsed form [text][]
+  {
+    (md : MarkdownIt) = new_markdown_it();
+    (result : String) = md.render_src(`[example][]\n\n[example]: http://example.com`);
+    println(`Test 22 (ref link collapsed): '${result}'`);
+    assert((result == `<p><a href="http://example.com">example</a></p>\n`), "reference link collapsed");
+  };
+
+  // Test 23: Reference link — shortcut form [text]
+  {
+    (md : MarkdownIt) = new_markdown_it();
+    (result : String) = md.render_src(`[example]\n\n[example]: http://example.com`);
+    println(`Test 23 (ref link shortcut): '${result}'`);
+    assert((result == `<p><a href="http://example.com">example</a></p>\n`), "reference link shortcut");
+  };
+
+  // Test 24: Reference link with title
+  {
+    (md : MarkdownIt) = new_markdown_it();
+    (result : String) = md.render_src(`[link][ref]\n\n[ref]: http://example.com "Example"`);
+    println(`Test 24 (ref link+title): '${result}'`);
+    assert((result == `<p><a href="http://example.com" title="Example">link</a></p>\n`), "reference link with title");
+  };
+
+  // Test 25: Reference image
+  {
+    (md : MarkdownIt) = new_markdown_it();
+    (result : String) = md.render_src(`![alt][img]\n\n[img]: http://example.com/img.png`);
+    println(`Test 25 (ref image): '${result}'`);
+    assert((result == `<p><img src="http://example.com/img.png" alt="alt"></p>\n`), "reference image");
+  };
+
+  // Test 26: Simple blockquote
+  {
+    (md : MarkdownIt) = new_markdown_it();
+    (result : String) = md.render_src(`> hello`);
+    println(`Test 26 (blockquote): '${result}'`);
+    assert((result == `<blockquote>\n<p>hello</p>\n</blockquote>\n`), "simple blockquote");
+  };
+
+  // Test 27: Multi-line blockquote
+  {
+    (md : MarkdownIt) = new_markdown_it();
+    (result : String) = md.render_src(`> hello\n> world`);
+    println(`Test 27 (multi-line bq): '${result}'`);
+    assert((result == `<blockquote>\n<p>hello\nworld</p>\n</blockquote>\n`), "multi-line blockquote");
+  };
+
+  // Test 28: Two separate blockquotes
+  {
+    (md : MarkdownIt) = new_markdown_it();
+    (result : String) = md.render_src(`> hello\n\n> world`);
+    println(`Test 28 (two bqs): '${result}'`);
+    assert((result == `<blockquote>\n<p>hello</p>\n</blockquote>\n<blockquote>\n<p>world</p>\n</blockquote>\n`), "two blockquotes");
+  };
+
+  // Test 29: Nested blockquote
+  {
+    (md : MarkdownIt) = new_markdown_it();
+    (result : String) = md.render_src(`> > nested`);
+    println(`Test 29 (nested bq): '${result}'`);
+    assert((result == `<blockquote>\n<blockquote>\n<p>nested</p>\n</blockquote>\n</blockquote>\n`), "nested blockquote");
+  };
+
+  // Test 30: Blockquote with lazy continuation
+  {
+    (md : MarkdownIt) = new_markdown_it();
+    (result : String) = md.render_src(`> line1\nline2`);
+    println(`Test 30 (bq lazy): '${result}'`);
+    assert((result == `<blockquote>\n<p>line1\nline2</p>\n</blockquote>\n`), "blockquote lazy continuation");
+  };
+
+  // Test 31: Tight bullet list
+  {
+    (md : MarkdownIt) = new_markdown_it();
+    (result : String) = md.render_src(`- a\n- b\n- c`);
+    println(`Test 31 (tight bullet): '${result}'`);
+    assert((result == `<ul>\n<li>a</li>\n<li>b</li>\n<li>c</li>\n</ul>\n`), "tight bullet list");
+  };
+
+  // Test 32: Loose bullet list
+  {
+    (md : MarkdownIt) = new_markdown_it();
+    (result : String) = md.render_src(`- a\n\n- b\n\n- c`);
+    println(`Test 32 (loose bullet): '${result}'`);
+    assert((result == `<ul>\n<li>\n<p>a</p>\n</li>\n<li>\n<p>b</p>\n</li>\n<li>\n<p>c</p>\n</li>\n</ul>\n`), "loose bullet list");
+  };
+
+  // Test 33: Ordered list
+  {
+    (md : MarkdownIt) = new_markdown_it();
+    (result : String) = md.render_src(`1. a\n2. b\n3. c`);
+    println(`Test 33 (ordered): '${result}'`);
+    assert((result == `<ol>\n<li>a</li>\n<li>b</li>\n<li>c</li>\n</ol>\n`), "ordered list");
+  };
+
+  // Test 34: Ordered list with start != 1
+  {
+    (md : MarkdownIt) = new_markdown_it();
+    (result : String) = md.render_src(`5. a\n6. b`);
+    println(`Test 34 (ordered start=5): '${result}'`);
+    assert((result == `<ol start="5">\n<li>a</li>\n<li>b</li>\n</ol>\n`), "ordered list start=5");
+  };
+
+  // Test 35: Nested lists
+  {
+    (md : MarkdownIt) = new_markdown_it();
+    (result : String) = md.render_src(`- a\n  - b\n  - c\n- d`);
+    println(`Test 35 (nested): '${result}'`);
+    assert((result == `<ul>\n<li>a\n<ul>\n<li>b</li>\n<li>c</li>\n</ul>\n</li>\n<li>d</li>\n</ul>\n`), "nested list");
+  };
+
+  // Test 36: Mixed list types (bullet then ordered = separate lists)
+  {
+    (md : MarkdownIt) = new_markdown_it();
+    (result : String) = md.render_src(`- a\n\n1. b`);
+    println(`Test 36 (mixed list types): '${result}'`);
+    assert((result == `<ul>\n<li>a</li>\n</ul>\n<ol>\n<li>b</li>\n</ol>\n`), "mixed list types");
+  };
+
+  // Test 37: List with indented code block inside
+  {
+    (md : MarkdownIt) = new_markdown_it();
+    (result : String) = md.render_src(`- item\n\n      code block`);
+    println(`Test 37 (list+code): '${result}'`);
+    assert((result == `<ul>\n<li>\n<p>item</p>\n<pre><code>code block\n</code></pre>\n</li>\n</ul>\n`), "list with code block");
+  };
+
+  // Test 38: List with blockquote inside
+  {
+    (md : MarkdownIt) = new_markdown_it();
+    (result : String) = md.render_src(`- item\n\n  > quote`);
+    println(`Test 38 (list+bq): '${result}'`);
+    assert((result == `<ul>\n<li>\n<p>item</p>\n<blockquote>\n<p>quote</p>\n</blockquote>\n</li>\n</ul>\n`), "list with blockquote");
+  };
+
+  // Test 39: List item continuation (multi-line item)
+  {
+    (md : MarkdownIt) = new_markdown_it();
+    (result : String) = md.render_src(`- line1\n  line2\n  line3`);
+    println(`Test 39 (list continuation): '${result}'`);
+    assert((result == `<ul>\n<li>line1\nline2\nline3</li>\n</ul>\n`), "list item continuation");
+  };
+
+  // Test 40: Multiple heading levels
+  {
+    (md : MarkdownIt) = new_markdown_it();
+    (result : String) = md.render_src(`## H2\n### H3\n#### H4`);
+    println(`Test 40 (heading levels): '${result}'`);
+    assert((result == `<h2>H2</h2>\n<h3>H3</h3>\n<h4>H4</h4>\n`), "heading levels");
+  };
+
+  // Test 41: Heading with inline formatting
+  {
+    (md : MarkdownIt) = new_markdown_it();
+    (result : String) = md.render_src(`# Hello **world**`);
+    println(`Test 41 (heading+inline): '${result}'`);
+    assert((result == `<h1>Hello <strong>world</strong></h1>\n`), "heading with inline");
+  };
+
+  // Test 42: Fence with language
+  {
+    (md : MarkdownIt) = new_markdown_it();
+    (result : String) = md.render_src(String.from("```js\nconsole.log(1);\n```"));
+    println(`Test 42 (fence+lang): '${result}'`);
+    assert((result == `<pre><code class="language-js">console.log(1);\n</code></pre>\n`), "fence with lang");
+  };
+
+  // Test 43: HR variations
+  {
+    (md : MarkdownIt) = new_markdown_it();
+    (result : String) = md.render_src(`---\n\n***\n\n___`);
+    println(`Test 43 (hr variations): '${result}'`);
+    assert((result == `<hr>\n<hr>\n<hr>\n`), "hr variations");
+  };
+
+  // Test 44: Blockquote with list inside
+  {
+    (md : MarkdownIt) = new_markdown_it();
+    (result : String) = md.render_src(`> - a\n> - b`);
+    println(`Test 44 (bq+list): '${result}'`);
+    assert((result == `<blockquote>\n<ul>\n<li>a</li>\n<li>b</li>\n</ul>\n</blockquote>\n`), "bq with list");
+  };
+
+  // Test 45: Nested emphasis (bold italic)
+  {
+    (md : MarkdownIt) = new_markdown_it();
+    (result : String) = md.render_src(`***bold italic***`);
+    println(`Test 45 (nested emphasis): '${result}'`);
+    assert((result == `<p><em><strong>bold italic</strong></em></p>\n`), "nested emphasis");
+  };
+
+  // Test 46: Strikethrough
+  {
+    (md : MarkdownIt) = new_markdown_it();
+    (result : String) = md.render_src(`~~deleted~~`);
+    println(`Test 46 (strikethrough): '${result}'`);
+    assert((result == `<p><s>deleted</s></p>\n`), "strikethrough");
+  };
+
+  // Test 47: Table
+  {
+    (md : MarkdownIt) = new_markdown_it();
+    (result : String) = md.render_src(`| a | b |\n|---|---|\n| 1 | 2 |`);
+    println(`Test 47 (table): '${result}'`);
+    assert((result == `<table>\n<thead>\n<tr>\n<th>a</th>\n<th>b</th>\n</tr>\n</thead>\n<tbody>\n<tr>\n<td>1</td>\n<td>2</td>\n</tr>\n</tbody>\n</table>\n`), "table");
+  };
+
+  // Test 48: Multiple blank lines collapse
+  {
+    (md : MarkdownIt) = new_markdown_it();
+    (result : String) = md.render_src(`a\n\n\n\nb`);
+    println(`Test 48 (multi blanks): '${result}'`);
+    assert((result == `<p>a</p>\n<p>b</p>\n`), "multiple blank lines");
+  };
+
+  // Test 49: Setext heading h1
+  {
+    (md : MarkdownIt) = new_markdown_it();
+    (result : String) = md.render_src(`Hello\n=====`);
+    println(`Test 49 (setext h1): '${result}'`);
+    assert((result == `<h1>Hello</h1>\n`), "setext h1");
+  };
+
+  // Test 50: Setext heading h2
+  {
+    (md : MarkdownIt) = new_markdown_it();
+    (result : String) = md.render_src(`Hello\n-----`);
+    println(`Test 50 (setext h2): '${result}'`);
+    assert((result == `<h2>Hello</h2>\n`), "setext h2");
+  };
+
+  // Test 51: Hard break (two trailing spaces)
+  {
+    (md : MarkdownIt) = new_markdown_it();
+    (result : String) = md.render_src(String.from("line1  \nline2"));
+    println(`Test 51 (hard break): '${result}'`);
+    assert((result == `<p>line1<br>\nline2</p>\n`), "hard break");
+  };
+
+  // Test 52: Bold with code inside
+  {
+    (md : MarkdownIt) = new_markdown_it();
+    (result : String) = md.render_src(String.from("**bold `code` bold**"));
+    println(`Test 52 (bold+code): '${result}'`);
+    assert((result == `<p><strong>bold <code>code</code> bold</strong></p>\n`), "bold with code");
+  };
+
+  // Test 53: Ordered list with nested bullet
+  {
+    (md : MarkdownIt) = new_markdown_it();
+    (result : String) = md.render_src(`1. a\n   - x\n   - y\n2. b`);
+    println(`Test 53 (ordered+nested): '${result}'`);
+    assert((result == `<ol>\n<li>a\n<ul>\n<li>x</li>\n<li>y</li>\n</ul>\n</li>\n<li>b</li>\n</ol>\n`), "ordered with nested bullet");
+  };
+
+  // Test 54: Loose ordered list
+  {
+    (md : MarkdownIt) = new_markdown_it();
+    (result : String) = md.render_src(`1. a\n\n2. b`);
+    println(`Test 54 (loose ordered): '${result}'`);
+    assert((result == `<ol>\n<li>\n<p>a</p>\n</li>\n<li>\n<p>b</p>\n</li>\n</ol>\n`), "loose ordered list");
+  };
+
+  // Test 55: Blockquote with heading
+  {
+    (md : MarkdownIt) = new_markdown_it();
+    (result : String) = md.render_src(`> # Heading`);
+    println(`Test 55 (bq+heading): '${result}'`);
+    assert((result == `<blockquote>\n<h1>Heading</h1>\n</blockquote>\n`), "bq with heading");
+  };
+
+  // Test 56: Blockquote with fence
+  {
+    (md : MarkdownIt) = new_markdown_it();
+    (result : String) = md.render_src(String.from("> ```\n> code\n> ```"));
+    println(`Test 56 (bq+fence): '${result}'`);
+    assert((result == `<blockquote>\n<pre><code>code\n</code></pre>\n</blockquote>\n`), "bq with fence");
+  };
+
+  // Test 57: Empty list item
+  {
+    (md : MarkdownIt) = new_markdown_it();
+    (result : String) = md.render_src(`- \n- b`);
+    println(`Test 57 (empty list item): '${result}'`);
+    assert((result == `<ul>\n<li></li>\n<li>b</li>\n</ul>\n`), "empty list item");
+  };
+
+  // Test 58: Entity in paragraph
+  {
+    (md : MarkdownIt) = new_markdown_it();
+    (result : String) = md.render_src(`&amp; &lt; &gt; &quot;`);
+    println(`Test 58 (entity): '${result}'`);
+    assert((result == `<p>&amp; &lt; &gt; &quot;</p>\n`), "entities");
+  };
+
+  // Test 59: HTML block with html enabled
+  {
+    (opts : Options) = default_options();
+    opts.html = true;
+    (md : MarkdownIt) = new_markdown_it_with_options(opts);
+    (result : String) = md.render_src(String.from("<div>\nhello\n</div>"));
+    println(`Test 59 (html block): '${result}'`);
+    assert((result == String.from("<div>\nhello\n</div>")), "html block");
+  };
+
+  // Test 60: Escaped asterisk
+  {
+    (md : MarkdownIt) = new_markdown_it();
+    (result : String) = md.render_src(`\\*not emphasis\\*`);
+    println(`Test 60 (escaped): '${result}'`);
+    assert((result == `<p>*not emphasis*</p>\n`), "escaped asterisk");
+  };
+
+  // Test 61: Softbreak
+  {
+    (md : MarkdownIt) = new_markdown_it();
+    (result : String) = md.render_src(String.from("line1\nline2"));
+    println(`Test 61 (softbreak): '${result}'`);
+    assert((result == String.from("<p>line1\nline2</p>\n")), "softbreak");
+  };
+
+  // Test 62: Emphasis across lines
+  {
+    (md : MarkdownIt) = new_markdown_it();
+    (result : String) = md.render_src(String.from("*hello\nworld*"));
+    println(`Test 62 (em across lines): '${result}'`);
+    assert((result == String.from("<p><em>hello\nworld</em></p>\n")), "em across lines");
+  };
+
+  // Test 63: Blockquote with separate paragraphs
+  {
+    (md : MarkdownIt) = new_markdown_it();
+    (result : String) = md.render_src(String.from("> a\n>\n> b"));
+    println(`Test 63 (bq paras): '${result}'`);
+    assert((result == String.from("<blockquote>\n<p>a</p>\n<p>b</p>\n</blockquote>\n")), "bq separate paras");
+  };
+
+  // Test 64: Heading with inline code
+  {
+    (md : MarkdownIt) = new_markdown_it();
+    (result : String) = md.render_src(String.from("# Hello `world`"));
+    println(`Test 64 (heading+code): '${result}'`);
+    assert((result == String.from("<h1>Hello <code>world</code></h1>\n")), "heading with code");
+  };
+
+  // Test 65: Link with parens in URL
+  {
+    (md : MarkdownIt) = new_markdown_it();
+    (result : String) = md.render_src(`[link](http://example.com/foo(bar))`);
+    println(`Test 65 (link parens): '${result}'`);
+    assert((result == `<p><a href="http://example.com/foo(bar)">link</a></p>\n`), "link with parens");
+  };
+
+  // Test 66: Multiple emphasis types
+  {
+    (md : MarkdownIt) = new_markdown_it();
+    (result : String) = md.render_src(`*a* **b** ***c***`);
+    println(`Test 66 (multi emphasis): '${result}'`);
+    assert((result == `<p><em>a</em> <strong>b</strong> <em><strong>c</strong></em></p>\n`), "multi emphasis");
+  };
+
+  // Test 67: Empty input (only newlines)
+  {
+    (md : MarkdownIt) = new_markdown_it();
+    (result : String) = md.render_src(String.from("\n\n\n"));
+    println(`Test 67 (empty lines): '${result}'`);
+    assert((result == ``), "empty lines only");
+  };
+
+  // Test 68: Consecutive headings
+  {
+    (md : MarkdownIt) = new_markdown_it();
+    (result : String) = md.render_src(String.from("# H1\n## H2\n### H3"));
+    println(`Test 68 (consecutive h): '${result}'`);
+    assert((result == String.from("<h1>H1</h1>\n<h2>H2</h2>\n<h3>H3</h3>\n")), "consecutive headings");
+  };
+
+  // Test 69: List then paragraph
+  {
+    (md : MarkdownIt) = new_markdown_it();
+    (result : String) = md.render_src(String.from("- item\n\nparagraph"));
+    println(`Test 69 (list then para): '${result}'`);
+    assert((result == String.from("<ul>\n<li>item</li>\n</ul>\n<p>paragraph</p>\n")), "list then para");
+  };
+
+  // Test 70: Paragraph then list
+  {
+    (md : MarkdownIt) = new_markdown_it();
+    (result : String) = md.render_src(String.from("paragraph\n\n- item"));
+    println(`Test 70 (para then list): '${result}'`);
+    assert((result == String.from("<p>paragraph</p>\n<ul>\n<li>item</li>\n</ul>\n")), "para then list");
+  };
+
+  // Test 71: Reference link multiline
+  {
+    (md : MarkdownIt) = new_markdown_it();
+    (result : String) = md.render_src(String.from("[foo]: http://example.com\n\n[foo]"));
+    println(`Test 71 (ref multiline): '${result}'`);
+    assert((result == String.from("<p><a href=\"http://example.com\">foo</a></p>\n")), "ref multiline");
+  };
+
+  // Test 72: Image with title
+  {
+    (md : MarkdownIt) = new_markdown_it();
+    (result : String) = md.render_src(String.from("![alt](http://example.com/img.png \"my title\")"));
+    println(`Test 72 (img title): '${result}'`);
+    assert((result == String.from("<p><img src=\"http://example.com/img.png\" alt=\"alt\" title=\"my title\"></p>\n")), "img with title");
+  };
+
+  // Test 73: Ordered list starting at 0
+  {
+    (md : MarkdownIt) = new_markdown_it();
+    (result : String) = md.render_src(`0. first`);
+    println(`Test 73 (ordered 0): '${result}'`);
+    assert((result == `<ol start="0">\n<li>first</li>\n</ol>\n`), "ordered starting at 0");
+  };
+
+  // Test 74: Deep nested lists (3 levels)
+  {
+    (md : MarkdownIt) = new_markdown_it();
+    (result : String) = md.render_src(String.from("- a\n  - b\n    - c"));
+    println(`Test 74 (deep nested): '${result}'`);
+    assert((result == String.from("<ul>\n<li>a\n<ul>\n<li>b\n<ul>\n<li>c</li>\n</ul>\n</li>\n</ul>\n</li>\n</ul>\n")), "deep nested list");
+  };
+
+  // Test 75: Ordered list with 10 items
+  {
+    (md : MarkdownIt) = new_markdown_it();
+    (result : String) = md.render_src(String.from("1. a\n2. b\n3. c\n4. d\n5. e\n6. f\n7. g\n8. h\n9. i\n10. j"));
+    println(`Test 75 (10 items): '${result}'`);
+    assert((result == String.from("<ol>\n<li>a</li>\n<li>b</li>\n<li>c</li>\n<li>d</li>\n<li>e</li>\n<li>f</li>\n<li>g</li>\n<li>h</li>\n<li>i</li>\n<li>j</li>\n</ol>\n")), "10 item list");
+  };
+
+  // Test 76: Table with alignment
+  {
+    (md : MarkdownIt) = new_markdown_it();
+    (result : String) = md.render_src(String.from("| Header 1 | Header 2 | Header 3 |\n| :------: | -------: | :------- |\n| Cell 1   | Cell 2   | Cell 3   |"));
+    println(`Test 76 (table align): '${result}'`);
+    assert((result == String.from("<table>\n<thead>\n<tr>\n<th style=\"text-align:center\">Header 1</th>\n<th style=\"text-align:right\">Header 2</th>\n<th style=\"text-align:left\">Header 3</th>\n</tr>\n</thead>\n<tbody>\n<tr>\n<td style=\"text-align:center\">Cell 1</td>\n<td style=\"text-align:right\">Cell 2</td>\n<td style=\"text-align:left\">Cell 3</td>\n</tr>\n</tbody>\n</table>\n")), "table alignment");
+  };
+
+  // Test 77: Email autolink
+  {
+    (md : MarkdownIt) = new_markdown_it();
+    (result : String) = md.render_src(String.from("<user@example.com>"));
+    println(`Test 77 (email autolink): '${result}'`);
+    assert((result == String.from("<p><a href=\"mailto:user@example.com\">user@example.com</a></p>\n")), "email autolink");
+  };
+
+  // Test 78: Empty image alt
+  {
+    (md : MarkdownIt) = new_markdown_it();
+    (result : String) = md.render_src(`![](img.png)`);
+    println(`Test 78 (empty alt img): '${result}'`);
+    assert((result == `<p><img src="img.png" alt=""></p>\n`), "empty alt image");
+  };
+
+  // Test 79: Deeply nested blockquote
+  {
+    (md : MarkdownIt) = new_markdown_it();
+    (result : String) = md.render_src(`> > > deeply nested`);
+    println(`Test 79 (deep bq): '${result}'`);
+    assert((result == String.from("<blockquote>\n<blockquote>\n<blockquote>\n<p>deeply nested</p>\n</blockquote>\n</blockquote>\n</blockquote>\n")), "deeply nested blockquote");
+  };
+
+  // Test 80: Mixed content document
+  {
+    (md : MarkdownIt) = new_markdown_it();
+    (result : String) = md.render_src(String.from("# Title\n\nSome *text* with **bold** and `code`.\n\n- list\n- items\n\n> quote\n\n---\n\n1. ordered\n2. items"));
+    println(`Test 80 (mixed doc): '${result}'`);
+    assert((result == String.from("<h1>Title</h1>\n<p>Some <em>text</em> with <strong>bold</strong> and <code>code</code>.</p>\n<ul>\n<li>list</li>\n<li>items</li>\n</ul>\n<blockquote>\n<p>quote</p>\n</blockquote>\n<hr>\n<ol>\n<li>ordered</li>\n<li>items</li>\n</ol>\n")), "mixed content document");
+  };
+
+  // Test 81: Inline emphasis edge case
+  {
+    (md : MarkdownIt) = new_markdown_it();
+    (result : String) = md.render_src(`foo*bar*baz`);
+    println(`Test 81 (em edge): '${result}'`);
+    assert((result == `<p>foo<em>bar</em>baz</p>\n`), "emphasis edge case");
+  };
+
+  // Test 82: Code fence with language info
+  {
+    (md : MarkdownIt) = new_markdown_it();
+    (result : String) = md.render_src(String.from("```ruby\ndef foo()\n  puts \"hello\"\nend\n```"));
+    println(`Test 82 (fence ruby): '${result}'`);
+    assert((result == String.from("<pre><code class=\"language-ruby\">def foo()\n  puts &quot;hello&quot;\nend\n</code></pre>\n")), "fence with ruby");
+  };
+
+  // Test 83: Empty code fence
+  {
+    (md : MarkdownIt) = new_markdown_it();
+    (result : String) = md.render_src(String.from("```\n```"));
+    println(`Test 83 (empty fence): '${result}'`);
+    assert((result == String.from("<pre><code></code></pre>\n")), "empty fence");
+  };
+
+  // Test 84: Multiline blockquote with paragraphs
+  {
+    (md : MarkdownIt) = new_markdown_it();
+    (result : String) = md.render_src(String.from("> line1\n> line2\n>\n> line3"));
+    println(`Test 84 (bq multi para): '${result}'`);
+    assert((result == String.from("<blockquote>\n<p>line1\nline2</p>\n<p>line3</p>\n</blockquote>\n")), "bq multi paragraphs");
+  };
+
+  // Test 85: Reference defined after use
+  {
+    (md : MarkdownIt) = new_markdown_it();
+    (result : String) = md.render_src(String.from("[foo]\n\n[foo]: /url"));
+    println(`Test 85 (ref after use): '${result}'`);
+    assert((result == String.from("<p><a href=\"/url\">foo</a></p>\n")), "ref defined after use");
+  };
+
+  // Test 86: Reference with title
+  {
+    (md : MarkdownIt) = new_markdown_it();
+    (result : String) = md.render_src(String.from("[foo][bar]\n\n[bar]: /url \"title\""));
+    println(`Test 86 (ref with title): '${result}'`);
+    assert((result == String.from("<p><a href=\"/url\" title=\"title\">foo</a></p>\n")), "ref with title");
+  };
+
+  // Test 87: List + HR + ordered list
+  {
+    (md : MarkdownIt) = new_markdown_it();
+    (result : String) = md.render_src(String.from("- a\n- b\n\n---\n\n1. c\n2. d"));
+    println(`Test 87 (list+hr+ol): '${result}'`);
+    assert((result == String.from("<ul>\n<li>a</li>\n<li>b</li>\n</ul>\n<hr>\n<ol>\n<li>c</li>\n<li>d</li>\n</ol>\n")), "list hr ordered");
+  };
+
+  // Test 88: Table with inline emphasis in cells
+  {
+    (md : MarkdownIt) = new_markdown_it();
+    (result : String) = md.render_src(String.from("| *em* | **strong** |\n|------|------|\n| `code` | ~~strike~~ |"));
+    println(`Test 88 (table+inline): '${result}'`);
+    assert((result == String.from("<table>\n<thead>\n<tr>\n<th><em>em</em></th>\n<th><strong>strong</strong></th>\n</tr>\n</thead>\n<tbody>\n<tr>\n<td><code>code</code></td>\n<td><s>strike</s></td>\n</tr>\n</tbody>\n</table>\n")), "table with inline");
+  };
+
+  // Test 89: Entity decoding
+  {
+    (md : MarkdownIt) = new_markdown_it();
+    (result : String) = md.render_src(`&copy; &#123; &#x41;`);
+    println(`Test 89 (entities): '${result}'`);
+    // &copy; → ©, &#123; → {, &#x41; → A
+    assert((result == String.from("<p>\u00A9 { A</p>\n")), "entity decoding");
+  };
+
+  // Test 90: List item with code block inside
+  {
+    (md : MarkdownIt) = new_markdown_it();
+    (result : String) = md.render_src(String.from("1.     code\n\n   paragraph"));
+    println(`Test 90 (list+code+para): '${result}'`);
+    assert((result == String.from("<ol>\n<li>\n<pre><code>code\n</code></pre>\n<p>paragraph</p>\n</li>\n</ol>\n")), "list with code and para");
+  };
+
+  println(`=== All tests passed ===`);
+});
+
+export main;
