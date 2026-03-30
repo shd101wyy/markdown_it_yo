@@ -2,6 +2,8 @@
 // Ported from: lib/index.mjs (markdown-it v14.1.1) options handling
 
 open import "std/string";
+{ ArrayList } :: import "std/collections/array_list";
+{ fromCodePoint } :: import "./common/char_utils.yo";
 
 Options :: struct(
   html : bool,
@@ -10,10 +12,16 @@ Options :: struct(
   lang_prefix : String,
   linkify : bool,
   typographer : bool,
+  quotes : ArrayList(String),
   max_nesting : i32
 );
 
-default_options :: (fn() -> Options)(
+default_options :: (fn() -> Options)({
+  (quotes : ArrayList(String)) = ArrayList(String).new();
+  _ := quotes.push(fromCodePoint(i32(0x201C)));
+  _ := quotes.push(fromCodePoint(i32(0x201D)));
+  _ := quotes.push(fromCodePoint(i32(0x2018)));
+  _ := quotes.push(fromCodePoint(i32(0x2019)));
   Options(
     html: false,
     xhtml_out: false,
@@ -21,8 +29,9 @@ default_options :: (fn() -> Options)(
     lang_prefix: `language-`,
     linkify: false,
     typographer: false,
+    quotes: quotes,
     max_nesting: i32(100)
   )
-);
+});
 
 export Options, default_options;

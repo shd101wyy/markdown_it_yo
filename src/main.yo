@@ -11,7 +11,8 @@ open import "std/string";
 { stdin, stdout, stderr, fopen, fclose, fread, fwrite, fputs,
   fseek, ftell, SEEK_SET, SEEK_END, FILE } :: import "std/libc/stdio";
 
-{ MarkdownIt, new_markdown_it } :: import "./markdown_it.yo";
+{ MarkdownIt, new_markdown_it, new_markdown_it_with_options } :: import "./markdown_it.yo";
+{ Options, default_options } :: import "./options.yo";
 
 // Read entire file contents into a String using libc
 _read_file :: (fn(path: String) -> Option(String))({
@@ -100,39 +101,61 @@ _read_stdin :: (fn() -> String)({
 
 main :: (fn() -> unit)({
   argv := args();
-  md := new_markdown_it();
 
-  if((argv.len() > usize(1)), {
-    // File mode: render file to stdout
-    (path : String) = argv.get(usize(1)).unwrap();
-    match(_read_file(path), 
-      .Some(content) => {
-        result := md.render_src(content);
-        // Write result to stdout
-        cstr := result.to_cstr();
-        match(cstr.ptr(),
-          .Some(p) => {
-            _ := fputs(*(char)(p), stdout);
-          },
-          .None => ()
-        );
-      },
-      .None => {
-        _ := fputs(*(char)(*(u8)("Error: cannot open file\n")), stderr);
-      }
+  // Parse flags
+  (html_enabled : bool) = false;
+  (typographer_enabled : bool) = false;
+  (no_lang_prefix : bool) = false;
+  (file_path : Option(String)) = .None;
+
+  (ai : usize) = usize(1);
+  while (ai < argv.len()), {
+    (arg : String) = argv.get(ai).unwrap();
+    cond(
+      (arg == `--html`) => { html_enabled = true; },
+      (arg == `--typographer`) => { typographer_enabled = true; },
+      (arg == `--no-lang-prefix`) => { no_lang_prefix = true; },
+      true => { file_path = .Some(arg); }
     );
-  }, {
-    // Stdin mode: read all stdin, render
-    content := _read_stdin();
-    result := md.render_src(content);
-    cstr := result.to_cstr();
-    match(cstr.ptr(),
-      .Some(p) => {
-        _ := fputs(*(char)(p), stdout);
-      },
-      .None => ()
-    );
-  });
+    ai = (ai + usize(1));
+  };
+
+  (opts : Options) = default_options();
+  opts.html = html_enabled;
+  opts.typographer = typographer_enabled;
+  if(no_lang_prefix, { opts.lang_prefix = ``; });
+  md := new_markdown_it_with_options(opts);
+
+  match(file_path,
+    .Some(path) => {
+      match(_read_file(path),
+        .Some(content) => {
+          result := md.render_src(content);
+          cstr := result.to_cstr();
+          match(cstr.ptr(),
+            .Some(p) => {
+              _ := fputs(*(char)(p), stdout);
+            },
+            .None => ()
+          );
+        },
+        .None => {
+          _ := fputs(*(char)(*(u8)("Error: cannot open file\n")), stderr);
+        }
+      );
+    },
+    .None => {
+      content := _read_stdin();
+      result := md.render_src(content);
+      cstr := result.to_cstr();
+      match(cstr.ptr(),
+        .Some(p) => {
+          _ := fputs(*(char)(p), stdout);
+        },
+        .None => ()
+      );
+    }
+  );
 });
 
 export main;

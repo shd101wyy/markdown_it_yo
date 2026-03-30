@@ -14,17 +14,29 @@ const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
 
-const md = require('markdown-it')();
+const enableHtml = process.argv.includes('--html');
+const enableTypographer = process.argv.includes('--typographer');
+const noLangPrefix = process.argv.includes('--no-lang-prefix');
 
-const fixtureFile = process.argv[2];
+const mdOpts = {};
+if (enableHtml) mdOpts.html = true;
+if (enableTypographer) mdOpts.typographer = true;
+if (noLangPrefix) mdOpts.langPrefix = '';
+const md = require('markdown-it')(mdOpts);
+
+const fixtureFile = process.argv.find(a => !a.startsWith('-') && a !== process.argv[0] && a !== process.argv[1]);
 const verbose = process.argv.includes('--verbose') || process.argv.includes('-v');
 
 if (!fixtureFile) {
-  console.error('Usage: node scripts/fixture_compare.js <fixture_file> [-v]');
+  console.error('Usage: node scripts/fixture_compare.js <fixture_file> [-v] [--html] [--typographer] [--no-lang-prefix]');
   process.exit(1);
 }
 
 const yoBin = path.join(__dirname, '..', 'markdown_it');
+const yoFlags = [];
+if (enableHtml) yoFlags.push('--html');
+if (enableTypographer) yoFlags.push('--typographer');
+if (noLangPrefix) yoFlags.push('--no-lang-prefix');
 
 function parseFixtures(content) {
   const fixtures = [];
@@ -84,7 +96,7 @@ for (const fix of fixtures) {
   // Get Yo output
   let yoOutput;
   try {
-    yoOutput = execSync(yoBin, { input: fix.input, encoding: 'utf8', timeout: 5000 });
+    yoOutput = execSync([yoBin, ...yoFlags].join(' '), { input: fix.input, encoding: 'utf8', timeout: 5000, shell: true });
   } catch (e) {
     yoOutput = `[ERROR: ${e.message}]`;
   }

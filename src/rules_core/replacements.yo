@@ -1,0 +1,331 @@
+// Ported from: lib/rules_core/replacements.mjs (markdown-it v14.1.1)
+//
+// Typographer rule — replace ASCII sequences with typographic characters:
+//   (c) (C) → ©    (r) (R) → ®    (tm) (TM) → ™
+//   +- → ±    ... → …    --- → —    -- → –
+//   Collapse repeated ?, !, and , characters.
+
+open import "std/string";
+{ ArrayList } :: import "std/collections/array_list";
+{ Token } :: import "../token.yo";
+{ fromCodePoint } :: import "../common/char_utils.yo";
+{ StateCore } :: import "./state_core.yo";
+
+// Check if a rune is ASCII whitespace (space, tab, LF, CR)
+_is_whitespace :: (fn(ch: rune) -> bool)(
+  (((ch == rune(u32(' '))) || (ch == rune(u32('\t')))) || ((ch == rune(u32('\n'))) || (ch == rune(u32('\r')))))
+);
+
+// Check if content contains scoped abbreviation patterns: (c), (r), (tm) case-insensitive
+_has_scoped_abbr :: (fn(content: String) -> bool)({
+  (has_c : bool) = content.contains(`(c)`);
+  (has_C : bool) = content.contains(`(C)`);
+  (has_r : bool) = content.contains(`(r)`);
+  (has_R : bool) = content.contains(`(R)`);
+  (has_tm : bool) = content.contains(`(tm)`);
+  (has_TM : bool) = content.contains(`(TM)`);
+  (has_Tm : bool) = content.contains(`(Tm)`);
+  (has_tM : bool) = content.contains(`(tM)`);
+  (((((((has_c || has_C) || has_r) || has_R) || has_tm) || has_TM) || has_Tm) || has_tM)
+});
+
+// Check if content contains rare typographic sequences
+_has_rare_chars :: (fn(content: String) -> bool)({
+  (has_pm : bool) = content.contains(`+-`);
+  (has_dots : bool) = content.contains(`..`);
+  (has_qmarks : bool) = content.contains(`????`);
+  (has_emarks : bool) = content.contains(`!!!!`);
+  (has_commas : bool) = content.contains(`,,`);
+  (has_dashes : bool) = content.contains(`--`);
+  (((((has_pm || has_dots) || has_qmarks) || has_emarks) || has_commas) || has_dashes)
+});
+
+// Replace scoped abbreviations: (c)→©, (C)→©, (r)→®, (R)→®, (tm)→™, etc.
+_replace_scoped_abbrs :: (fn(content: String) -> String)({
+  (copyright : String) = fromCodePoint(i32(0xA9));
+  (registered : String) = fromCodePoint(i32(0xAE));
+  (trademark : String) = fromCodePoint(i32(0x2122));
+  (result : String) = content;
+  result = result.replace_all(`(c)`, copyright);
+  result = result.replace_all(`(C)`, copyright);
+  result = result.replace_all(`(r)`, registered);
+  result = result.replace_all(`(R)`, registered);
+  result = result.replace_all(`(tm)`, trademark);
+  result = result.replace_all(`(TM)`, trademark);
+  result = result.replace_all(`(Tm)`, trademark);
+  result = result.replace_all(`(tM)`, trademark);
+  result
+});
+
+// Collapse runs of 2+ dots into a single ellipsis character (U+2026)
+_collapse_dots :: (fn(content: String) -> String)({
+  (ellipsis : String) = fromCodePoint(i32(0x2026));
+  (result : String) = ``;
+  (i : usize) = usize(0);
+  (len : usize) = content.len();
+  while (i < len), {
+    (ch : rune) = content.at(i).unwrap();
+    if((ch == rune(u32('.'))), {
+      (run_start : usize) = i;
+      while ((i < len) && (content.at(i).unwrap() == rune(u32('.')))), {
+        i = (i + usize(1));
+      };
+      if(((i - run_start) >= usize(2)), {
+        result = `${result}${ellipsis}`;
+      }, {
+        result = `${result}.`;
+      });
+    }, {
+      result = `${result}${ch}`;
+      i = (i + usize(1));
+    });
+  };
+  result
+});
+
+// Collapse runs of 4+ ? or ! into 3 of the same character
+_collapse_excl_question :: (fn(content: String) -> String)({
+  (result : String) = ``;
+  (i : usize) = usize(0);
+  (len : usize) = content.len();
+  while (i < len), {
+    (ch : rune) = content.at(i).unwrap();
+    if(((ch == rune(u32('?'))) || (ch == rune(u32('!')))), {
+      (run_start : usize) = i;
+      (run_char : rune) = ch;
+      while ((i < len) && (content.at(i).unwrap() == run_char)), {
+        i = (i + usize(1));
+      };
+      (run_len : usize) = (i - run_start);
+      if((run_len >= usize(4)), {
+        result = `${result}${run_char}${run_char}${run_char}`;
+      }, {
+        (j : usize) = usize(0);
+        while (j < run_len), {
+          result = `${result}${run_char}`;
+          j = (j + usize(1));
+        };
+      });
+    }, {
+      result = `${result}${ch}`;
+      i = (i + usize(1));
+    });
+  };
+  result
+});
+
+// Collapse runs of 2+ commas into a single comma
+_collapse_commas :: (fn(content: String) -> String)({
+  (result : String) = ``;
+  (i : usize) = usize(0);
+  (len : usize) = content.len();
+  while (i < len), {
+    (ch : rune) = content.at(i).unwrap();
+    if((ch == rune(u32(','))), {
+      while ((i < len) && (content.at(i).unwrap() == rune(u32(',')))), {
+        i = (i + usize(1));
+      };
+      result = `${result},`;
+    }, {
+      result = `${result}${ch}`;
+      i = (i + usize(1));
+    });
+  };
+  result
+});
+
+// Replace --- with em-dash (U+2014) and -- with en-dash (U+2013), context-dependent.
+//
+// Em-dash rule:  (^|[^-])---(?=[^-]|$)  with multiline
+// En-dash rule 7: (^|\s)--(?=\s|$)       with multiline
+// En-dash rule 8: (^|[^-\s])--(?=[^-\s]|$) with multiline
+_replace_dashes :: (fn(content: String) -> String)({
+  (em_dash : String) = fromCodePoint(i32(0x2014));
+  (en_dash : String) = fromCodePoint(i32(0x2013));
+  (result : String) = ``;
+  (i : usize) = usize(0);
+  (len : usize) = content.len();
+  while (i < len), {
+    (ch : rune) = content.at(i).unwrap();
+    if((ch == rune(u32('-'))), {
+      // Count consecutive dashes
+      (dash_start : usize) = i;
+      while ((i < len) && (content.at(i).unwrap() == rune(u32('-')))), {
+        i = (i + usize(1));
+      };
+      (dash_count : usize) = (i - dash_start);
+
+      // Get surrounding context characters
+      (prev : Option(rune)) = .None;
+      if((dash_start > usize(0)), {
+        prev = content.at((dash_start - usize(1)));
+      });
+      (next_ch : Option(rune)) = .None;
+      if((i < len), {
+        next_ch = content.at(i);
+      });
+
+      cond(
+        (dash_count == usize(3)) => {
+          // Em-dash: not preceded or followed by dash
+          (prev_ok : bool) = match(prev,
+            .None => true,
+            .Some(p) => (p != rune(u32('-')))
+          );
+          (next_ok : bool) = match(next_ch,
+            .None => true,
+            .Some(n) => (n != rune(u32('-')))
+          );
+          if((prev_ok && next_ok), {
+            result = `${result}${em_dash}`;
+          }, {
+            result = `${result}---`;
+          });
+        },
+
+        (dash_count == usize(2)) => {
+          // Multiline: ^ matches after \n and at start of string
+          (is_line_start : bool) = match(prev,
+            .None => true,
+            .Some(p) => (p == rune(u32('\n')))
+          );
+          // Multiline: $ matches before \n and at end of string
+          (is_line_end : bool) = match(next_ch,
+            .None => true,
+            .Some(n) => (n == rune(u32('\n')))
+          );
+
+          // Rule 7: preceded by whitespace or line start, followed by whitespace or line end
+          (prev_ws : bool) = match(prev,
+            .None => true,
+            .Some(p) => _is_whitespace(p)
+          );
+          (next_ws : bool) = match(next_ch,
+            .None => true,
+            .Some(n) => _is_whitespace(n)
+          );
+
+          // Rule 8: preceded by non-dash-non-whitespace or line start,
+          //          followed by non-dash-non-whitespace or line end
+          (prev_nds : bool) = (is_line_start || match(prev,
+            .None => false,
+            .Some(p) => ((p != rune(u32('-'))) && !(_is_whitespace(p)))
+          ));
+          (next_nds : bool) = (is_line_end || match(next_ch,
+            .None => false,
+            .Some(n) => ((n != rune(u32('-'))) && !(_is_whitespace(n)))
+          ));
+
+          if(((prev_ws && next_ws) || (prev_nds && next_nds)), {
+            result = `${result}${en_dash}`;
+          }, {
+            result = `${result}--`;
+          });
+        },
+
+        true => {
+          // 1 or 4+ dashes: emit literally
+          (d : usize) = usize(0);
+          while (d < dash_count), {
+            result = `${result}-`;
+            d = (d + usize(1));
+          };
+        }
+      );
+    }, {
+      result = `${result}${ch}`;
+      i = (i + usize(1));
+    });
+  };
+  result
+});
+
+// Apply all rare character replacements in the correct order
+_replace_rare :: (fn(content: String) -> String)({
+  (plus_minus : String) = fromCodePoint(i32(0xB1));
+  (ellipsis : String) = fromCodePoint(i32(0x2026));
+
+  // Step 1: +- → ±
+  (result : String) = content.replace_all(`+-`, plus_minus);
+  // Step 2: 2+ consecutive dots → …
+  result = _collapse_dots(result);
+  // Step 3: ?… → ?.., !… → !..
+  result = result.replace_all(`?${ellipsis}`, `?..`);
+  result = result.replace_all(`!${ellipsis}`, `!..`);
+  // Step 4: 4+ consecutive ? or ! → 3 of the same
+  result = _collapse_excl_question(result);
+  // Step 5: 2+ consecutive commas → single comma
+  result = _collapse_commas(result);
+  // Steps 6-8: em-dash and en-dash replacements
+  result = _replace_dashes(result);
+  result
+});
+
+// Iterate inline children in reverse, replace scoped abbreviations in text tokens,
+// skipping tokens inside autolinks.
+_replace_scoped :: (fn(inline_tokens: ArrayList(Token)) -> unit)({
+  (inside_autolink : i32) = i32(0);
+  (i : i32) = (i32(inline_tokens.len()) - i32(1));
+  while (i >= i32(0)), {
+    (token : Token) = inline_tokens.get(usize(i)).unwrap();
+    if(((token.type_name == `text`) && (inside_autolink == i32(0))), {
+      token.content = _replace_scoped_abbrs(token.content);
+      inline_tokens.set(usize(i), token);
+    });
+    if(((token.type_name == `link_open`) && (token.info == `auto`)), {
+      inside_autolink = (inside_autolink - i32(1));
+    });
+    if(((token.type_name == `link_close`) && (token.info == `auto`)), {
+      inside_autolink = (inside_autolink + i32(1));
+    });
+    i = (i - i32(1));
+  };
+});
+
+// Iterate inline children in reverse, replace rare sequences in text tokens,
+// skipping tokens inside autolinks.
+_replace_rare_tokens :: (fn(inline_tokens: ArrayList(Token)) -> unit)({
+  (inside_autolink : i32) = i32(0);
+  (i : i32) = (i32(inline_tokens.len()) - i32(1));
+  while (i >= i32(0)), {
+    (token : Token) = inline_tokens.get(usize(i)).unwrap();
+    if(((token.type_name == `text`) && (inside_autolink == i32(0))), {
+      if(_has_rare_chars(token.content), {
+        token.content = _replace_rare(token.content);
+        inline_tokens.set(usize(i), token);
+      });
+    });
+    if(((token.type_name == `link_open`) && (token.info == `auto`)), {
+      inside_autolink = (inside_autolink - i32(1));
+    });
+    if(((token.type_name == `link_close`) && (token.info == `auto`)), {
+      inside_autolink = (inside_autolink + i32(1));
+    });
+    i = (i - i32(1));
+  };
+});
+
+// Main replacements rule — iterate block tokens in reverse, process inline tokens.
+replacements :: (fn(state: *(StateCore)) -> unit)({
+  (block_tokens : ArrayList(Token)) = state.*.tokens;
+  (blk_idx : i32) = (i32(block_tokens.len()) - i32(1));
+  while (blk_idx >= i32(0)), {
+    (block_tok : Token) = block_tokens.get(usize(blk_idx)).unwrap();
+    if((block_tok.type_name == `inline`), {
+      match(block_tok.children,
+        .Some(children) => {
+          if(_has_scoped_abbr(block_tok.content), {
+            _replace_scoped(children);
+          });
+          if(_has_rare_chars(block_tok.content), {
+            _replace_rare_tokens(children);
+          });
+        },
+        .None => ()
+      );
+    });
+    blk_idx = (blk_idx - i32(1));
+  };
+});
+
+export replacements;

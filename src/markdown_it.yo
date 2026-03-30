@@ -22,6 +22,8 @@ open import "std/string";
 // Core rules
 { normalize } :: import "./rules_core/normalize.yo";
 { text_join } :: import "./rules_core/text_join.yo";
+{ replacements } :: import "./rules_core/replacements.yo";
+{ smartquotes } :: import "./rules_core/smartquotes.yo";
 
 // Renderer
 { render } :: import "./renderer.yo";
@@ -99,7 +101,15 @@ impl(MarkdownIt,
     _core_block((&state), self.block, self.options.html);
     // 3. Inline parse
     _core_inline((&state), self.inline_parser, self.options.html);
-    // 4. Text join
+    // 4. Typographer replacements (if enabled)
+    if(self.options.typographer, {
+      replacements((&state));
+    });
+    // 5. Smartquotes (if enabled)
+    if(self.options.typographer, {
+      smartquotes((&state), self.options.quotes);
+    });
+    // 6. Text join
     text_join((&state));
 
     state.tokens

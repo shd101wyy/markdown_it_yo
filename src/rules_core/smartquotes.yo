@@ -1,0 +1,272 @@
+// Ported from: lib/rules_core/smartquotes.mjs (markdown-it v14.1.1)
+//
+// Convert straight quotation marks to typographic ones.
+
+open import "std/string";
+{ ArrayList } :: import "std/collections/array_list";
+{ Token } :: import "../token.yo";
+{ StateCore } :: import "./state_core.yo";
+{ isWhiteSpace, isPunctChar, isMdAsciiPunct } :: import "../common/utils.yo";
+{ fromCodePoint } :: import "../common/char_utils.yo";
+
+APOSTROPHE := fromCodePoint(i32(0x2019));
+
+// Stack entry for tracking quote positions
+_QuoteEntry :: struct(
+  token_idx : i32,
+  pos : usize,
+  single : bool,
+  level : i32
+);
+
+// Replace character at position in string
+_replace_at :: (fn(s: String, index: usize, ch: String) -> String)({
+  (before : String) = s.substring(usize(0), index);
+  (after : String) = s.substring((index + usize(1)), s.len());
+  `${before}${ch}${after}`
+});
+
+// Process inline tokens for smart quotes
+_process_inlines :: (fn(tokens: ArrayList(Token), quotes: ArrayList(String)) -> unit)({
+  (stack : ArrayList(_QuoteEntry)) = ArrayList(_QuoteEntry).new();
+  (i : i32) = i32(0);
+  (tokens_len : i32) = i32(tokens.len());
+
+  while (i < tokens_len), {
+    (token : Token) = tokens.get(usize(i)).unwrap();
+    (this_level : i32) = token.level;
+
+    // Trim stack to current nesting level
+    (j : i32) = (i32(stack.len()) - i32(1));
+    while ((j >= i32(0)) && (stack.get(usize(j)).unwrap().level > this_level)), {
+      j = (j - i32(1));
+    };
+    // Truncate stack to j+1
+    while (i32(stack.len()) > (j + i32(1))), {
+      _ := stack.pop();
+    };
+
+    if((token.type_name != `text`), {
+      i = (i + i32(1));
+    }, {
+      (text : String) = token.content;
+      (pos : usize) = usize(0);
+      (max : usize) = text.len();
+      (done : bool) = false;
+
+      while ((pos < max) && !(done)), {
+        // Find next quote character
+        (found_quote : bool) = false;
+        (quote_pos : usize) = pos;
+        while ((quote_pos < max) && !(found_quote)), {
+          (qch : rune) = text.at(quote_pos).unwrap();
+          if(((qch == rune(u32(0x27))) || (qch == rune(u32(0x22)))), {
+            found_quote = true;
+          }, {
+            quote_pos = (quote_pos + usize(1));
+          });
+        };
+
+        if(!(found_quote), {
+          done = true;
+        }, {
+          (quote_char : rune) = text.at(quote_pos).unwrap();
+          (is_single : bool) = (quote_char == rune(u32(0x27)));
+          pos = (quote_pos + usize(1));
+
+          (can_open : bool) = true;
+          (can_close : bool) = true;
+
+          // Find previous character (default to space)
+          (last_char : i32) = i32(0x20);
+          if((quote_pos > usize(0)), {
+            last_char = i32(text.at((quote_pos - usize(1))).unwrap().to_u32());
+          }, {
+            // Look at previous tokens
+            (pj : i32) = (i - i32(1));
+            (found_prev : bool) = false;
+            while ((pj >= i32(0)) && !(found_prev)), {
+              (prev_tok : Token) = tokens.get(usize(pj)).unwrap();
+              if(((prev_tok.type_name == `softbreak`) || (prev_tok.type_name == `hardbreak`)), {
+                found_prev = true;
+              }, {
+                if((prev_tok.content.len() > usize(0)), {
+                  last_char = i32(prev_tok.content.at((prev_tok.content.len() - usize(1))).unwrap().to_u32());
+                  found_prev = true;
+                }, {
+                  pj = (pj - i32(1));
+                });
+              });
+            };
+          });
+
+          // Find next character (default to space)
+          (next_char : i32) = i32(0x20);
+          if((pos < max), {
+            next_char = i32(text.at(pos).unwrap().to_u32());
+          }, {
+            // Look at next tokens
+            (nj : i32) = (i + i32(1));
+            (found_next : bool) = false;
+            while ((nj < tokens_len) && !(found_next)), {
+              (next_tok : Token) = tokens.get(usize(nj)).unwrap();
+              if(((next_tok.type_name == `softbreak`) || (next_tok.type_name == `hardbreak`)), {
+                found_next = true;
+              }, {
+                if((next_tok.content.len() > usize(0)), {
+                  next_char = i32(next_tok.content.at(usize(0)).unwrap().to_u32());
+                  found_next = true;
+                }, {
+                  nj = (nj + i32(1));
+                });
+              });
+            };
+          });
+
+          (is_last_punct : bool) = ((isMdAsciiPunct(last_char)) || (isPunctChar(last_char)));
+          (is_next_punct : bool) = ((isMdAsciiPunct(next_char)) || (isPunctChar(next_char)));
+          (is_last_ws : bool) = isWhiteSpace(last_char);
+          (is_next_ws : bool) = isWhiteSpace(next_char);
+
+          if(is_next_ws, {
+            can_open = false;
+          }, {
+            if(is_next_punct, {
+              if(!(((is_last_ws) || (is_last_punct))), {
+                can_open = false;
+              });
+            });
+          });
+
+          if(is_last_ws, {
+            can_close = false;
+          }, {
+            if(is_last_punct, {
+              if(!(((is_next_ws) || (is_next_punct))), {
+                can_close = false;
+              });
+            });
+          });
+
+          // Special case: 1"" - first quote as inch
+          if(((next_char == i32(0x22)) && (quote_char == rune(u32(0x22)))), {
+            if(((last_char >= i32(0x30)) && (last_char <= i32(0x39))), {
+              can_close = false;
+              can_open = false;
+            });
+          });
+
+          if((can_open && can_close), {
+            can_open = is_last_punct;
+            can_close = is_next_punct;
+          });
+
+          if((!(can_open) && !(can_close)), {
+            // Middle of word — replace single quote with apostrophe
+            if(is_single, {
+              text = _replace_at(text, quote_pos, APOSTROPHE);
+              token.content = text;
+              _ := tokens.set(usize(i), token);
+            });
+          }, {
+            if(can_close, {
+              // Try to find matching opening quote on stack
+              (sj : i32) = (i32(stack.len()) - i32(1));
+              (matched : bool) = false;
+              while ((sj >= i32(0)) && !(matched)), {
+                (item : _QuoteEntry) = stack.get(usize(sj)).unwrap();
+                if((item.level < this_level), {
+                  sj = i32(-1);
+                }, {
+                  if(((item.single == is_single) && (item.level == this_level)), {
+                    (open_quote : String) = cond(
+                      is_single => quotes.get(usize(2)).unwrap(),
+                      true => quotes.get(usize(0)).unwrap()
+                    );
+                    (close_quote : String) = cond(
+                      is_single => quotes.get(usize(3)).unwrap(),
+                      true => quotes.get(usize(1)).unwrap()
+                    );
+
+                    // Replace closing quote first (before opening, in case same token)
+                    text = _replace_at(text, quote_pos, close_quote);
+                    token.content = text;
+                    _ := tokens.set(usize(i), token);
+
+                    // Replace opening quote
+                    (open_tok : Token) = tokens.get(usize(item.token_idx)).unwrap();
+                    open_tok.content = _replace_at(open_tok.content, item.pos, open_quote);
+                    _ := tokens.set(usize(item.token_idx), open_tok);
+
+                    // Adjust position if same token
+                    pos = (pos + (close_quote.len() - usize(1)));
+                    if((item.token_idx == i), {
+                      pos = (pos + (open_quote.len() - usize(1)));
+                    });
+
+                    // Re-read text after modification
+                    text = tokens.get(usize(i)).unwrap().content;
+                    max = text.len();
+
+                    // Truncate stack
+                    while (i32(stack.len()) > sj), {
+                      _ := stack.pop();
+                    };
+                    matched = true;
+                  }, {
+                    sj = (sj - i32(1));
+                  });
+                });
+              };
+              if(!(matched), {
+                if(can_open, {
+                  _ := stack.push(_QuoteEntry(token_idx: i, pos: quote_pos, single: is_single, level: this_level));
+                }, {
+                  if(is_single, {
+                    text = _replace_at(text, quote_pos, APOSTROPHE);
+                    token.content = text;
+                    _ := tokens.set(usize(i), token);
+                  });
+                });
+              });
+            }, {
+              // can_open only
+              _ := stack.push(_QuoteEntry(token_idx: i, pos: quote_pos, single: is_single, level: this_level));
+            });
+          });
+        });
+      };
+
+      i = (i + i32(1));
+    });
+  };
+});
+
+// Main smartquotes rule
+smartquotes :: (fn(state: *(StateCore), quotes: ArrayList(String)) -> unit)({
+  (blk_idx : i32) = (i32(state.*.tokens.len()) - i32(1));
+  while (blk_idx >= i32(0)), {
+    (block_tok : Token) = state.*.tokens.get(usize(blk_idx)).unwrap();
+    if((block_tok.type_name == `inline`), {
+      // Quick test: does content contain any quotes?
+      (has_quotes : bool) = false;
+      (qi : usize) = usize(0);
+      while ((qi < block_tok.content.len()) && !(has_quotes)), {
+        (qc : rune) = block_tok.content.at(qi).unwrap();
+        if(((qc == rune(u32(0x27))) || (qc == rune(u32(0x22)))), {
+          has_quotes = true;
+        });
+        qi = (qi + usize(1));
+      };
+      if(has_quotes, {
+        match(block_tok.children,
+          .Some(children) => _process_inlines(children, quotes),
+          .None => ()
+        );
+      });
+    });
+    blk_idx = (blk_idx - i32(1));
+  };
+});
+
+export smartquotes;

@@ -43,7 +43,9 @@ _emit_autolink :: (fn(state: *(StateInline), full_url: String, display_text: Str
   token_t.content = display_text;
   state.*.tokens.set(usize((i32(state.*.tokens.len()) - i32(1))), token_t);
 
-  _ := state_push(state, `link_close`, `a`, i32(-1));
+  (token_c : Token) = state_push(state, `link_close`, `a`, i32(-1));
+  token_c.info = `auto`;
+  state.*.tokens.set(usize((i32(state.*.tokens.len()) - i32(1))), token_c);
 });
 
 autolink :: (fn(state: *(StateInline), silent: bool) -> bool)({
