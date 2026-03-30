@@ -48,6 +48,7 @@ BlockTokenizeFn :: (fn(state: *(StateBlock), start: i32, end: i32) -> unit);
 // Use this instead of the push_token method which has a by-value self bug.
 block_push_token :: (fn(state: *(StateBlock), tok: Token) -> unit)({
   (token : Token) = tok;
+  token.block = true;
 
   if((token.nesting < i32(0)), {
     state.*.level = (state.*.level - i32(1));
@@ -285,9 +286,14 @@ impl(StateBlock,
       (line_indent : i32) = i32(0);
       (line_start : i32) = self.b_marks.get(usize(line)).unwrap();
       (first : i32) = line_start;
-      (last : i32) = cond(
+      (last_raw : i32) = cond(
         (((line + i32(1)) < end) || keep_last_lf) => (self.e_marks.get(usize(line)).unwrap() + i32(1)),
         true => self.e_marks.get(usize(line)).unwrap()
+      );
+      // Clamp to source length (last line may not have trailing newline)
+      (last : i32) = cond(
+        (last_raw > i32(self._src_bytes.len())) => i32(self._src_bytes.len()),
+        true => last_raw
       );
 
       (done : bool) = false;

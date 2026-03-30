@@ -73,6 +73,11 @@ render_token :: (fn(tokens: ArrayList(Token), idx: i32, options: *(Options)) -> 
         (next_token : Token) = tokens.get(usize((idx + i32(1)))).unwrap();
         if(((next_token.type_name == `inline`) || next_token.hidden), {
           need_lf = false;
+        }, {
+          // Opening + closing tag of same type, e.g. <li></li>
+          if(((next_token.nesting == i32(-1)) && (next_token.tag == token.tag)), {
+            need_lf = false;
+          });
         });
       });
     });
