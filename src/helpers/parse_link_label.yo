@@ -147,6 +147,56 @@ parse_link_label :: (fn(src_bytes: ArrayList(u8), start: i32, pos_max: i32, disa
           pos = (pos + i32(1));
         });
       },
+      // Exclamation mark — check for image pattern ![alt](url) or ![alt][ref]
+      // Images inside links are allowed, so skip past the entire image pattern
+      (marker == i32(0x21)) => {
+        if((((pos + i32(1)) < max) && (i32(src_bytes.get(usize((pos + i32(1)))).unwrap()) == i32(0x5B))), {
+          // Found '![' — check if it forms a complete image to skip over
+          (img_label_end : i32) = recur(src_bytes, (pos + i32(1)), max, false);
+          if((img_label_end >= i32(0)), {
+            (after : i32) = (img_label_end + i32(1));
+            (skipped : bool) = false;
+            if((after < max), {
+              (next_ch : i32) = i32(src_bytes.get(usize(after)).unwrap());
+              // Check for ![alt](url) — skip past closing ')'
+              if((next_ch == i32(0x28)), {
+                (p : i32) = (after + i32(1));
+                (depth : i32) = i32(1);
+                while (((p < max) && (depth > i32(0)))), {
+                  (ch : i32) = i32(src_bytes.get(usize(p)).unwrap());
+                  cond(
+                    (ch == i32(0x5C)) => { p = (p + i32(2)); },
+                    (ch == i32(0x28)) => { depth = (depth + i32(1)); p = (p + i32(1)); },
+                    (ch == i32(0x29)) => { depth = (depth - i32(1)); p = (p + i32(1)); },
+                    true => { p = (p + i32(1)); }
+                  );
+                };
+                if((depth == i32(0)), {
+                  pos = p;
+                  skipped = true;
+                });
+              });
+              // Check for ![alt][ref] — skip past closing ']'
+              if((!(skipped)), {
+                if((next_ch == i32(0x5B)), {
+                  (ref_end : i32) = recur(src_bytes, after, max, false);
+                  if((ref_end >= i32(0)), {
+                    pos = (ref_end + i32(1));
+                    skipped = true;
+                  });
+                });
+              });
+            });
+            if((!(skipped)), {
+              pos = (pos + i32(1));
+            });
+          }, {
+            pos = (pos + i32(1));
+          });
+        }, {
+          pos = (pos + i32(1));
+        });
+      },
       // Any other character
       true => {
         pos = (pos + i32(1));
