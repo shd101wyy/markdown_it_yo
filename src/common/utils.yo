@@ -16,7 +16,6 @@ open import "std/string";
 escapeHtml :: (fn(input: String) -> String)(
   {
     (bytes : ArrayList(u8)) = input.as_bytes();
-    (result : String) = ``;
     (i : usize) = usize(0);
     (len : usize) = bytes.len();
     (has_special : bool) = false;
@@ -34,20 +33,47 @@ escapeHtml :: (fn(input: String) -> String)(
       return input;
     });
 
+    // Build output as raw bytes to avoid double-encoding multi-byte UTF-8
+    (out : ArrayList(u8)) = ArrayList(u8).new();
     i = usize(0);
     while (i < len), {
       (ch : u8) = bytes.get(i).unwrap();
       cond(
-        (ch == u8(0x26)) => { result = `${result}&amp;`; },
-        (ch == u8(0x3C)) => { result = `${result}&lt;`; },
-        (ch == u8(0x3E)) => { result = `${result}&gt;`; },
-        (ch == u8(0x22)) => { result = `${result}&quot;`; },
-        true => { result = `${result}${fromCodePoint(i32(ch))}`; }
+        (ch == u8(0x26)) => {
+          _ := out.push(u8('&'));
+          _ := out.push(u8('a'));
+          _ := out.push(u8('m'));
+          _ := out.push(u8('p'));
+          _ := out.push(u8(';'));
+        },
+        (ch == u8(0x3C)) => {
+          _ := out.push(u8('&'));
+          _ := out.push(u8('l'));
+          _ := out.push(u8('t'));
+          _ := out.push(u8(';'));
+        },
+        (ch == u8(0x3E)) => {
+          _ := out.push(u8('&'));
+          _ := out.push(u8('g'));
+          _ := out.push(u8('t'));
+          _ := out.push(u8(';'));
+        },
+        (ch == u8(0x22)) => {
+          _ := out.push(u8('&'));
+          _ := out.push(u8('q'));
+          _ := out.push(u8('u'));
+          _ := out.push(u8('o'));
+          _ := out.push(u8('t'));
+          _ := out.push(u8(';'));
+        },
+        true => {
+          _ := out.push(ch);
+        }
       );
       i = (i + usize(1));
     };
 
-    result
+    String.from_bytes(out)
   }
 );
 

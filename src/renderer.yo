@@ -213,6 +213,7 @@ _render_one_token :: (fn(tokens: ArrayList(Token), idx: i32, options: *(Options)
     (type_name == `hardbreak`) => _render_hardbreak(options),
     (type_name == `softbreak`) => _render_softbreak(options),
     (type_name == `text`) => _render_text(token),
+    (type_name == `text_special`) => _render_text(token),
     (type_name == `html_block`) => _render_html_block(token),
     (type_name == `html_inline`) => _render_html_inline(token),
     true => render_token(tokens, idx, options)
