@@ -58,7 +58,7 @@ new_markdown_it_with_options :: (fn(opts: Options) -> MarkdownIt)(
 // ============================================================================
 
 // Core block rule: run the block parser on state.src
-_core_block :: (fn(state: *(StateCore), block_parser: ParserBlock, html_enabled: bool) -> unit)({
+_core_block :: (fn(state: *(StateCore), block_parser: ParserBlock, html_enabled: bool, enable_table: bool) -> unit)({
   if((state.*.inline_mode), {
     // In inline mode, wrap entire source as a single inline token
     (token : Token) = Token.new(`inline`, ``, i32(0));
@@ -67,12 +67,12 @@ _core_block :: (fn(state: *(StateCore), block_parser: ParserBlock, html_enabled:
     _ := state.*.tokens.push(token);
   }, {
     // Run block parser
-    block_parser.parse(state.*.src, state.*.env, state.*.tokens, html_enabled);
+    block_parser.parse(state.*.src, state.*.env, state.*.tokens, html_enabled, enable_table);
   });
 });
 
 // Core inline rule: for each 'inline' token, parse its content
-_core_inline :: (fn(state: *(StateCore), inline_parser: ParserInline, html_enabled: bool) -> unit)({
+_core_inline :: (fn(state: *(StateCore), inline_parser: ParserInline, html_enabled: bool, enable_strikethrough: bool) -> unit)({
   (len : i32) = i32(state.*.tokens.len());
   (i : i32) = i32(0);
 
@@ -80,7 +80,7 @@ _core_inline :: (fn(state: *(StateCore), inline_parser: ParserInline, html_enabl
     (token : Token) = state.*.tokens.get(usize(i)).unwrap();
     if((token.type_name == `inline`), {
       (children : ArrayList(Token)) = ArrayList(Token).new();
-      inline_parser.parse(token.content, state.*.env, children, html_enabled);
+      inline_parser.parse(token.content, state.*.env, children, html_enabled, enable_strikethrough);
       token.children = .Some(children);
       state.*.tokens.set(usize(i), token);
     });
@@ -98,9 +98,9 @@ impl(MarkdownIt,
     // 1. Normalize
     normalize((&state));
     // 2. Block parse
-    _core_block((&state), self.block, self.options.html);
+    _core_block((&state), self.block, self.options.html, self.options.enable_table);
     // 3. Inline parse
-    _core_inline((&state), self.inline_parser, self.options.html);
+    _core_inline((&state), self.inline_parser, self.options.html, self.options.enable_strikethrough);
     // 4. Typographer replacements (if enabled)
     if(self.options.typographer, {
       replacements((&state));

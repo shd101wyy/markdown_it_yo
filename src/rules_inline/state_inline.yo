@@ -63,6 +63,7 @@ StateInline :: struct(
 
   // Options pushed down from MarkdownIt
   html_enabled : bool,
+  enable_strikethrough : bool,
 
   // Cached bytes for fast access
   _src_bytes : ArrayList(u8),
@@ -76,7 +77,7 @@ StateInline :: struct(
 );
 
 // Create a new StateInline
-new_state_inline :: (fn(src: String, env: *(Env), out_tokens: ArrayList(Token), html_enabled: bool, tokenize_fn: (fn(state: *(StateInline)) -> unit), parse_fn: (fn(state: *(StateInline)) -> unit)) -> StateInline)(
+new_state_inline :: (fn(src: String, env: *(Env), out_tokens: ArrayList(Token), html_enabled: bool, enable_strikethrough: bool, tokenize_fn: (fn(state: *(StateInline)) -> unit), parse_fn: (fn(state: *(StateInline)) -> unit)) -> StateInline)(
   {
     (bytes : ArrayList(u8)) = src.as_bytes();
     (pos_max : i32) = i32(bytes.len());
@@ -98,6 +99,7 @@ new_state_inline :: (fn(src: String, env: *(Env), out_tokens: ArrayList(Token), 
       backticks_scanned: false,
       link_level: i32(0),
       html_enabled: html_enabled,
+      enable_strikethrough: enable_strikethrough,
       _src_bytes: bytes,
       _tokenize_fn: tokenize_fn,
       _parse_fn: parse_fn

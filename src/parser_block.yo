@@ -35,7 +35,7 @@ _table_as_terminator :: (fn(state: *(StateBlock), start_line: i32, end_line: i32
 _block_tokenize :: (fn(state: *(StateBlock), start_line: i32, end_line: i32) -> unit)({
   // Build paragraph terminator list (rules that can interrupt paragraphs)
   (para_terminators : ArrayList(BlockRuleFn)) = ArrayList(BlockRuleFn).new();
-  _ := para_terminators.push(_table_as_terminator);
+  if(state.*.enable_table, { _ := para_terminators.push(_table_as_terminator); });
   _ := para_terminators.push(fence);
   _ := para_terminators.push(blockquote);
   _ := para_terminators.push(hr);
@@ -46,7 +46,7 @@ _block_tokenize :: (fn(state: *(StateBlock), start_line: i32, end_line: i32) -> 
   // Build reference terminator list (rules that can interrupt references)
   // Matches JS: table, fence, blockquote, hr, list, html_block, heading
   (ref_terminators : ArrayList(BlockRuleFn)) = ArrayList(BlockRuleFn).new();
-  _ := ref_terminators.push(_table_as_terminator);
+  if(state.*.enable_table, { _ := ref_terminators.push(_table_as_terminator); });
   _ := ref_terminators.push(fence);
   _ := ref_terminators.push(blockquote);
   _ := ref_terminators.push(hr);
@@ -86,7 +86,7 @@ _block_tokenize :: (fn(state: *(StateBlock), start_line: i32, end_line: i32) -> 
 
     // Try rules in order (same order as markdown-it default preset)
     (ok : bool) = false;
-    if(!(ok), { ok = table(state, line, end_line, false, (&block_terminators)); });
+    if((!(ok) && state.*.enable_table), { ok = table(state, line, end_line, false, (&block_terminators)); });
     if(!(ok), { ok = code(state, line, end_line, false); });
     if(!(ok), { ok = fence(state, line, end_line, false); });
     if(!(ok), { ok = blockquote(state, line, end_line, false); });
@@ -133,8 +133,8 @@ new_parser_block :: (fn() -> ParserBlock)(
 
 impl(ParserBlock,
   // Parse block content and fill out_tokens.
-  parse : (fn(self: Self, src: String, env: *(Env), out_tokens: ArrayList(Token), html_enabled: bool) -> unit)({
-    (state : StateBlock) = new_state_block(src, env, out_tokens, html_enabled, _block_tokenize);
+  parse : (fn(self: Self, src: String, env: *(Env), out_tokens: ArrayList(Token), html_enabled: bool, enable_table: bool) -> unit)({
+    (state : StateBlock) = new_state_block(src, env, out_tokens, html_enabled, enable_table, _block_tokenize);
     _block_tokenize((&state), i32(0), state.line_max);
   })
 );

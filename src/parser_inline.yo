@@ -37,7 +37,7 @@ _inline_tokenize :: (fn(state: *(StateInline)) -> unit)({
     if(!(ok), { ok = newline(state, false); });
     if(!(ok), { ok = escape_rule(state, false); });
     if(!(ok), { ok = backtick(state, false); });
-    if(!(ok), { ok = strikethrough_tokenize(state, false); });
+    if((!(ok) && state.*.enable_strikethrough), { ok = strikethrough_tokenize(state, false); });
     if(!(ok), { ok = emphasis_tokenize(state, false); });
     if(!(ok), { ok = link_rule(state, false); });
     if(!(ok), { ok = image_rule(state, false); });
@@ -67,7 +67,7 @@ _inline_tokenize :: (fn(state: *(StateInline)) -> unit)({
 _inline_parse_state :: (fn(state: *(StateInline)) -> unit)({
   _inline_tokenize(state);
   link_pairs(state);
-  strikethrough_post_process(state);
+  if(state.*.enable_strikethrough, { strikethrough_post_process(state); });
   emphasis_post_process(state);
   fragments_join(state);
 });
@@ -83,8 +83,8 @@ new_parser_inline :: (fn() -> ParserInline)(
 
 impl(ParserInline,
   // Parse inline content: tokenize then run post-processing rules.
-  parse : (fn(self: Self, src: String, env: *(Env), out_tokens: ArrayList(Token), html_enabled: bool) -> unit)({
-    (state : StateInline) = new_state_inline(src, env, out_tokens, html_enabled, _inline_tokenize, _inline_parse_state);
+  parse : (fn(self: Self, src: String, env: *(Env), out_tokens: ArrayList(Token), html_enabled: bool, enable_strikethrough: bool) -> unit)({
+    (state : StateInline) = new_state_inline(src, env, out_tokens, html_enabled, enable_strikethrough, _inline_tokenize, _inline_parse_state);
     _inline_parse_state((&state));
   })
 );

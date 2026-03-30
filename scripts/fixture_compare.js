@@ -17,26 +17,33 @@ const { execSync } = require('child_process');
 const enableHtml = process.argv.includes('--html');
 const enableTypographer = process.argv.includes('--typographer');
 const noLangPrefix = process.argv.includes('--no-lang-prefix');
+const useCommonmark = process.argv.includes('--commonmark');
 
 const mdOpts = {};
 if (enableHtml) mdOpts.html = true;
 if (enableTypographer) mdOpts.typographer = true;
 if (noLangPrefix) mdOpts.langPrefix = '';
-const md = require('markdown-it')(mdOpts);
+const md = useCommonmark
+  ? require('markdown-it')('commonmark')
+  : require('markdown-it')(mdOpts);
 
 const fixtureFile = process.argv.find(a => !a.startsWith('-') && a !== process.argv[0] && a !== process.argv[1]);
 const verbose = process.argv.includes('--verbose') || process.argv.includes('-v');
 
 if (!fixtureFile) {
-  console.error('Usage: node scripts/fixture_compare.js <fixture_file> [-v] [--html] [--typographer] [--no-lang-prefix]');
+  console.error('Usage: node scripts/fixture_compare.js <fixture_file> [-v] [--html] [--typographer] [--no-lang-prefix] [--commonmark]');
   process.exit(1);
 }
 
 const yoBin = path.join(__dirname, '..', 'markdown_it');
 const yoFlags = [];
-if (enableHtml) yoFlags.push('--html');
-if (enableTypographer) yoFlags.push('--typographer');
-if (noLangPrefix) yoFlags.push('--no-lang-prefix');
+if (useCommonmark) {
+  yoFlags.push('--commonmark');
+} else {
+  if (enableHtml) yoFlags.push('--html');
+  if (enableTypographer) yoFlags.push('--typographer');
+  if (noLangPrefix) yoFlags.push('--no-lang-prefix');
+}
 
 function parseFixtures(content) {
   const fixtures = [];

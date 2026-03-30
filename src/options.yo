@@ -13,7 +13,9 @@ Options :: struct(
   linkify : bool,
   typographer : bool,
   quotes : ArrayList(String),
-  max_nesting : i32
+  max_nesting : i32,
+  enable_table : bool,
+  enable_strikethrough : bool
 );
 
 default_options :: (fn() -> Options)({
@@ -30,8 +32,31 @@ default_options :: (fn() -> Options)({
     linkify: false,
     typographer: false,
     quotes: quotes,
-    max_nesting: i32(100)
+    max_nesting: i32(100),
+    enable_table: true,
+    enable_strikethrough: true
   )
 });
 
-export Options, default_options;
+// Options matching the CommonMark preset
+commonmark_options :: (fn() -> Options)({
+  (quotes : ArrayList(String)) = ArrayList(String).new();
+  _ := quotes.push(fromCodePoint(i32(0x201C)));
+  _ := quotes.push(fromCodePoint(i32(0x201D)));
+  _ := quotes.push(fromCodePoint(i32(0x2018)));
+  _ := quotes.push(fromCodePoint(i32(0x2019)));
+  Options(
+    html: true,
+    xhtml_out: true,
+    breaks: false,
+    lang_prefix: `language-`,
+    linkify: false,
+    typographer: false,
+    quotes: quotes,
+    max_nesting: i32(20),
+    enable_table: false,
+    enable_strikethrough: false
+  )
+});
+
+export Options, default_options, commonmark_options;

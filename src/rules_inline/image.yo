@@ -131,7 +131,7 @@ image_rule :: (fn(state: *(StateInline), silent: bool) -> bool)({
 
     // Parse alt text content through the full inline parser to get child tokens
     (children_tokens : ArrayList(Token)) = ArrayList(Token).new();
-    (sub_state : StateInline) = new_state_inline(content, state.*.env, children_tokens, state.*.html_enabled, state.*._tokenize_fn, state.*._parse_fn);
+    (sub_state : StateInline) = new_state_inline(content, state.*.env, children_tokens, state.*.html_enabled, state.*.enable_strikethrough, state.*._tokenize_fn, state.*._parse_fn);
     state.*._parse_fn((&sub_state));
 
     (token : Token) = state_push(state, `image`, `img`, i32(0));
