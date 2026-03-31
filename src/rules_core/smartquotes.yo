@@ -4,7 +4,7 @@
 
 open import "std/string";
 { ArrayList } :: import "std/collections/array_list";
-{ Token, TokenType, TT_TEXT, TT_SOFTBREAK, TT_HARDBREAK, TT_INLINE } :: import "../token.yo";
+{ Token, TokenType } :: import "../token.yo";
 { StateCore } :: import "./state_core.yo";
 { is_white_space, is_punct_char, is_md_ascii_punct } :: import "../common/utils.yo";
 { from_code_point } :: import "../common/char_utils.yo";
@@ -48,7 +48,7 @@ _process_inlines :: (fn(tokens: ArrayList(Token), quotes: ArrayList(String)) -> 
       _ := stack.pop();
     };
 
-    if((token.*.type_name != TT_TEXT), {
+    if((token.*.type_name != .TT_TEXT), {
       i = (i + i32(1));
     }, {
       (text : String) = token.*.content;
@@ -89,7 +89,7 @@ _process_inlines :: (fn(tokens: ArrayList(Token), quotes: ArrayList(String)) -> 
             (found_prev : bool) = false;
             while ((pj >= i32(0)) && !(found_prev)), {
               (prev_tok : *(Token)) = tokens.get_ptr(usize(pj));
-              if(((prev_tok.*.type_name == TT_SOFTBREAK) || (prev_tok.*.type_name == TT_HARDBREAK)), {
+              if(((prev_tok.*.type_name == .TT_SOFTBREAK) || (prev_tok.*.type_name == .TT_HARDBREAK)), {
                 found_prev = true;
               }, {
                 if((prev_tok.*.content.len() > usize(0)), {
@@ -112,7 +112,7 @@ _process_inlines :: (fn(tokens: ArrayList(Token), quotes: ArrayList(String)) -> 
             (found_next : bool) = false;
             while ((nj < tokens_len) && !(found_next)), {
               (next_tok : *(Token)) = tokens.get_ptr(usize(nj));
-              if(((next_tok.*.type_name == TT_SOFTBREAK) || (next_tok.*.type_name == TT_HARDBREAK)), {
+              if(((next_tok.*.type_name == .TT_SOFTBREAK) || (next_tok.*.type_name == .TT_HARDBREAK)), {
                 found_next = true;
               }, {
                 if((next_tok.*.content.len() > usize(0)), {
@@ -245,7 +245,7 @@ smartquotes :: (fn(state: *(StateCore), quotes: ArrayList(String)) -> unit)({
   (blk_idx : i32) = (i32(state.*.tokens.len()) - i32(1));
   while (blk_idx >= i32(0)), {
     (block_tok : *(Token)) = state.*.tokens.get_ptr(usize(blk_idx));
-    if((block_tok.*.type_name == TT_INLINE), {
+    if((block_tok.*.type_name == .TT_INLINE), {
       // Quick test: does content contain any quotes?
       (has_quotes : bool) = false;
       (qi : usize) = usize(0);

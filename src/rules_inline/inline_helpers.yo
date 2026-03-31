@@ -3,7 +3,7 @@
 
 open import "std/string";
 { ArrayList } :: import "std/collections/array_list";
-{ Token, TokenType, TT_TEXT } :: import "../token.yo";
+{ Token, TokenType } :: import "../token.yo";
 { StateInline, TokenMeta, Delimiter } :: import "./state_inline.yo";
 
 // Inline rule function signature
@@ -13,7 +13,7 @@ InlineRuleFn :: (fn(state: *(StateInline), silent: bool) -> bool);
 flush_pending :: (fn(state: *(StateInline)) -> unit)({
   if((state.*.pending.len() > usize(0)), {
     (token : Token) = Token(
-      type_name: TT_TEXT,
+      type_name: .TT_TEXT,
       tag: ``,
       nesting: i32(0),
       attrs: .None,

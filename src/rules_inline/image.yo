@@ -4,7 +4,7 @@
 
 open import "std/string";
 { ArrayList } :: import "std/collections/array_list";
-{ Token, StringPair, TokenType, TT_IMAGE } :: import "../token.yo";
+{ Token, StringPair, TokenType } :: import "../token.yo";
 { StateInline, new_state_inline } :: import "./state_inline.yo";
 { state_push } :: import "./inline_helpers.yo";
 { is_space, normalize_reference, byte_substring } :: import "../common/utils.yo";
@@ -134,7 +134,7 @@ image_rule :: (fn(state: *(StateInline), silent: bool) -> bool)({
     (sub_state : StateInline) = new_state_inline(content, state.*.env, children_tokens, state.*.html_enabled, state.*.enable_strikethrough, state.*._tokenize_fn, state.*._parse_fn);
     state.*._parse_fn((&sub_state));
 
-    (token : Token) = state_push(state, TT_IMAGE, `img`, i32(0));
+    (token : Token) = state_push(state, .TT_IMAGE, `img`, i32(0));
     (attrs : ArrayList(StringPair)) = ArrayList(StringPair).new();
     _ := attrs.push(StringPair(name: `src`, value: href));
     _ := attrs.push(StringPair(name: `alt`, value: ``));

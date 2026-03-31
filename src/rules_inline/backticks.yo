@@ -5,7 +5,7 @@
 open import "std/string";
 { ArrayList } :: import "std/collections/array_list";
 { HashMap } :: import "std/collections/hash_map";
-{ Token, TokenType, TT_CODE_INLINE } :: import "../token.yo";
+{ Token, TokenType } :: import "../token.yo";
 { StateInline } :: import "./state_inline.yo";
 { flush_pending, inline_push_token } :: import "./inline_helpers.yo";
 
@@ -97,7 +97,7 @@ backtick :: (fn(state: *(StateInline), silent: bool) -> bool)({
           });
 
           (token : Token) = Token(
-            type_name: TT_CODE_INLINE,
+            type_name: .TT_CODE_INLINE,
             tag: `code`,
             nesting: i32(0),
             attrs: .None,

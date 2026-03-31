@@ -7,7 +7,7 @@ open import "std/string";
 { Regex } :: import "std/regex";
 { StateInline } :: import "./state_inline.yo";
 { state_push } :: import "./inline_helpers.yo";
-{ Token, StringPair, TokenType, TT_TEXT, TT_LINK_OPEN, TT_LINK_CLOSE } :: import "../token.yo";
+{ Token, StringPair, TokenType } :: import "../token.yo";
 { validate_link, normalize_link, normalize_link_text } :: import "../common/link_utils.yo";
 
 // Cached regex patterns (compiled once at startup)
@@ -32,7 +32,7 @@ _is_email :: (fn(url: String) -> bool)(
 
 // Helper to emit autolink tokens
 _emit_autolink :: (fn(state: *(StateInline), full_url: String, display_text: String) -> unit)({
-  (token_o : Token) = state_push(state, TT_LINK_OPEN, `a`, i32(1));
+  (token_o : Token) = state_push(state, .TT_LINK_OPEN, `a`, i32(1));
   (attrs : ArrayList(StringPair)) = ArrayList(StringPair).new();
   _ := attrs.push(StringPair(name: `href`, value: full_url));
   token_o.attrs = .Some(attrs);
@@ -40,11 +40,11 @@ _emit_autolink :: (fn(state: *(StateInline), full_url: String, display_text: Str
   token_o.info = `auto`;
   state.*.tokens.set(usize((i32(state.*.tokens.len()) - i32(1))), token_o);
 
-  (token_t : Token) = state_push(state, TT_TEXT, ``, i32(0));
+  (token_t : Token) = state_push(state, .TT_TEXT, ``, i32(0));
   token_t.content = display_text;
   state.*.tokens.set(usize((i32(state.*.tokens.len()) - i32(1))), token_t);
 
-  (token_c : Token) = state_push(state, TT_LINK_CLOSE, `a`, i32(-1));
+  (token_c : Token) = state_push(state, .TT_LINK_CLOSE, `a`, i32(-1));
   token_c.info = `auto`;
   state.*.tokens.set(usize((i32(state.*.tokens.len()) - i32(1))), token_c);
 });

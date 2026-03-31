@@ -5,7 +5,7 @@
 open import "std/string";
 { ArrayList } :: import "std/collections/array_list";
 { Regex, RegexMatch } :: import "std/regex";
-{ Token, TokenType, TT_TEXT, TT_TEXT_SPECIAL } :: import "../token.yo";
+{ Token, TokenType } :: import "../token.yo";
 { is_valid_entity_code, from_code_point } :: import "../common/char_utils.yo";
 { decode_html } :: import "../common/entities.yo";
 { byte_substring } :: import "../common/utils.yo";
@@ -89,7 +89,7 @@ entity :: (fn(state: *(StateInline), silent: bool) -> bool)({
           );
 
           (token : Token) = Token(
-            type_name: TT_TEXT_SPECIAL,
+            type_name: .TT_TEXT_SPECIAL,
             tag: ``,
             nesting: i32(0),
             attrs: .None,
@@ -120,7 +120,7 @@ entity :: (fn(state: *(StateInline), silent: bool) -> bool)({
         if(!(decoded == matched), {
           if(!(silent), {
             (token : Token) = Token(
-              type_name: TT_TEXT_SPECIAL,
+              type_name: .TT_TEXT_SPECIAL,
               tag: ``,
               nesting: i32(0),
               attrs: .None,

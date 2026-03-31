@@ -7,7 +7,7 @@
 
 open import "std/string";
 { ArrayList } :: import "std/collections/array_list";
-{ Token, TokenType, TT_TEXT, TT_LINK_OPEN, TT_LINK_CLOSE, TT_INLINE } :: import "../token.yo";
+{ Token, TokenType } :: import "../token.yo";
 { from_code_point } :: import "../common/char_utils.yo";
 { StateCore } :: import "./state_core.yo";
 
@@ -271,13 +271,13 @@ _replace_scoped :: (fn(inline_tokens: ArrayList(Token)) -> unit)({
   (i : i32) = (i32(inline_tokens.len()) - i32(1));
   while (i >= i32(0)), {
     (token : *(Token)) = inline_tokens.get_ptr(usize(i));
-    if(((token.*.type_name == TT_TEXT) && (inside_autolink == i32(0))), {
+    if(((token.*.type_name == .TT_TEXT) && (inside_autolink == i32(0))), {
       token.*.content = _replace_scoped_abbrs(token.*.content);
     });
-    if(((token.*.type_name == TT_LINK_OPEN) && (token.*.info == `auto`)), {
+    if(((token.*.type_name == .TT_LINK_OPEN) && (token.*.info == `auto`)), {
       inside_autolink = (inside_autolink - i32(1));
     });
-    if(((token.*.type_name == TT_LINK_CLOSE) && (token.*.info == `auto`)), {
+    if(((token.*.type_name == .TT_LINK_CLOSE) && (token.*.info == `auto`)), {
       inside_autolink = (inside_autolink + i32(1));
     });
     i = (i - i32(1));
@@ -291,15 +291,15 @@ _replace_rare_tokens :: (fn(inline_tokens: ArrayList(Token)) -> unit)({
   (i : i32) = (i32(inline_tokens.len()) - i32(1));
   while (i >= i32(0)), {
     (token : *(Token)) = inline_tokens.get_ptr(usize(i));
-    if(((token.*.type_name == TT_TEXT) && (inside_autolink == i32(0))), {
+    if(((token.*.type_name == .TT_TEXT) && (inside_autolink == i32(0))), {
       if(_has_rare_chars(token.*.content), {
         token.*.content = _replace_rare(token.*.content);
       });
     });
-    if(((token.*.type_name == TT_LINK_OPEN) && (token.*.info == `auto`)), {
+    if(((token.*.type_name == .TT_LINK_OPEN) && (token.*.info == `auto`)), {
       inside_autolink = (inside_autolink - i32(1));
     });
-    if(((token.*.type_name == TT_LINK_CLOSE) && (token.*.info == `auto`)), {
+    if(((token.*.type_name == .TT_LINK_CLOSE) && (token.*.info == `auto`)), {
       inside_autolink = (inside_autolink + i32(1));
     });
     i = (i - i32(1));
@@ -312,7 +312,7 @@ replacements :: (fn(state: *(StateCore)) -> unit)({
   (blk_idx : i32) = (i32(block_tokens.len()) - i32(1));
   while (blk_idx >= i32(0)), {
     (block_tok : *(Token)) = block_tokens.get_ptr(usize(blk_idx));
-    if((block_tok.*.type_name == TT_INLINE), {
+    if((block_tok.*.type_name == .TT_INLINE), {
       match(block_tok.*.children,
         .Some(children) => {
           if(_has_scoped_abbr(block_tok.*.content), {

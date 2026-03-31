@@ -2,13 +2,11 @@
 // Ported from: test/token.mjs (markdown-it v14.1.1)
 
 open import "std/string";
-{ Token, TokenType, StringPair,
-  TT_PARAGRAPH_OPEN, TT_PARAGRAPH_CLOSE,
-  TT_INLINE, TT_LINK_OPEN, TT_LINK_CLOSE } :: import "../src/token.yo";
+{ Token, TokenType, StringPair } :: import "../src/token.yo";
 
 test "Token — constructor defaults", {
-  tok := Token.new(TT_PARAGRAPH_OPEN, `p`, i32(1));
-  assert((tok.type_name == TT_PARAGRAPH_OPEN), "type_name should match");
+  tok := Token.new(.TT_PARAGRAPH_OPEN, `p`, i32(1));
+  assert((tok.type_name == .TT_PARAGRAPH_OPEN), "type_name should match");
   assert((tok.tag == `p`), "tag should match");
   assert((tok.nesting == i32(1)), "nesting should match");
   assert((tok.level == i32(0)), "level should default to 0");
@@ -20,13 +18,13 @@ test "Token — constructor defaults", {
 };
 
 test "Token — attr_index with no attrs", {
-  (tok : Token) = Token.new(TT_INLINE, ``, i32(0));
+  (tok : Token) = Token.new(.TT_INLINE, ``, i32(0));
   (idx : i32) = (&tok).attr_index(`href`);
   assert((idx == i32(-1)), "should return -1 when no attrs");
 };
 
 test "Token — attr_push", {
-  (tok : Token) = Token.new(TT_LINK_OPEN, `a`, i32(1));
+  (tok : Token) = Token.new(.TT_LINK_OPEN, `a`, i32(1));
   (&tok).attr_push(StringPair(name: `href`, value: `https://example.com`));
 
   (idx : i32) = (&tok).attr_index(`href`);
@@ -34,7 +32,7 @@ test "Token — attr_push", {
 };
 
 test "Token — attr_set creates new attr", {
-  (tok : Token) = Token.new(TT_LINK_OPEN, `a`, i32(1));
+  (tok : Token) = Token.new(.TT_LINK_OPEN, `a`, i32(1));
   (&tok).attr_set(`href`, `https://example.com`);
 
   (val : Option(String)) = (&tok).attr_get(`href`);
@@ -45,7 +43,7 @@ test "Token — attr_set creates new attr", {
 };
 
 test "Token — attr_set overrides existing", {
-  (tok : Token) = Token.new(TT_LINK_OPEN, `a`, i32(1));
+  (tok : Token) = Token.new(.TT_LINK_OPEN, `a`, i32(1));
   (&tok).attr_set(`href`, `old`);
   (&tok).attr_set(`href`, `new`);
 
@@ -57,7 +55,7 @@ test "Token — attr_set overrides existing", {
 };
 
 test "Token — attr_get returns None for missing attr", {
-  (tok : Token) = Token.new(TT_INLINE, ``, i32(0));
+  (tok : Token) = Token.new(.TT_INLINE, ``, i32(0));
   (val : Option(String)) = (&tok).attr_get(`class`);
   match(val,
     .Some(_) => assert(false, "should not find attr"),
@@ -66,7 +64,7 @@ test "Token — attr_get returns None for missing attr", {
 };
 
 test "Token — attr_join creates new attr", {
-  (tok : Token) = Token.new(TT_PARAGRAPH_OPEN, `p`, i32(1));
+  (tok : Token) = Token.new(.TT_PARAGRAPH_OPEN, `p`, i32(1));
   (&tok).attr_join(`class`, `foo`);
 
   (val : Option(String)) = (&tok).attr_get(`class`);
@@ -77,7 +75,7 @@ test "Token — attr_join creates new attr", {
 };
 
 test "Token — attr_join appends to existing", {
-  (tok : Token) = Token.new(TT_PARAGRAPH_OPEN, `p`, i32(1));
+  (tok : Token) = Token.new(.TT_PARAGRAPH_OPEN, `p`, i32(1));
   (&tok).attr_join(`class`, `foo`);
   (&tok).attr_join(`class`, `bar`);
 
@@ -89,7 +87,7 @@ test "Token — attr_join appends to existing", {
 };
 
 test "Token — multiple different attrs", {
-  (tok : Token) = Token.new(TT_LINK_OPEN, `a`, i32(1));
+  (tok : Token) = Token.new(.TT_LINK_OPEN, `a`, i32(1));
   (&tok).attr_set(`href`, `https://example.com`);
   (&tok).attr_set(`title`, `Example`);
   (&tok).attr_join(`class`, `link`);

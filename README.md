@@ -89,7 +89,7 @@ clang -std=c11 -w -O3 yo-out/aarch64-macos/bin/markdown-it-yo.c -o bench_native
 /usr/bin/time node -e "const md = require('markdown-it')(); const fs = require('fs'); md.render(fs.readFileSync('bench_1mb.md', 'utf8'));"
 ```
 
-### Results (Apple M-series, macOS)
+### Results (Apple M4, macOS)
 
 #### CPU Time (user) — actual work done
 
