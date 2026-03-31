@@ -1,23 +1,27 @@
 # Build output
-yo-out/
-
-# Generated files
+*.dSYM/
 *.o
+yo-out/
 a.out
 a.out.c
-*.dSYM/
-
-# Compiled binaries and their C output
 /markdown_it
 /markdown_it.c
 /markdown_it_debug*
 
+# Binaries
+bench_binary
+bench_debug
+bench_o2
+
+# Generated files
+node_modules
+package-lock.json
+tmp
+
+# Benchmark data
+bench_*.md
+
 # OS files
 .DS_Store
-Thumbs.db
-
 .devenv*
-tmp
-node_modules
-package-lock.jsonbench_*
-bench_binary\nbench_debug\nbench_o2
+Thumbs.db
