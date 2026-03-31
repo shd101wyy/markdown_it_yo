@@ -124,7 +124,10 @@ At 1 MB, both Yo targets use less memory than JS. At larger sizes, Yo's per-toke
 #### WASM Build
 
 ```bash
-# Compile to WASM (Emscripten)
+# Using build system
+yo build wasm
+
+# Or compile directly with Emscripten
 yo compile src/main.yo --release --cc emcc \
   --cflags='-sALLOW_MEMORY_GROWTH=1 -sINITIAL_MEMORY=256MB -sMAXIMUM_MEMORY=4GB' \
   -o yo-out/wasm/markdown_it_yo.js
