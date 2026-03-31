@@ -12,6 +12,9 @@ a.out.c
 bench_binary
 bench_debug
 bench_o2
+bench_o2g
+bench_noinline
+bench_profile
 
 # Generated files
 node_modules
