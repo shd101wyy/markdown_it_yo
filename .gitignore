@@ -20,3 +20,4 @@ Thumbs.db
 tmp
 node_modules
 package-lock.jsonbench_*
+bench_binary\nbench_debug\nbench_o2
