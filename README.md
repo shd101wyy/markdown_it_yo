@@ -91,42 +91,51 @@ clang -std=c11 -w -O3 yo-out/aarch64-macos/bin/markdown-it-yo.c -o bench_native
 
 ### Results (Apple M4, macOS)
 
-#### CPU Time (user) — actual work done
+#### CPU Time (user) — single-thread work
 
-| Input | Yo Native | JS/Node.js | WASM/Node.js |
-|-------|-----------|------------|--------------|
-| 1 MB  | **0.13s** | 0.20s      | 0.33s        |
-| 5 MB  | **0.63s** | 0.63s      | 0.89s        |
+| Input | Yo Native (libc) | JS/Node.js | Speedup |
+|-------|------------------|------------|---------|
+| 1 MB  | **0.10s**        | 0.22s      | 2.2×    |
+| 5 MB  | **0.49s**        | 0.69s      | 1.4×    |
+| 20 MB | **1.97s**        | 2.37s      | 1.2×    |
 
-**Yo native is 35-54% faster than JS in CPU time.**
+**Yo native is 1.2–2.2× faster than JS in CPU time at all sizes.**
 
 #### Wall Clock Time
 
-| Input | Yo Native | JS/Node.js | WASM/Node.js |
-|-------|-----------|------------|--------------|
-| 1 MB  | 0.14s     | **0.10s**  | 0.18s        |
-| 5 MB  | 0.68s     | **0.40s**  | 0.75s        |
+| Input | Yo Native (libc) | JS/Node.js |
+|-------|------------------|------------|
+| 1 MB  | 0.11s            | **0.11s**  |
+| 5 MB  | 0.54s            | **0.40s**  |
+| 20 MB | 2.17s            | **1.72s**  |
 
-JS has lower wall-clock time because Node.js V8 uses multi-threaded JIT compilation (user time 0.20s > real time 0.10s ≈ 2 cores).
+JS has lower wall-clock time because Node.js V8 uses multi-threaded JIT/GC (user time > real time). Yo is single-threaded.
 
 #### Memory Usage (RSS)
 
-| Input | Yo Native | JS/Node.js | WASM/Node.js |
-|-------|-----------|------------|--------------|
-| 1 MB  | **163 MB** | 194 MB    | 179 MB       |
-| 5 MB  | 808 MB    | **518 MB** | 557 MB       |
+| Input | Yo Native (libc) | JS/Node.js |
+|-------|------------------|------------|
+| 1 MB  | **170 MB**       | 207 MB     |
+| 5 MB  | 829 MB           | **578 MB** |
+| 20 MB | 3323 MB          | **1767 MB**|
+
+At 1 MB, Yo uses less memory than JS. At larger sizes, Yo's per-token RC String allocations dominate (~4 RC objects per token × ~100K tokens/MB).
 
 ### Optimizations Applied
 
 The port achieves competitive performance through several key optimizations:
 
-1. **Integer token types** — Token `type_name` uses `i32` constants instead of `String`, eliminating millions of allocations for comparisons and token creation (2x speedup)
-2. **Bulk memory operations** — `String.substring` and `String.trim` use `memcpy`/`extend_from_ptr` instead of byte-by-byte copying
-3. **Pointer-based access** — `ArrayList.get_ptr` returns pointers to elements without copying, avoiding RC overhead in hot loops
-4. **Regex caching** — Compiled regex patterns cached as module-level variables instead of recompiled per call
-5. **Pre-allocated arrays** — Parser state arrays pre-allocated to expected capacity
-6. **O(n) string operations** — Fixed O(n²) string concatenation patterns in parser and renderer
-7. **System allocator** — macOS system malloc outperforms mimalloc on Apple Silicon; use `--allocator libc` or compile manually with `clang`
+1. **Enum token types** — Token `type_name` uses an `enum` instead of `String`, eliminating millions of string allocations and comparisons (2× speedup)
+2. **Buffer-pattern renderer** — Renderer appends to a pre-allocated `String` buffer via `push_str`/`push_string` instead of string concatenation
+3. **Zero-allocation HTML escaping** — `escape_html_to()` appends escaped content directly to the output buffer using run-batching and `extend_from_ptr`, avoiding intermediate String objects
+4. **`push_str` for literals** — All string literal appends use `push_str("...")` (str type) instead of `push_string(\`...\`)` (String type), avoiding RC object creation
+5. **libc allocator** — macOS system malloc outperforms mimalloc by 3.3× for this allocation pattern (many small RC objects). Set via `build.Allocator.Libc` in `build.yo`
+6. **Pre-allocated buffers** — Render buffer pre-allocated to 1.5× source size; `escape_html` pre-allocates with headroom
+7. **O(1) length checks** — `bytes_len()` for byte count instead of `len()` which counts Unicode characters
+8. **Bulk memory operations** — `String.substring` and `String.trim` use `memcpy`/`extend_from_ptr` instead of byte-by-byte copying
+9. **Pointer-based access** — `ArrayList.get_ptr` returns pointers to elements without copying, avoiding RC overhead in hot loops
+10. **Regex caching** — Compiled regex patterns cached as module-level variables instead of recompiled per call
+11. **Pre-allocated arrays** — Parser state arrays pre-allocated to expected capacity
 
 ### Verifying Correctness
 
