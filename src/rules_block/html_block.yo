@@ -109,6 +109,9 @@ _build_html_sequences :: (fn() -> ArrayList(HtmlSequence))({
   seqs
 });
 
+// Cached HTML block sequences (compiled once at startup)
+_cached_html_seqs := _build_html_sequences();
+
 // HTML block rule
 html_block :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: bool) -> bool)({
   (pos : i32) = (state.*.b_marks.get(usize(start_line)).unwrap() + state.*.t_shift.get(usize(start_line)).unwrap());
@@ -132,14 +135,14 @@ html_block :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: 
   (line_bytes : ArrayList(u8)) = state.*._src_bytes.slice(usize(pos), usize(max)).unwrap();
   (line_text : String) = String.from_bytes(line_bytes);
 
-  // Build sequences (TODO: cache these for performance)
-  (seqs : ArrayList(HtmlSequence)) = _build_html_sequences();
+  // Use cached HTML sequences
+  (seqs : *(ArrayList(HtmlSequence))) = &(_cached_html_seqs);
 
   // Find matching sequence
   (seq_idx : i32) = i32(0);
   (found : bool) = false;
-  while ((seq_idx < i32(seqs.len())) && (!(found))), {
-    (seq : HtmlSequence) = seqs.get(usize(seq_idx)).unwrap();
+  while ((seq_idx < i32(seqs.*.len())) && (!(found))), {
+    (seq : HtmlSequence) = seqs.*.get(usize(seq_idx)).unwrap();
     if(seq.open_re.test(line_text), {
       found = true;
     }, {
@@ -153,7 +156,7 @@ html_block :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: 
 
   if(silent, {
     // true if this sequence can be a terminator, false otherwise
-    (seq : HtmlSequence) = seqs.get(usize(seq_idx)).unwrap();
+    (seq : HtmlSequence) = seqs.*.get(usize(seq_idx)).unwrap();
     return seq.can_terminate;
   });
 
@@ -161,7 +164,7 @@ html_block :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: 
 
   // If we are here - we detected HTML block.
   // Let's roll down till block end.
-  (matched_seq : HtmlSequence) = seqs.get(usize(seq_idx)).unwrap();
+  (matched_seq : HtmlSequence) = seqs.*.get(usize(seq_idx)).unwrap();
   if(!(matched_seq.close_re.test(line_text)), {
     (scanning : bool) = true;
     while ((next_line < end_line) && scanning), {
@@ -199,4 +202,4 @@ html_block :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: 
   true
 });
 
-export html_block, HtmlSequence, _build_html_sequences;
+export html_block, HtmlSequence;

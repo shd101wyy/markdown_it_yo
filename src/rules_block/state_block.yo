@@ -328,15 +328,14 @@ impl(StateBlock,
       if((line_indent > indent), {
         // Partially expanding tabs: prepend spaces
         (spaces : i32) = (line_indent - indent);
-        (padding : String) = ``;
         (s : i32) = i32(0);
         while (s < spaces), {
-          padding = `${padding} `;
+          (&result).push_string(` `);
           s = (s + i32(1));
         };
-        result = `${result}${padding}${line_str}`;
+        (&result).push_string(line_str);
       }, {
-        result = `${result}${line_str}`;
+        (&result).push_string(line_str);
       });
 
       line = (line + i32(1));

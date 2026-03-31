@@ -10,6 +10,8 @@ open import "std/string";
 
 // Render attributes of a token as an HTML attribute string.
 // Returns a string like ` class="foo" id="bar"`.
+// Render attributes of a token as an HTML attribute string.
+// Returns a string like ` class="foo" id="bar"`.
 render_attrs :: (fn(token: Token) -> String)(
   match(token.attrs,
     .None => ``,
@@ -20,7 +22,7 @@ render_attrs :: (fn(token: Token) -> String)(
         (pair : StringPair) = attrs.get(usize(i)).unwrap();
         (ek : String) = escape_html(pair.name);
         (ev : String) = escape_html(pair.value);
-        result = `${result} ${ek}="${ev}"`;
+        (&result).push_string(` ${ek}="${ev}"`);
         i = (i + i32(1));
       };
       result
@@ -43,26 +45,26 @@ render_token :: (fn(tokens: ArrayList(Token), idx: i32, options: *(Options)) -> 
   if(((((token.block) && (token.nesting != i32(-1))) && (idx > i32(0)))), {
     (prev : Token) = tokens.get(usize((idx - i32(1)))).unwrap();
     if(prev.hidden, {
-      result = `${result}\n`;
+      (&result).push_string(`\n`);
     });
   });
 
   // Build tag
   if((token.nesting == i32(-1)), {
-    result = `${result}</${token.tag}`;
+    (&result).push_string(`</${token.tag}`);
   }, {
-    result = `${result}<${token.tag}`;
+    (&result).push_string(`<${token.tag}`);
   });
 
   // Render attributes
-  result = `${result}${render_attrs(token)}`;
+  (&result).push_string(render_attrs(token));
 
   // Self-closing tag
   if(((token.nesting == i32(0)) && options.*.xhtml_out), {
-    result = `${result} /`;
+    (&result).push_string(` /`);
   });
 
-  result = `${result}>`;
+  (&result).push_string(`>`);
 
   // Add newline after block-level tags
   if(token.block, {
@@ -82,7 +84,7 @@ render_token :: (fn(tokens: ArrayList(Token), idx: i32, options: *(Options)) -> 
       });
     });
     if(need_lf, {
-      result = `${result}\n`;
+      (&result).push_string(`\n`);
     });
   });
 
@@ -153,21 +155,20 @@ render_inline_as_text :: (fn(tokens: ArrayList(Token)) -> String)({
     (tok : Token) = tokens.get(usize(i)).unwrap();
     (tn : String) = tok.type_name;
     cond(
-      (tn == `text`) => { result = `${result}${tok.content}`; },
+      (tn == `text`) => { (&result).push_string(tok.content); },
       (tn == `image`) => {
         match(tok.children,
           .Some(children) => {
-            (child_text : String) = recur(children);
-            result = `${result}${child_text}`;
+            (&result).push_string(recur(children));
           },
           .None => ()
         );
       },
       ((tn == `html_inline`) || (tn == `html_block`)) => {
-        result = `${result}${tok.content}`;
+        (&result).push_string(tok.content);
       },
       ((tn == `softbreak`) || (tn == `hardbreak`)) => {
-        result = `${result}\n`;
+        (&result).push_string(`\n`);
       },
       true => ()
     );
@@ -264,8 +265,7 @@ render_inline :: (fn(tokens: ArrayList(Token), options: *(Options)) -> String)({
 
   while (i < len), {
     (token : Token) = tokens.get(usize(i)).unwrap();
-    (rendered : String) = _render_one_token(tokens, i, options);
-    result = `${result}${rendered}`;
+    (&result).push_string(_render_one_token(tokens, i, options));
     i = (i + i32(1));
   };
 
@@ -286,12 +286,12 @@ render :: (fn(tokens: ArrayList(Token), options: *(Options)) -> String)({
       // Render inline children
       match(token.children,
         .Some(children) => {
-          result = `${result}${render_inline(children, options)}`;
+          (&result).push_string(render_inline(children, options));
         },
         .None => ()
       );
     }, {
-      result = `${result}${_render_one_token(tokens, i, options)}`;
+      (&result).push_string(_render_one_token(tokens, i, options));
     });
 
     i = (i + i32(1));

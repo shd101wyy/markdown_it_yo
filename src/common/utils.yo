@@ -134,6 +134,10 @@ is_md_ascii_punct :: (fn(ch: i32) -> bool)(
 // unescape_md
 // ============================================================================
 
+// Cached regex patterns
+_unescape_md_re := Regex.new(String.from("\\\\([!\"#$%&'()*+,\\-./:;<=>?@[\\\\\\]^_`{|}~])"), ``).unwrap();
+_normalize_ref_re := Regex.new(`\\s+`, `g`).unwrap();
+
 // Remove backslash escapes from markdown: \* → *
 unescape_md :: (fn(input: String) -> String)(
   {
@@ -141,8 +145,7 @@ unescape_md :: (fn(input: String) -> String)(
       return input;
     });
 
-    (re : Regex) = Regex.new(String.from("\\\\([!\"#$%&'()*+,\\-./:;<=>?@[\\\\\\]^_`{|}~])"), ``).unwrap();
-    re.replace(input, String.from("$1"))
+    _unescape_md_re.replace(input, String.from("$1"))
   }
 );
 
@@ -156,8 +159,7 @@ unescape_md :: (fn(input: String) -> String)(
 normalize_reference :: (fn(input: String) -> String)(
   {
     (trimmed : String) = input.trim();
-    (re : Regex) = Regex.new(`\\s+`, `g`).unwrap();
-    (collapsed : String) = re.replace_all(trimmed, ` `);
+    (collapsed : String) = _normalize_ref_re.replace_all(trimmed, ` `);
     unicode_to_uppercase(unicode_to_lowercase(collapsed))
   }
 );

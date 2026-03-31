@@ -10,24 +10,25 @@ open import "std/string";
 { Token, StringPair } :: import "../token.yo";
 { validate_link, normalize_link, normalize_link_text } :: import "../common/link_utils.yo";
 
+// Cached regex patterns (compiled once at startup)
+_autolink_uri_re := Regex.new(`^([a-zA-Z][a-zA-Z0-9+.\\-]{1,31}):([^\\s<>]*)$`, ``).unwrap();
+_autolink_email_re := Regex.new(`^([a-zA-Z0-9.!#$%&'*+/=?^_\x60{|}~\\-]+@[a-zA-Z0-9](?:[a-zA-Z0-9\\-]{0,61}[a-zA-Z0-9])?(?:\\.[a-zA-Z0-9](?:[a-zA-Z0-9\\-]{0,61}[a-zA-Z0-9])?)*)$`, ``).unwrap();
+
 // Autolink URI pattern: <scheme:path>
-// Original uses \x00-\x20 to exclude control chars + space; we use \s and explicit control char check
-_is_autolink_uri :: (fn(url: String) -> bool)({
-  (re : Regex) = Regex.new(`^([a-zA-Z][a-zA-Z0-9+.\\-]{1,31}):([^\\s<>]*)$`, ``).unwrap();
-  match(re.exec(url),
+_is_autolink_uri :: (fn(url: String) -> bool)(
+  match(_autolink_uri_re.exec(url),
     .Some(_) => true,
     .None => false
   )
-});
+);
 
 // Email pattern
-_is_email :: (fn(url: String) -> bool)({
-  (re : Regex) = Regex.new(`^([a-zA-Z0-9.!#$%&'*+/=?^_\x60{|}~\\-]+@[a-zA-Z0-9](?:[a-zA-Z0-9\\-]{0,61}[a-zA-Z0-9])?(?:\\.[a-zA-Z0-9](?:[a-zA-Z0-9\\-]{0,61}[a-zA-Z0-9])?)*)$`, ``).unwrap();
-  match(re.exec(url),
+_is_email :: (fn(url: String) -> bool)(
+  match(_autolink_email_re.exec(url),
     .Some(_) => true,
     .None => false
   )
-});
+);
 
 // Helper to emit autolink tokens
 _emit_autolink :: (fn(state: *(StateInline), full_url: String, display_text: String) -> unit)({

@@ -10,26 +10,31 @@ open import "std/string";
 { Token } :: import "../token.yo";
 { HtmlRegexPatterns, html_re } :: import "../common/html_re.yo";
 
+// Cached regex patterns (compiled once at startup)
+_link_open_re := Regex.new(`^<a[>\\s]`, `i`).unwrap();
+_link_close_re := Regex.new(`^</a\\s*>`, `i`).unwrap();
+
 _is_letter :: (fn(ch: i32) -> bool)({
   (lc : i32) = (ch | i32(0x20));
   ((lc >= i32(0x61)) && (lc <= i32(0x7A)))
 });
 
-_is_link_open :: (fn(s: String) -> bool)({
-  (re : Regex) = Regex.new(`^<a[>\\s]`, `i`).unwrap();
-  match(re.exec(s.to_lowercase()),
+_is_link_open :: (fn(s: String) -> bool)(
+  match(_link_open_re.exec(s.to_lowercase()),
     .Some(_) => true,
     .None => false
   )
-});
+);
 
-_is_link_close :: (fn(s: String) -> bool)({
-  (re : Regex) = Regex.new(`^</a\\s*>`, `i`).unwrap();
-  match(re.exec(s.to_lowercase()),
+_is_link_close :: (fn(s: String) -> bool)(
+  match(_link_close_re.exec(s.to_lowercase()),
     .Some(_) => true,
     .None => false
   )
-});
+);
+
+// Cached HTML tag regex (compiled once at startup)
+_html_tag_re := Regex.new(html_re().HTML_TAG_RE_STR, ``).unwrap();
 
 html_inline :: (fn(state: *(StateInline), silent: bool) -> bool)({
   // HTML option must be enabled
@@ -54,10 +59,8 @@ html_inline :: (fn(state: *(StateInline), silent: bool) -> bool)({
   // Try to match HTML tag regex
   (remaining_bytes : ArrayList(u8)) = state.*._src_bytes.slice(usize(pos), usize(max)).unwrap();
   (remaining : String) = String.from_bytes(remaining_bytes);
-  (patterns : HtmlRegexPatterns) = html_re();
-  (re : Regex) = Regex.new(patterns.HTML_TAG_RE_STR, ``).unwrap();
 
-  match(re.exec(remaining),
+  match(_html_tag_re.exec(remaining),
     .Some(m) => {
       if(!(silent), {
         (tok : Token) = state_push(state, `html_inline`, ``, i32(0));
