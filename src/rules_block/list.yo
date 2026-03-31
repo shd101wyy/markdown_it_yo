@@ -4,7 +4,7 @@
 
 open import "std/string";
 { ArrayList } :: import "std/collections/array_list";
-{ Token, StringPair } :: import "../token.yo";
+{ Token, StringPair, TokenType, TT_PARAGRAPH_OPEN, TT_BULLET_LIST_OPEN, TT_BULLET_LIST_CLOSE, TT_ORDERED_LIST_OPEN, TT_ORDERED_LIST_CLOSE, TT_LIST_ITEM_OPEN, TT_LIST_ITEM_CLOSE } :: import "../token.yo";
 { StateBlock, BlockTokenizeFn, block_push_token } :: import "./state_block.yo";
 { is_space, byte_substring } :: import "../common/utils.yo";
 { fence } :: import "./fence.yo";
@@ -93,14 +93,12 @@ mark_tight_paragraphs :: (fn(state: *(StateBlock), idx: usize) -> unit)({
   (l : i32) = (i32(state.*.tokens.len()) - i32(2));
 
   while (i < l), {
-    (tok : Token) = state.*.tokens.get(usize(i)).unwrap();
-    if(((tok.level == level) && (tok.type_name == `paragraph_open`)), {
-      tok.hidden = true;
-      state.*.tokens.set(usize(i), tok);
+    (tok : *(Token)) = state.*.tokens.get_ptr(usize(i));
+    if(((tok.*.level == level) && (tok.*.type_name == TT_PARAGRAPH_OPEN)), {
+      tok.*.hidden = true;
 
-      (next : Token) = state.*.tokens.get(usize((i + i32(2)))).unwrap();
-      next.hidden = true;
-      state.*.tokens.set(usize((i + i32(2))), next);
+      (next : *(Token)) = state.*.tokens.get_ptr(usize((i + i32(2))));
+      next.*.hidden = true;
 
       i = (i + i32(2));
     });
@@ -196,7 +194,7 @@ list :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: bool) 
   (list_tok_idx : usize) = state.*.tokens.len();
 
   (list_tag : String) = cond(is_ordered => `ol`, true => `ul`);
-  (list_type_open : String) = cond(is_ordered => `ordered_list_open`, true => `bullet_list_open`);
+  (list_type_open : TokenType) = cond(is_ordered => TT_ORDERED_LIST_OPEN, true => TT_BULLET_LIST_OPEN);
 
   // Create list open token
   (list_open : Token) = Token.new(list_type_open, list_tag, i32(1));
@@ -263,7 +261,7 @@ list :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: bool) 
     (indent : i32) = (initial + indent_after_marker);
 
     // Run subparser & write tokens
-    (item_open : Token) = Token.new(`list_item_open`, `li`, i32(1));
+    (item_open : Token) = Token.new(TT_LIST_ITEM_OPEN, `li`, i32(1));
     item_open.block = true;
     item_open.markup = markup_str;
     (item_lines : ArrayList(i32)) = ArrayList(i32).new();
@@ -322,7 +320,7 @@ list :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: bool) 
     state.*.tight = old_tight;
 
     // Close list item
-    (item_close : Token) = Token.new(`list_item_close`, `li`, i32(-1));
+    (item_close : Token) = Token.new(TT_LIST_ITEM_CLOSE, `li`, i32(-1));
     item_close.block = true;
     item_close.markup = markup_str;
     block_push_token(state, item_close);
@@ -377,7 +375,7 @@ list :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: bool) 
   };
 
   // Close list
-  (list_type_close : String) = cond(is_ordered => `ordered_list_close`, true => `bullet_list_close`);
+  (list_type_close : TokenType) = cond(is_ordered => TT_ORDERED_LIST_CLOSE, true => TT_BULLET_LIST_CLOSE);
   (list_close : Token) = Token.new(list_type_close, list_tag, i32(-1));
   list_close.block = true;
   list_close.markup = markup_str;

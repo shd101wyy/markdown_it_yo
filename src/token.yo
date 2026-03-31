@@ -11,12 +11,59 @@ StringPair :: struct(
   value : String
 );
 
+// Token type constants — replaces string type_name for zero-allocation dispatch
+TokenType :: i32;
+TT_TEXT :: i32(0);
+TT_TEXT_SPECIAL :: i32(1);
+TT_SOFTBREAK :: i32(2);
+TT_HARDBREAK :: i32(3);
+TT_CODE_INLINE :: i32(4);
+TT_CODE_BLOCK :: i32(5);
+TT_FENCE :: i32(6);
+TT_HTML_INLINE :: i32(7);
+TT_HTML_BLOCK :: i32(8);
+TT_PARAGRAPH_OPEN :: i32(9);
+TT_PARAGRAPH_CLOSE :: i32(10);
+TT_HEADING_OPEN :: i32(11);
+TT_HEADING_CLOSE :: i32(12);
+TT_BLOCKQUOTE_OPEN :: i32(13);
+TT_BLOCKQUOTE_CLOSE :: i32(14);
+TT_HR :: i32(15);
+TT_BULLET_LIST_OPEN :: i32(16);
+TT_BULLET_LIST_CLOSE :: i32(17);
+TT_ORDERED_LIST_OPEN :: i32(18);
+TT_ORDERED_LIST_CLOSE :: i32(19);
+TT_LIST_ITEM_OPEN :: i32(20);
+TT_LIST_ITEM_CLOSE :: i32(21);
+TT_TABLE_OPEN :: i32(22);
+TT_TABLE_CLOSE :: i32(23);
+TT_THEAD_OPEN :: i32(24);
+TT_THEAD_CLOSE :: i32(25);
+TT_TBODY_OPEN :: i32(26);
+TT_TBODY_CLOSE :: i32(27);
+TT_TR_OPEN :: i32(28);
+TT_TR_CLOSE :: i32(29);
+TT_TH_OPEN :: i32(30);
+TT_TH_CLOSE :: i32(31);
+TT_TD_OPEN :: i32(32);
+TT_TD_CLOSE :: i32(33);
+TT_LINK_OPEN :: i32(34);
+TT_LINK_CLOSE :: i32(35);
+TT_IMAGE :: i32(36);
+TT_EM_OPEN :: i32(37);
+TT_EM_CLOSE :: i32(38);
+TT_STRONG_OPEN :: i32(39);
+TT_STRONG_CLOSE :: i32(40);
+TT_S_OPEN :: i32(41);
+TT_S_CLOSE :: i32(42);
+TT_INLINE :: i32(43);
+
 // Token class
 //
 // Represents a parsed markdown element (opening tag, closing tag, text, etc.)
 Token :: struct(
-  // Type of the token (string, e.g. "paragraph_open")
-  type_name : String,
+  // Type of the token (enum for fast dispatch)
+  type_name : TokenType,
 
   // HTML tag name, e.g. "p"
   tag : String,
@@ -63,7 +110,7 @@ Token :: struct(
 
 impl(Token,
   // Create new token and fill passed properties.
-  new : (fn(type_name: String, tag: String, nesting: i32) -> Self)(
+  new : (fn(type_name: TokenType, tag: String, nesting: i32) -> Self)(
     Self(
       type_name: type_name,
       tag: tag,
@@ -176,4 +223,23 @@ impl(Token,
   })
 );
 
-export Token, StringPair;
+export Token, TokenType,
+  TT_TEXT, TT_TEXT_SPECIAL, TT_SOFTBREAK, TT_HARDBREAK,
+  TT_CODE_INLINE, TT_CODE_BLOCK, TT_FENCE,
+  TT_HTML_INLINE, TT_HTML_BLOCK,
+  TT_PARAGRAPH_OPEN, TT_PARAGRAPH_CLOSE,
+  TT_HEADING_OPEN, TT_HEADING_CLOSE,
+  TT_BLOCKQUOTE_OPEN, TT_BLOCKQUOTE_CLOSE, TT_HR,
+  TT_BULLET_LIST_OPEN, TT_BULLET_LIST_CLOSE,
+  TT_ORDERED_LIST_OPEN, TT_ORDERED_LIST_CLOSE,
+  TT_LIST_ITEM_OPEN, TT_LIST_ITEM_CLOSE,
+  TT_TABLE_OPEN, TT_TABLE_CLOSE,
+  TT_THEAD_OPEN, TT_THEAD_CLOSE,
+  TT_TBODY_OPEN, TT_TBODY_CLOSE,
+  TT_TR_OPEN, TT_TR_CLOSE,
+  TT_TH_OPEN, TT_TH_CLOSE,
+  TT_TD_OPEN, TT_TD_CLOSE,
+  TT_LINK_OPEN, TT_LINK_CLOSE, TT_IMAGE,
+  TT_EM_OPEN, TT_EM_CLOSE, TT_STRONG_OPEN, TT_STRONG_CLOSE,
+  TT_S_OPEN, TT_S_CLOSE, TT_INLINE,
+  StringPair;

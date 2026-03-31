@@ -58,7 +58,7 @@ _try_get_next_line :: (fn(state: *(StateBlock), buf: *(String), str_max: *(i32),
   (line_pos : i32) = (state.*.b_marks.get(usize(next_line.*)).unwrap() + state.*.t_shift.get(usize(next_line.*)).unwrap());
   (line_max : i32) = state.*.e_marks.get(usize(next_line.*)).unwrap();
   (line_content : String) = byte_substring(state.*._src_bytes, line_pos, (line_max + i32(1)));
-  buf.* = `${buf.*}${line_content}`;
+  (&(buf.*)).push_string(line_content);
   str_max.* = i32(buf.*.as_bytes().len());
   next_line.* = (next_line.* + i32(1));
   true

@@ -4,7 +4,7 @@
 
 open import "std/string";
 { ArrayList } :: import "std/collections/array_list";
-{ Token } :: import "../token.yo";
+{ Token, TokenType, TT_HEADING_OPEN, TT_HEADING_CLOSE, TT_INLINE } :: import "../token.yo";
 { StateBlock, block_push_token } :: import "./state_block.yo";
 
 // Block rule function type: (state, start_line, end_line, silent) -> bool
@@ -105,7 +105,7 @@ lheading :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: bo
   });
 
   // heading_open
-  (token_o : Token) = Token.new(`heading_open`, h_tag, i32(1));
+  (token_o : Token) = Token.new(TT_HEADING_OPEN, h_tag, i32(1));
   token_o.markup = marker_str;
   token_o.block = true;
   (map_o : ArrayList(i32)) = ArrayList(i32).new();
@@ -115,7 +115,7 @@ lheading :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: bo
   block_push_token(state, token_o);
 
   // inline content
-  (token_i : Token) = Token.new(`inline`, ``, i32(0));
+  (token_i : Token) = Token.new(TT_INLINE, ``, i32(0));
   token_i.content = content;
   token_i.block = true;
   (map_i : ArrayList(i32)) = ArrayList(i32).new();
@@ -126,7 +126,7 @@ lheading :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: bo
   block_push_token(state, token_i);
 
   // heading_close
-  (token_c : Token) = Token.new(`heading_close`, h_tag, i32(-1));
+  (token_c : Token) = Token.new(TT_HEADING_CLOSE, h_tag, i32(-1));
   token_c.markup = marker_str;
   token_c.block = true;
   block_push_token(state, token_c);

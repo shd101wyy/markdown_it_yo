@@ -4,7 +4,7 @@
 
 open import "std/string";
 { ArrayList } :: import "std/collections/array_list";
-{ Token, StringPair } :: import "../token.yo";
+{ Token, StringPair, TokenType, TT_LINK_OPEN, TT_LINK_CLOSE } :: import "../token.yo";
 { StateInline } :: import "./state_inline.yo";
 { state_push } :: import "./inline_helpers.yo";
 { is_space, normalize_reference, byte_substring } :: import "../common/utils.yo";
@@ -128,7 +128,7 @@ link_rule :: (fn(state: *(StateInline), silent: bool) -> bool)({
     state.*.pos_max = label_end;
 
     // link_open
-    (token_o : Token) = state_push(state, `link_open`, `a`, i32(1));
+    (token_o : Token) = state_push(state, TT_LINK_OPEN, `a`, i32(1));
     (attrs : ArrayList(StringPair)) = ArrayList(StringPair).new();
     _ := attrs.push(StringPair(name: `href`, value: href));
     if((title.len() > usize(0)), {
@@ -146,7 +146,7 @@ link_rule :: (fn(state: *(StateInline), silent: bool) -> bool)({
     state.*.link_level = (state.*.link_level - i32(1));
 
     // link_close
-    _ := state_push(state, `link_close`, `a`, i32(-1));
+    _ := state_push(state, TT_LINK_CLOSE, `a`, i32(-1));
   });
 
   state.*.pos = pos;

@@ -32,14 +32,15 @@ escaped_split :: (fn(input: String) -> ArrayList(String))({
         // pipe separating cells
         (seg_bytes : ArrayList(u8)) = bytes.slice(usize(last_pos), usize(pos)).unwrap();
         (seg : String) = String.from_bytes(seg_bytes);
-        _ := result.push(`${current}${seg}`);
+        (&current).push_string(seg);
+        _ := result.push(current);
         current = ``;
         last_pos = (pos + i32(1));
       }, {
         // escaped pipe '\|'
         (seg_bytes : ArrayList(u8)) = bytes.slice(usize(last_pos), usize((pos - i32(1)))).unwrap();
         (seg : String) = String.from_bytes(seg_bytes);
-        current = `${current}${seg}`;
+        (&current).push_string(seg);
         last_pos = pos;
       });
     });
@@ -50,7 +51,8 @@ escaped_split :: (fn(input: String) -> ArrayList(String))({
 
   (tail_bytes : ArrayList(u8)) = bytes.slice(usize(last_pos), usize(max)).unwrap();
   (tail : String) = String.from_bytes(tail_bytes);
-  _ := result.push(`${current}${tail}`);
+  (&current).push_string(tail);
+  _ := result.push(current);
 
   result
 });

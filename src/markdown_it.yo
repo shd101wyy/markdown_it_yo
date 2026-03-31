@@ -12,7 +12,7 @@
 
 open import "std/string";
 { ArrayList } :: import "std/collections/array_list";
-{ Token } :: import "./token.yo";
+{ Token, TokenType, TT_INLINE } :: import "./token.yo";
 { Options, default_options } :: import "./options.yo";
 { StateCore, new_state_core } :: import "./rules_core/state_core.yo";
 { ParserBlock, new_parser_block } :: import "./parser_block.yo";
@@ -61,7 +61,7 @@ new_markdown_it_with_options :: (fn(opts: Options) -> MarkdownIt)(
 _core_block :: (fn(state: *(StateCore), block_parser: ParserBlock, html_enabled: bool, enable_table: bool) -> unit)({
   if((state.*.inline_mode), {
     // In inline mode, wrap entire source as a single inline token
-    (token : Token) = Token.new(`inline`, ``, i32(0));
+    (token : Token) = Token.new(TT_INLINE, ``, i32(0));
     token.content = state.*.src;
     token.children = .Some(ArrayList(Token).new());
     _ := state.*.tokens.push(token);
@@ -77,12 +77,11 @@ _core_inline :: (fn(state: *(StateCore), inline_parser: ParserInline, html_enabl
   (i : i32) = i32(0);
 
   while (i < len), {
-    (token : Token) = state.*.tokens.get(usize(i)).unwrap();
-    if((token.type_name == `inline`), {
+    (token : *(Token)) = state.*.tokens.get_ptr(usize(i));
+    if((token.*.type_name == TT_INLINE), {
       (children : ArrayList(Token)) = ArrayList(Token).new();
-      inline_parser.parse(token.content, state.*.env, children, html_enabled, enable_strikethrough);
-      token.children = .Some(children);
-      state.*.tokens.set(usize(i), token);
+      inline_parser.parse(token.*.content, state.*.env, children, html_enabled, enable_strikethrough);
+      token.*.children = .Some(children);
     });
     i = (i + i32(1));
   };

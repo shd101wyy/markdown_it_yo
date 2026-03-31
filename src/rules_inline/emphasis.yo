@@ -4,7 +4,7 @@
 
 open import "std/string";
 { ArrayList } :: import "std/collections/array_list";
-{ Token } :: import "../token.yo";
+{ Token, TokenType, TT_TEXT, TT_EM_OPEN, TT_EM_CLOSE, TT_STRONG_OPEN, TT_STRONG_CLOSE } :: import "../token.yo";
 { from_code_point } :: import "../common/char_utils.yo";
 { StateInline, Delimiter, TokenMeta, ScanDelimsResult } :: import "./state_inline.yo";
 { flush_pending, inline_push_token } :: import "./inline_helpers.yo";
@@ -27,7 +27,7 @@ emphasis_tokenize :: (fn(state: *(StateInline), silent: bool) -> bool)({
 
   (i : i32) = i32(0);
   while (i < scanned.length), {
-    (token : Token) = Token.new(`text`, ``, i32(0));
+    (token : Token) = Token.new(TT_TEXT, ``, i32(0));
     token.content = marker_str;
     token.level = state.*.level;
     inline_push_token(state, token);
@@ -78,34 +78,30 @@ _post_process_emphasis :: (fn(tokens: ArrayList(Token), delimiters: ArrayList(De
       (ch : String) = from_code_point(start_delim.marker);
 
       // Opening token
-      (token_o : Token) = tokens.get(usize(start_delim.token_idx)).unwrap();
-      token_o.type_name = cond(is_strong => `strong_open`, true => `em_open`);
-      token_o.tag = cond(is_strong => `strong`, true => `em`);
-      token_o.nesting = i32(1);
-      token_o.markup = cond(is_strong => `${ch}${ch}`, true => ch);
-      token_o.content = ``;
-      tokens.set(usize(start_delim.token_idx), token_o);
+      (token_o : *(Token)) = tokens.get_ptr(usize(start_delim.token_idx));
+      token_o.*.type_name = cond(is_strong => TT_STRONG_OPEN, true => TT_EM_OPEN);
+      token_o.*.tag = cond(is_strong => `strong`, true => `em`);
+      token_o.*.nesting = i32(1);
+      token_o.*.markup = cond(is_strong => `${ch}${ch}`, true => ch);
+      token_o.*.content = ``;
 
       // Closing token
-      (token_c : Token) = tokens.get(usize(end_delim.token_idx)).unwrap();
-      token_c.type_name = cond(is_strong => `strong_close`, true => `em_close`);
-      token_c.tag = cond(is_strong => `strong`, true => `em`);
-      token_c.nesting = i32(-1);
-      token_c.markup = cond(is_strong => `${ch}${ch}`, true => ch);
-      token_c.content = ``;
-      tokens.set(usize(end_delim.token_idx), token_c);
+      (token_c : *(Token)) = tokens.get_ptr(usize(end_delim.token_idx));
+      token_c.*.type_name = cond(is_strong => TT_STRONG_CLOSE, true => TT_EM_CLOSE);
+      token_c.*.tag = cond(is_strong => `strong`, true => `em`);
+      token_c.*.nesting = i32(-1);
+      token_c.*.markup = cond(is_strong => `${ch}${ch}`, true => ch);
+      token_c.*.content = ``;
 
       // If strong, clear inner delimiter tokens
       if(is_strong, {
         (prev_delim : Delimiter) = delimiters.get(usize((i - i32(1)))).unwrap();
-        (tok1 : Token) = tokens.get(usize(prev_delim.token_idx)).unwrap();
-        tok1.content = ``;
-        tokens.set(usize(prev_delim.token_idx), tok1);
+        (tok1 : *(Token)) = tokens.get_ptr(usize(prev_delim.token_idx));
+        tok1.*.content = ``;
 
         (next_end_delim : Delimiter) = delimiters.get(usize((start_delim.end + i32(1)))).unwrap();
-        (tok2 : Token) = tokens.get(usize(next_end_delim.token_idx)).unwrap();
-        tok2.content = ``;
-        tokens.set(usize(next_end_delim.token_idx), tok2);
+        (tok2 : *(Token)) = tokens.get_ptr(usize(next_end_delim.token_idx));
+        tok2.*.content = ``;
 
         i = (i - i32(1));
       });

@@ -5,7 +5,7 @@
 open import "std/string";
 { ArrayList } :: import "std/collections/array_list";
 { HashMap } :: import "std/collections/hash_map";
-{ Token } :: import "../token.yo";
+{ Token, TokenType, TT_TEXT } :: import "../token.yo";
 { is_white_space, is_punct_char, is_md_ascii_punct } :: import "../common/utils.yo";
 { is_valid_entity_code, from_code_point } :: import "../common/char_utils.yo";
 { Env } :: import "../env.yo";
@@ -111,7 +111,7 @@ impl(StateInline,
   // Flush pending text as a text token
   push_pending : (fn(self: Self) -> Token)({
     (token : Token) = Token(
-      type_name: `text`,
+      type_name: TT_TEXT,
       tag: ``,
       nesting: i32(0),
       attrs: .None,
@@ -130,7 +130,7 @@ impl(StateInline,
   }),
 
   // Push a new token to the stream. Flushes pending text first.
-  push : (fn(self: Self, type_name: String, tag: String, nesting: i32) -> Token)({
+  push : (fn(self: Self, type_name: TokenType, tag: String, nesting: i32) -> Token)({
     if((self.pending.len() > usize(0)), {
       _ := self.push_pending();
     });

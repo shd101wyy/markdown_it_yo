@@ -7,7 +7,7 @@ open import "std/string";
 { Regex } :: import "std/regex";
 { StateInline } :: import "./state_inline.yo";
 { state_push } :: import "./inline_helpers.yo";
-{ Token } :: import "../token.yo";
+{ Token, TokenType, TT_HTML_INLINE } :: import "../token.yo";
 { HtmlRegexPatterns, html_re } :: import "../common/html_re.yo";
 
 // Cached regex patterns (compiled once at startup)
@@ -63,7 +63,7 @@ html_inline :: (fn(state: *(StateInline), silent: bool) -> bool)({
   match(_html_tag_re.exec(remaining),
     .Some(m) => {
       if(!(silent), {
-        (tok : Token) = state_push(state, `html_inline`, ``, i32(0));
+        (tok : Token) = state_push(state, TT_HTML_INLINE, ``, i32(0));
         tok.content = m.value();
         state.*.tokens.set(usize((i32(state.*.tokens.len()) - i32(1))), tok);
 

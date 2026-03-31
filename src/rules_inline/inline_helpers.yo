@@ -3,7 +3,7 @@
 
 open import "std/string";
 { ArrayList } :: import "std/collections/array_list";
-{ Token } :: import "../token.yo";
+{ Token, TokenType, TT_TEXT } :: import "../token.yo";
 { StateInline, TokenMeta, Delimiter } :: import "./state_inline.yo";
 
 // Inline rule function signature
@@ -13,7 +13,7 @@ InlineRuleFn :: (fn(state: *(StateInline), silent: bool) -> bool);
 flush_pending :: (fn(state: *(StateInline)) -> unit)({
   if((state.*.pending.len() > usize(0)), {
     (token : Token) = Token(
-      type_name: `text`,
+      type_name: TT_TEXT,
       tag: ``,
       nesting: i32(0),
       attrs: .None,
@@ -45,7 +45,7 @@ inline_push_token :: (fn(state: *(StateInline), token: Token) -> unit)({
 // Push a new token to the inline state through a pointer.
 // Equivalent to StateInline.push but works through *(StateInline) to ensure
 // mutations to level, delimiters, pending, etc. are not lost.
-state_push :: (fn(state: *(StateInline), type_name: String, tag: String, nesting: i32) -> Token)({
+state_push :: (fn(state: *(StateInline), type_name: TokenType, tag: String, nesting: i32) -> Token)({
   flush_pending(state);
 
   (token : Token) = Token(

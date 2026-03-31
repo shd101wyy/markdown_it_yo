@@ -111,17 +111,29 @@ main :: (fn() -> unit)({
 
   argv := args();
 
+  // No arguments — show help
+  if((argv.len() <= usize(1)), {
+    _ := fputs(*(char)(*(u8)("markdown-it-yo — Markdown to HTML converter\n\nUsage:\n  markdown-it-yo [options] <file>   Render file to stdout\n  cat file.md | markdown-it-yo     Read from stdin\n\nOptions:\n  --html            Enable HTML tags in source\n  --typographer     Enable typographic replacements\n  --no-lang-prefix  Remove language prefix from fenced code blocks\n  --commonmark      Use CommonMark preset\n  -h, --help        Show this help\n")), stdout);
+    return ();
+  });
+
   // Parse flags
   (html_enabled : bool) = false;
   (typographer_enabled : bool) = false;
   (no_lang_prefix : bool) = false;
   (use_commonmark : bool) = false;
   (file_path : Option(String)) = .None;
+  (read_from_stdin : bool) = false;
 
   (ai : usize) = usize(1);
   while (ai < argv.len()), {
     (arg : String) = argv.get(ai).unwrap();
     cond(
+      ((arg == `--help`) || (arg == `-h`)) => {
+        _ := fputs(*(char)(*(u8)("markdown-it-yo — Markdown to HTML converter\n\nUsage:\n  markdown-it-yo [options] <file>   Render file to stdout\n  cat file.md | markdown-it-yo -   Read from stdin\n\nOptions:\n  --html            Enable HTML tags in source\n  --typographer     Enable typographic replacements\n  --no-lang-prefix  Remove language prefix from fenced code blocks\n  --commonmark      Use CommonMark preset\n  -h, --help        Show this help\n")), stdout);
+        return ();
+      },
+      (arg == `-`) => { read_from_stdin = true; },
       (arg == `--html`) => { html_enabled = true; },
       (arg == `--typographer`) => { typographer_enabled = true; },
       (arg == `--no-lang-prefix`) => { no_lang_prefix = true; },
@@ -159,15 +171,19 @@ main :: (fn() -> unit)({
       );
     },
     .None => {
-      content := _read_stdin();
-      result := md.render_src(content);
-      cstr := result.to_cstr();
-      match(cstr.ptr(),
-        .Some(p) => {
-          _ := fputs(*(char)(p), stdout);
-        },
-        .None => ()
-      );
+      if(read_from_stdin, {
+        content := _read_stdin();
+        result := md.render_src(content);
+        cstr := result.to_cstr();
+        match(cstr.ptr(),
+          .Some(p) => {
+            _ := fputs(*(char)(p), stdout);
+          },
+          .None => ()
+        );
+      }, {
+        _ := fputs(*(char)(*(u8)("Error: no input file specified. Use -h for help.\n")), stderr);
+      });
     }
   );
 });

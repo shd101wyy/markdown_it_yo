@@ -5,7 +5,7 @@
 
 open import "std/string";
 { ArrayList } :: import "std/collections/array_list";
-{ Token } :: import "../token.yo";
+{ Token, TokenType, TT_TEXT } :: import "../token.yo";
 { StateInline } :: import "./state_inline.yo";
 
 fragments_join :: (fn(state: *(StateInline)) -> unit)({
@@ -17,33 +17,31 @@ fragments_join :: (fn(state: *(StateInline)) -> unit)({
   (last : i32) = i32(0);
 
   while (curr < max), {
-    (tok : Token) = tokens.get(usize(curr)).unwrap();
+    (tok : *(Token)) = tokens.get_ptr(usize(curr));
 
     // re-calculate levels
-    if((tok.nesting < i32(0)), {
+    if((tok.*.nesting < i32(0)), {
       level = (level - i32(1));
     });
-    tok.level = level;
-    tokens.set(usize(curr), tok);
-    if((tok.nesting > i32(0)), {
+    tok.*.level = level;
+    if((tok.*.nesting > i32(0)), {
       level = (level + i32(1));
     });
 
-    if(((tok.type_name == `text`) && ((curr + i32(1)) < max)), {
-      (next_tok : Token) = tokens.get(usize((curr + i32(1)))).unwrap();
-      if((next_tok.type_name == `text`), {
+    if(((tok.*.type_name == TT_TEXT) && ((curr + i32(1)) < max)), {
+      (next_tok : *(Token)) = tokens.get_ptr(usize((curr + i32(1))));
+      if((next_tok.*.type_name == TT_TEXT), {
         // collapse two adjacent text nodes
-        next_tok.content = `${tok.content}${next_tok.content}`;
-        tokens.set(usize((curr + i32(1))), next_tok);
+        next_tok.*.content = `${tok.*.content}${next_tok.*.content}`;
       }, {
         if((curr != last), {
-          tokens.set(usize(last), tok);
+          tokens.set(usize(last), tok.*);
         });
         last = (last + i32(1));
       });
     }, {
       if((curr != last), {
-        tokens.set(usize(last), tok);
+        tokens.set(usize(last), tok.*);
       });
       last = (last + i32(1));
     });

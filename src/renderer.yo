@@ -4,7 +4,7 @@
 
 open import "std/string";
 { ArrayList } :: import "std/collections/array_list";
-{ Token, StringPair } :: import "./token.yo";
+{ Token, TokenType, StringPair, TT_TEXT, TT_TEXT_SPECIAL, TT_SOFTBREAK, TT_HARDBREAK, TT_CODE_INLINE, TT_CODE_BLOCK, TT_FENCE, TT_HTML_INLINE, TT_HTML_BLOCK, TT_IMAGE, TT_INLINE } :: import "./token.yo";
 { Options } :: import "./options.yo";
 { escape_html, unescape_all, is_white_space, byte_substring } :: import "./common/utils.yo";
 
@@ -33,51 +33,51 @@ render_attrs :: (fn(token: Token) -> String)(
 // Render a single token (open or close tag) as HTML.
 // Handles self-closing tags (nesting == -1 with xhtml), and block-level newlines.
 render_token :: (fn(tokens: ArrayList(Token), idx: i32, options: *(Options)) -> String)({
-  (token : Token) = tokens.get(usize(idx)).unwrap();
+  (token : *(Token)) = tokens.get_ptr(usize(idx));
   (result : String) = ``;
 
   // Tight list paragraphs: hide open/close tags
-  if(token.hidden, {
+  if(token.*.hidden, {
     return ``;
   });
 
   // Insert a newline before this tag if prev token was hidden
-  if(((((token.block) && (token.nesting != i32(-1))) && (idx > i32(0)))), {
-    (prev : Token) = tokens.get(usize((idx - i32(1)))).unwrap();
-    if(prev.hidden, {
+  if(((((token.*.block) && (token.*.nesting != i32(-1))) && (idx > i32(0)))), {
+    (prev : *(Token)) = tokens.get_ptr(usize((idx - i32(1))));
+    if(prev.*.hidden, {
       (&result).push_string(`\n`);
     });
   });
 
   // Build tag
-  if((token.nesting == i32(-1)), {
-    (&result).push_string(`</${token.tag}`);
+  if((token.*.nesting == i32(-1)), {
+    (&result).push_string(`</${token.*.tag}`);
   }, {
-    (&result).push_string(`<${token.tag}`);
+    (&result).push_string(`<${token.*.tag}`);
   });
 
   // Render attributes
-  (&result).push_string(render_attrs(token));
+  (&result).push_string(render_attrs(token.*));
 
   // Self-closing tag
-  if(((token.nesting == i32(0)) && options.*.xhtml_out), {
+  if(((token.*.nesting == i32(0)) && options.*.xhtml_out), {
     (&result).push_string(` /`);
   });
 
   (&result).push_string(`>`);
 
   // Add newline after block-level tags
-  if(token.block, {
+  if(token.*.block, {
     (need_lf : bool) = true;
     // Suppress newline after opening tag if next token is inline or hidden
-    if((token.nesting == i32(1)), {
+    if((token.*.nesting == i32(1)), {
       if(((idx + i32(1)) < i32(tokens.len())), {
-        (next_token : Token) = tokens.get(usize((idx + i32(1)))).unwrap();
-        if(((next_token.type_name == `inline`) || next_token.hidden), {
+        (next_token : *(Token)) = tokens.get_ptr(usize((idx + i32(1))));
+        if(((next_token.*.type_name == TT_INLINE) || next_token.*.hidden), {
           need_lf = false;
         }, {
           // Opening + closing tag of same type, e.g. <li></li>
-          if(((next_token.nesting == i32(-1)) && (next_token.tag == token.tag)), {
+          if(((next_token.*.nesting == i32(-1)) && (next_token.*.tag == token.*.tag)), {
             need_lf = false;
           });
         });
@@ -96,19 +96,19 @@ render_token :: (fn(tokens: ArrayList(Token), idx: i32, options: *(Options)) -> 
 // ============================================================================
 
 _render_code_inline :: (fn(tokens: ArrayList(Token), idx: i32, options: *(Options)) -> String)({
-  (token : Token) = tokens.get(usize(idx)).unwrap();
-  `<code${render_attrs(token)}>${escape_html(token.content)}</code>`
+  (token : *(Token)) = tokens.get_ptr(usize(idx));
+  `<code${render_attrs(token.*)}>${escape_html(token.*.content)}</code>`
 });
 
 _render_code_block :: (fn(tokens: ArrayList(Token), idx: i32, options: *(Options)) -> String)({
-  (token : Token) = tokens.get(usize(idx)).unwrap();
-  `<pre${render_attrs(token)}><code>${escape_html(token.content)}</code></pre>\n`
+  (token : *(Token)) = tokens.get_ptr(usize(idx));
+  `<pre${render_attrs(token.*)}><code>${escape_html(token.*.content)}</code></pre>\n`
 });
 
 _render_fence :: (fn(tokens: ArrayList(Token), idx: i32, options: *(Options)) -> String)({
-  (token : Token) = tokens.get(usize(idx)).unwrap();
+  (token : *(Token)) = tokens.get_ptr(usize(idx));
   (info : String) = cond(
-    (token.info.len() > usize(0)) => unescape_all(token.info).trim(),
+    (token.*.info.len() > usize(0)) => unescape_all(token.*.info).trim(),
     true => ``
   );
 
@@ -135,14 +135,14 @@ _render_fence :: (fn(tokens: ArrayList(Token), idx: i32, options: *(Options)) ->
   });
 
   // TODO: highlight callback support
-  (highlighted : String) = escape_html(token.content);
+  (highlighted : String) = escape_html(token.*.content);
 
   if((lang_name.len() > usize(0)), {
     // Add language class
     (lang_class : String) = `${options.*.lang_prefix}${escape_html(lang_name)}`;
-    `<pre><code class="${lang_class}"${render_attrs(token)}>${highlighted}</code></pre>\n`
+    `<pre><code class="${lang_class}"${render_attrs(token.*)}>${highlighted}</code></pre>\n`
   }, {
-    `<pre><code${render_attrs(token)}>${highlighted}</code></pre>\n`
+    `<pre><code${render_attrs(token.*)}>${highlighted}</code></pre>\n`
   })
 });
 
@@ -152,22 +152,22 @@ render_inline_as_text :: (fn(tokens: ArrayList(Token)) -> String)({
   (result : String) = ``;
   (i : i32) = i32(0);
   while (i < i32(tokens.len())), {
-    (tok : Token) = tokens.get(usize(i)).unwrap();
-    (tn : String) = tok.type_name;
+    (tok : *(Token)) = tokens.get_ptr(usize(i));
+    (tn : TokenType) = tok.*.type_name;
     cond(
-      (tn == `text`) => { (&result).push_string(tok.content); },
-      (tn == `image`) => {
-        match(tok.children,
+      (tn == TT_TEXT) => { (&result).push_string(tok.*.content); },
+      (tn == TT_IMAGE) => {
+        match(tok.*.children,
           .Some(children) => {
             (&result).push_string(recur(children));
           },
           .None => ()
         );
       },
-      ((tn == `html_inline`) || (tn == `html_block`)) => {
-        (&result).push_string(tok.content);
+      ((tn == TT_HTML_INLINE) || (tn == TT_HTML_BLOCK)) => {
+        (&result).push_string(tok.*.content);
       },
-      ((tn == `softbreak`) || (tn == `hardbreak`)) => {
+      ((tn == TT_SOFTBREAK) || (tn == TT_HARDBREAK)) => {
         (&result).push_string(`\n`);
       },
       true => ()
@@ -178,15 +178,15 @@ render_inline_as_text :: (fn(tokens: ArrayList(Token)) -> String)({
 });
 
 _render_image :: (fn(tokens: ArrayList(Token), idx: i32, options: *(Options)) -> String)({
-  (token : Token) = tokens.get(usize(idx)).unwrap();
+  (token : *(Token)) = tokens.get_ptr(usize(idx));
   // Alt text: strip markdown from children (render_inline_as_text)
   // render_token will escape_html the attribute value
-  (alt_text : String) = match(token.children,
+  (alt_text : String) = match(token.*.children,
     .Some(children) => render_inline_as_text(children),
-    .None => token.content
+    .None => token.*.content
   );
   // Find and update the alt attribute
-  match(token.attrs,
+  match(token.*.attrs,
     .Some(attrs) => {
       (ai : i32) = i32(0);
       while (ai < i32(attrs.len())), {
@@ -200,7 +200,7 @@ _render_image :: (fn(tokens: ArrayList(Token), idx: i32, options: *(Options)) ->
     .None => ()
   );
   // Update token in the list then render via render_token
-  tokens.set(usize(idx), token);
+  tokens.set(usize(idx), token.*);
   render_token(tokens, idx, options)
 });
 
@@ -239,20 +239,20 @@ _render_html_inline :: (fn(token: Token) -> String)(
 
 // Render a single token to HTML (dispatches by type).
 _render_one_token :: (fn(tokens: ArrayList(Token), idx: i32, options: *(Options)) -> String)({
-  (token : Token) = tokens.get(usize(idx)).unwrap();
-  (type_name : String) = token.type_name;
+  (token : *(Token)) = tokens.get_ptr(usize(idx));
+  (type_name : TokenType) = token.*.type_name;
 
   cond(
-    (type_name == `code_inline`) => _render_code_inline(tokens, idx, options),
-    (type_name == `code_block`) => _render_code_block(tokens, idx, options),
-    (type_name == `fence`) => _render_fence(tokens, idx, options),
-    (type_name == `image`) => _render_image(tokens, idx, options),
-    (type_name == `hardbreak`) => _render_hardbreak(options),
-    (type_name == `softbreak`) => _render_softbreak(options),
-    (type_name == `text`) => _render_text(token),
-    (type_name == `text_special`) => _render_text(token),
-    (type_name == `html_block`) => _render_html_block(token),
-    (type_name == `html_inline`) => _render_html_inline(token),
+    (type_name == TT_CODE_INLINE) => _render_code_inline(tokens, idx, options),
+    (type_name == TT_CODE_BLOCK) => _render_code_block(tokens, idx, options),
+    (type_name == TT_FENCE) => _render_fence(tokens, idx, options),
+    (type_name == TT_IMAGE) => _render_image(tokens, idx, options),
+    (type_name == TT_HARDBREAK) => _render_hardbreak(options),
+    (type_name == TT_SOFTBREAK) => _render_softbreak(options),
+    (type_name == TT_TEXT) => _render_text(token.*),
+    (type_name == TT_TEXT_SPECIAL) => _render_text(token.*),
+    (type_name == TT_HTML_BLOCK) => _render_html_block(token.*),
+    (type_name == TT_HTML_INLINE) => _render_html_inline(token.*),
     true => render_token(tokens, idx, options)
   )
 });
@@ -264,7 +264,7 @@ render_inline :: (fn(tokens: ArrayList(Token), options: *(Options)) -> String)({
   (i : i32) = i32(0);
 
   while (i < len), {
-    (token : Token) = tokens.get(usize(i)).unwrap();
+    (token : *(Token)) = tokens.get_ptr(usize(i));
     (&result).push_string(_render_one_token(tokens, i, options));
     i = (i + i32(1));
   };
@@ -279,12 +279,12 @@ render :: (fn(tokens: ArrayList(Token), options: *(Options)) -> String)({
   (i : i32) = i32(0);
 
   while (i < len), {
-    (token : Token) = tokens.get(usize(i)).unwrap();
-    (type_name : String) = token.type_name;
+    (token : *(Token)) = tokens.get_ptr(usize(i));
+    (type_name : TokenType) = token.*.type_name;
 
-    if((type_name == `inline`), {
+    if((type_name == TT_INLINE), {
       // Render inline children
-      match(token.children,
+      match(token.*.children,
         .Some(children) => {
           (&result).push_string(render_inline(children, options));
         },

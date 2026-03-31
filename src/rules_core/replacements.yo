@@ -7,7 +7,7 @@
 
 open import "std/string";
 { ArrayList } :: import "std/collections/array_list";
-{ Token } :: import "../token.yo";
+{ Token, TokenType, TT_TEXT, TT_LINK_OPEN, TT_LINK_CLOSE, TT_INLINE } :: import "../token.yo";
 { from_code_point } :: import "../common/char_utils.yo";
 { StateCore } :: import "./state_core.yo";
 
@@ -71,12 +71,12 @@ _collapse_dots :: (fn(content: String) -> String)({
         i = (i + usize(1));
       };
       if(((i - run_start) >= usize(2)), {
-        result = `${result}${ellipsis}`;
+        (&result).push_string(ellipsis);
       }, {
-        result = `${result}.`;
+        _ := (&result)._bytes.push(u8('.'));
       });
     }, {
-      result = `${result}${ch}`;
+      (&result).push_string(`${ch}`);
       i = (i + usize(1));
     });
   };
@@ -93,21 +93,24 @@ _collapse_excl_question :: (fn(content: String) -> String)({
     if(((ch == rune(u32('?'))) || (ch == rune(u32('!')))), {
       (run_start : usize) = i;
       (run_char : rune) = ch;
+      (run_byte : u8) = u8(run_char.to_u32());
       while ((i < len) && (content.at(i).unwrap() == run_char)), {
         i = (i + usize(1));
       };
       (run_len : usize) = (i - run_start);
       if((run_len >= usize(4)), {
-        result = `${result}${run_char}${run_char}${run_char}`;
+        _ := (&result)._bytes.push(run_byte);
+        _ := (&result)._bytes.push(run_byte);
+        _ := (&result)._bytes.push(run_byte);
       }, {
         (j : usize) = usize(0);
         while (j < run_len), {
-          result = `${result}${run_char}`;
+          _ := (&result)._bytes.push(run_byte);
           j = (j + usize(1));
         };
       });
     }, {
-      result = `${result}${ch}`;
+      (&result).push_string(`${ch}`);
       i = (i + usize(1));
     });
   };
@@ -125,9 +128,9 @@ _collapse_commas :: (fn(content: String) -> String)({
       while ((i < len) && (content.at(i).unwrap() == rune(u32(',')))), {
         i = (i + usize(1));
       };
-      result = `${result},`;
+      _ := (&result)._bytes.push(u8(','));
     }, {
-      result = `${result}${ch}`;
+      (&result).push_string(`${ch}`);
       i = (i + usize(1));
     });
   };
@@ -177,9 +180,9 @@ _replace_dashes :: (fn(content: String) -> String)({
             .Some(n) => (n != rune(u32('-')))
           );
           if((prev_ok && next_ok), {
-            result = `${result}${em_dash}`;
+            (&result).push_string(em_dash);
           }, {
-            result = `${result}---`;
+            (&result).push_string(`---`);
           });
         },
 
@@ -217,9 +220,9 @@ _replace_dashes :: (fn(content: String) -> String)({
           ));
 
           if(((prev_ws && next_ws) || (prev_nds && next_nds)), {
-            result = `${result}${en_dash}`;
+            (&result).push_string(en_dash);
           }, {
-            result = `${result}--`;
+            (&result).push_string(`--`);
           });
         },
 
@@ -227,13 +230,13 @@ _replace_dashes :: (fn(content: String) -> String)({
           // 1 or 4+ dashes: emit literally
           (d : usize) = usize(0);
           while (d < dash_count), {
-            result = `${result}-`;
+            _ := (&result)._bytes.push(u8('-'));
             d = (d + usize(1));
           };
         }
       );
     }, {
-      result = `${result}${ch}`;
+      (&result).push_string(`${ch}`);
       i = (i + usize(1));
     });
   };
@@ -267,15 +270,14 @@ _replace_scoped :: (fn(inline_tokens: ArrayList(Token)) -> unit)({
   (inside_autolink : i32) = i32(0);
   (i : i32) = (i32(inline_tokens.len()) - i32(1));
   while (i >= i32(0)), {
-    (token : Token) = inline_tokens.get(usize(i)).unwrap();
-    if(((token.type_name == `text`) && (inside_autolink == i32(0))), {
-      token.content = _replace_scoped_abbrs(token.content);
-      inline_tokens.set(usize(i), token);
+    (token : *(Token)) = inline_tokens.get_ptr(usize(i));
+    if(((token.*.type_name == TT_TEXT) && (inside_autolink == i32(0))), {
+      token.*.content = _replace_scoped_abbrs(token.*.content);
     });
-    if(((token.type_name == `link_open`) && (token.info == `auto`)), {
+    if(((token.*.type_name == TT_LINK_OPEN) && (token.*.info == `auto`)), {
       inside_autolink = (inside_autolink - i32(1));
     });
-    if(((token.type_name == `link_close`) && (token.info == `auto`)), {
+    if(((token.*.type_name == TT_LINK_CLOSE) && (token.*.info == `auto`)), {
       inside_autolink = (inside_autolink + i32(1));
     });
     i = (i - i32(1));
@@ -288,17 +290,16 @@ _replace_rare_tokens :: (fn(inline_tokens: ArrayList(Token)) -> unit)({
   (inside_autolink : i32) = i32(0);
   (i : i32) = (i32(inline_tokens.len()) - i32(1));
   while (i >= i32(0)), {
-    (token : Token) = inline_tokens.get(usize(i)).unwrap();
-    if(((token.type_name == `text`) && (inside_autolink == i32(0))), {
-      if(_has_rare_chars(token.content), {
-        token.content = _replace_rare(token.content);
-        inline_tokens.set(usize(i), token);
+    (token : *(Token)) = inline_tokens.get_ptr(usize(i));
+    if(((token.*.type_name == TT_TEXT) && (inside_autolink == i32(0))), {
+      if(_has_rare_chars(token.*.content), {
+        token.*.content = _replace_rare(token.*.content);
       });
     });
-    if(((token.type_name == `link_open`) && (token.info == `auto`)), {
+    if(((token.*.type_name == TT_LINK_OPEN) && (token.*.info == `auto`)), {
       inside_autolink = (inside_autolink - i32(1));
     });
-    if(((token.type_name == `link_close`) && (token.info == `auto`)), {
+    if(((token.*.type_name == TT_LINK_CLOSE) && (token.*.info == `auto`)), {
       inside_autolink = (inside_autolink + i32(1));
     });
     i = (i - i32(1));
@@ -310,14 +311,14 @@ replacements :: (fn(state: *(StateCore)) -> unit)({
   (block_tokens : ArrayList(Token)) = state.*.tokens;
   (blk_idx : i32) = (i32(block_tokens.len()) - i32(1));
   while (blk_idx >= i32(0)), {
-    (block_tok : Token) = block_tokens.get(usize(blk_idx)).unwrap();
-    if((block_tok.type_name == `inline`), {
-      match(block_tok.children,
+    (block_tok : *(Token)) = block_tokens.get_ptr(usize(blk_idx));
+    if((block_tok.*.type_name == TT_INLINE), {
+      match(block_tok.*.children,
         .Some(children) => {
-          if(_has_scoped_abbr(block_tok.content), {
+          if(_has_scoped_abbr(block_tok.*.content), {
             _replace_scoped(children);
           });
-          if(_has_rare_chars(block_tok.content), {
+          if(_has_rare_chars(block_tok.*.content), {
             _replace_rare_tokens(children);
           });
         },

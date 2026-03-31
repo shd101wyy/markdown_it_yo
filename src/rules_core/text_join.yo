@@ -6,7 +6,7 @@
 
 open import "std/string";
 { ArrayList } :: import "std/collections/array_list";
-{ Token } :: import "../token.yo";
+{ Token, TokenType, TT_TEXT, TT_TEXT_SPECIAL, TT_INLINE } :: import "../token.yo";
 { StateCore } :: import "./state_core.yo";
 
 text_join :: (fn(state: *(StateCore)) -> unit)({
@@ -15,20 +15,19 @@ text_join :: (fn(state: *(StateCore)) -> unit)({
 
   (j : i32) = i32(0);
   while (j < l), {
-    (block_tok : Token) = block_tokens.get(usize(j)).unwrap();
+    (block_tok : *(Token)) = block_tokens.get_ptr(usize(j));
 
-    if((block_tok.type_name == `inline`), {
-      match(block_tok.children,
+    if((block_tok.*.type_name == TT_INLINE), {
+      match(block_tok.*.children,
         .Some(tokens) => {
           (max : i32) = i32(tokens.len());
 
           // First pass: rename text_special → text
           (curr : i32) = i32(0);
           while (curr < max), {
-            (tok : Token) = tokens.get(usize(curr)).unwrap();
-            if((tok.type_name == `text_special`), {
-              tok.type_name = `text`;
-              tokens.set(usize(curr), tok);
+            (tok : *(Token)) = tokens.get_ptr(usize(curr));
+            if((tok.*.type_name == TT_TEXT_SPECIAL), {
+              tok.*.type_name = TT_TEXT;
             });
             curr = (curr + i32(1));
           };
@@ -37,16 +36,17 @@ text_join :: (fn(state: *(StateCore)) -> unit)({
           curr = i32(0);
           (last : i32) = i32(0);
           while (curr < max), {
-            (tok : Token) = tokens.get(usize(curr)).unwrap();
-            if((((tok.type_name == `text`) && ((curr + i32(1)) < max))
-                && (tokens.get(usize((curr + i32(1)))).unwrap().type_name == `text`)), {
+            (tok : *(Token)) = tokens.get_ptr(usize(curr));
+            if((((tok.*.type_name == TT_TEXT) && ((curr + i32(1)) < max))
+                && (tokens.get_ptr(usize((curr + i32(1)))).*.type_name == TT_TEXT)), {
               // Collapse two adjacent text nodes
-              (next_tok : Token) = tokens.get(usize((curr + i32(1)))).unwrap();
-              next_tok.content = `${tok.content}${next_tok.content}`;
-              tokens.set(usize((curr + i32(1))), next_tok);
+              (next_tok : *(Token)) = tokens.get_ptr(usize((curr + i32(1))));
+              (merged : String) = tok.*.content;
+              (&merged).push_string(next_tok.*.content);
+              next_tok.*.content = merged;
             }, {
               if((curr != last), {
-                tokens.set(usize(last), tok);
+                tokens.set(usize(last), tok.*);
               });
               last = (last + i32(1));
             });

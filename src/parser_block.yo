@@ -23,45 +23,83 @@ open import "std/string";
 { Env } :: import "./env.yo";
 
 // Wrapper: adapts table to BlockRuleFn signature for use as paragraph terminator.
+(_empty_rule_list : ArrayList(BlockRuleFn)) = ArrayList(BlockRuleFn).new();
 _table_as_terminator :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: bool) -> bool)({
-  (empty : ArrayList(BlockRuleFn)) = ArrayList(BlockRuleFn).new();
-  table(state, start_line, end_line, silent, (&empty))
+  table(state, start_line, end_line, silent, (&_empty_rule_list))
+});
+
+// Pre-built terminator lists — created once in _init_terminators, reused every _block_tokenize call.
+(_para_terminators : ArrayList(BlockRuleFn)) = ArrayList(BlockRuleFn).new();
+(_ref_terminators : ArrayList(BlockRuleFn)) = ArrayList(BlockRuleFn).new();
+(_block_terminators : ArrayList(BlockRuleFn)) = ArrayList(BlockRuleFn).new();
+(_para_terminators_no_table : ArrayList(BlockRuleFn)) = ArrayList(BlockRuleFn).new();
+(_ref_terminators_no_table : ArrayList(BlockRuleFn)) = ArrayList(BlockRuleFn).new();
+(_terminators_initialized : bool) = false;
+
+_init_terminators :: (fn() -> unit)({
+  if(_terminators_initialized, { return (); });
+  _terminators_initialized = true;
+
+  // Para terminators with table
+  _para_terminators = ArrayList(BlockRuleFn).new();
+  _ := _para_terminators.push(_table_as_terminator);
+  _ := _para_terminators.push(fence);
+  _ := _para_terminators.push(blockquote);
+  _ := _para_terminators.push(hr);
+  _ := _para_terminators.push(list);
+  _ := _para_terminators.push(html_block);
+  _ := _para_terminators.push(heading);
+
+  // Para terminators without table
+  _para_terminators_no_table = ArrayList(BlockRuleFn).new();
+  _ := _para_terminators_no_table.push(fence);
+  _ := _para_terminators_no_table.push(blockquote);
+  _ := _para_terminators_no_table.push(hr);
+  _ := _para_terminators_no_table.push(list);
+  _ := _para_terminators_no_table.push(html_block);
+  _ := _para_terminators_no_table.push(heading);
+
+  // Ref terminators with table
+  _ref_terminators = ArrayList(BlockRuleFn).new();
+  _ := _ref_terminators.push(_table_as_terminator);
+  _ := _ref_terminators.push(fence);
+  _ := _ref_terminators.push(blockquote);
+  _ := _ref_terminators.push(hr);
+  _ := _ref_terminators.push(list);
+  _ := _ref_terminators.push(html_block);
+  _ := _ref_terminators.push(heading);
+
+  // Ref terminators without table
+  _ref_terminators_no_table = ArrayList(BlockRuleFn).new();
+  _ := _ref_terminators_no_table.push(fence);
+  _ := _ref_terminators_no_table.push(blockquote);
+  _ := _ref_terminators_no_table.push(hr);
+  _ := _ref_terminators_no_table.push(list);
+  _ := _ref_terminators_no_table.push(html_block);
+  _ := _ref_terminators_no_table.push(heading);
+
+  // Block terminators (no table variant needed)
+  _block_terminators = ArrayList(BlockRuleFn).new();
+  _ := _block_terminators.push(code);
+  _ := _block_terminators.push(fence);
+  _ := _block_terminators.push(blockquote);
+  _ := _block_terminators.push(hr);
+  _ := _block_terminators.push(html_block);
+  _ := _block_terminators.push(heading);
 });
 
 // Standalone block tokenizer — dispatches to block rules in order.
-// Stored as a function pointer in StateBlock._tokenize_fn so that
-// rules like blockquote can recursively tokenize nested content
-// without creating circular import dependencies.
 _block_tokenize :: (fn(state: *(StateBlock), start_line: i32, end_line: i32) -> unit)({
-  // Build paragraph terminator list (rules that can interrupt paragraphs)
-  (para_terminators : ArrayList(BlockRuleFn)) = ArrayList(BlockRuleFn).new();
-  if(state.*.enable_table, { _ := para_terminators.push(_table_as_terminator); });
-  _ := para_terminators.push(fence);
-  _ := para_terminators.push(blockquote);
-  _ := para_terminators.push(hr);
-  _ := para_terminators.push(list);
-  _ := para_terminators.push(html_block);
-  _ := para_terminators.push(heading);
+  _init_terminators();
 
-  // Build reference terminator list (rules that can interrupt references)
-  // Matches JS: table, fence, blockquote, hr, list, html_block, heading
-  (ref_terminators : ArrayList(BlockRuleFn)) = ArrayList(BlockRuleFn).new();
-  if(state.*.enable_table, { _ := ref_terminators.push(_table_as_terminator); });
-  _ := ref_terminators.push(fence);
-  _ := ref_terminators.push(blockquote);
-  _ := ref_terminators.push(hr);
-  _ := ref_terminators.push(list);
-  _ := ref_terminators.push(html_block);
-  _ := ref_terminators.push(heading);
-
-  // Build table terminator list
-  (block_terminators : ArrayList(BlockRuleFn)) = ArrayList(BlockRuleFn).new();
-  _ := block_terminators.push(code);
-  _ := block_terminators.push(fence);
-  _ := block_terminators.push(blockquote);
-  _ := block_terminators.push(hr);
-  _ := block_terminators.push(html_block);
-  _ := block_terminators.push(heading);
+  (pt : *(ArrayList(BlockRuleFn))) = cond(
+    state.*.enable_table => (&_para_terminators),
+    true => (&_para_terminators_no_table)
+  );
+  (rt : *(ArrayList(BlockRuleFn))) = cond(
+    state.*.enable_table => (&_ref_terminators),
+    true => (&_ref_terminators_no_table)
+  );
 
   (line : i32) = start_line;
   (max_nesting : i32) = i32(100);
@@ -86,17 +124,17 @@ _block_tokenize :: (fn(state: *(StateBlock), start_line: i32, end_line: i32) -> 
 
     // Try rules in order (same order as markdown-it default preset)
     (ok : bool) = false;
-    if((!(ok) && state.*.enable_table), { ok = table(state, line, end_line, false, (&block_terminators)); });
+    if((!(ok) && state.*.enable_table), { ok = table(state, line, end_line, false, (&_block_terminators)); });
     if(!(ok), { ok = code(state, line, end_line, false); });
     if(!(ok), { ok = fence(state, line, end_line, false); });
     if(!(ok), { ok = blockquote(state, line, end_line, false); });
     if(!(ok), { ok = hr(state, line, end_line, false); });
     if(!(ok), { ok = list(state, line, end_line, false); });
-    if(!(ok), { ok = reference(state, line, end_line, false, (&ref_terminators)); });
+    if(!(ok), { ok = reference(state, line, end_line, false, rt); });
     if(!(ok), { ok = html_block(state, line, end_line, false); });
     if(!(ok), { ok = heading(state, line, end_line, false); });
-    if(!(ok), { ok = lheading(state, line, end_line, false, (&para_terminators)); });
-    if(!(ok), { ok = paragraph(state, line, end_line, false, (&para_terminators)); });
+    if(!(ok), { ok = lheading(state, line, end_line, false, pt); });
+    if(!(ok), { ok = paragraph(state, line, end_line, false, pt); });
 
     // Set state.tight based on whether empty lines have been seen before this tag.
     // i.e. latest empty line should not count (matches JS: state.tight = !has_empty_lines)

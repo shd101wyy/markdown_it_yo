@@ -4,7 +4,7 @@
 
 open import "std/string";
 { ArrayList } :: import "std/collections/array_list";
-{ Token } :: import "../token.yo";
+{ Token, TokenType } :: import "../token.yo";
 { is_space } :: import "../common/utils.yo";
 { Env } :: import "../env.yo";
 
@@ -68,11 +68,13 @@ new_state_block :: (fn(src: String, env: *(Env), tokens: ArrayList(Token), html_
     (bytes : ArrayList(u8)) = src.as_bytes();
     (len : i32) = i32(bytes.len());
 
-    (b_marks : ArrayList(i32)) = ArrayList(i32).new();
-    (e_marks : ArrayList(i32)) = ArrayList(i32).new();
-    (t_shift : ArrayList(i32)) = ArrayList(i32).new();
-    (s_count : ArrayList(i32)) = ArrayList(i32).new();
-    (bs_count : ArrayList(i32)) = ArrayList(i32).new();
+    // Estimate line count: ~60 bytes per line average, +1 for sentinel
+    (est_lines : usize) = ((usize(len) / usize(60)) + usize(2));
+    (b_marks : ArrayList(i32)) = ArrayList(i32).with_capacity(est_lines);
+    (e_marks : ArrayList(i32)) = ArrayList(i32).with_capacity(est_lines);
+    (t_shift : ArrayList(i32)) = ArrayList(i32).with_capacity(est_lines);
+    (s_count : ArrayList(i32)) = ArrayList(i32).with_capacity(est_lines);
+    (bs_count : ArrayList(i32)) = ArrayList(i32).with_capacity(est_lines);
 
     // Scan source and compute line markers
     (start : i32) = i32(0);
@@ -173,7 +175,7 @@ impl(StateBlock,
 
   // Convenience: create a minimal block-level token and push it.
   // Returns a copy of the pushed token (not a reference into the list).
-  push : (fn(self: Self, type_name: String, tag: String, nesting: i32) -> Token)({
+  push : (fn(self: Self, type_name: TokenType, tag: String, nesting: i32) -> Token)({
     (token : Token) = Token(
       type_name: type_name,
       tag: tag,
