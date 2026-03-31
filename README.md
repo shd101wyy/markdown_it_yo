@@ -89,37 +89,49 @@ clang -std=c11 -w -O3 yo-out/aarch64-macos/bin/markdown_it_yo.c -o bench_native
 /usr/bin/time node -e "const md = require('markdown-it')(); const fs = require('fs'); md.render(fs.readFileSync('bench_1mb.md', 'utf8'));"
 ```
 
-### Results (Apple M4, macOS)
+### Results (AMD AI Max 395, macOS)
 
-#### CPU Time (user) — single-thread work
-
-| Input | markdown_it_yo (Native, libc) | markdown-it (Node.js) | Speedup |
-| ----- | ----------------------------- | --------------------- | ------- |
-| 1 MB  | **0.10s**                     | 0.22s                 | 2.2×    |
-| 5 MB  | **0.49s**                     | 0.69s                 | 1.4×    |
-| 20 MB | **1.97s**                     | 2.37s                 | 1.2×    |
-
-**markdown_it_yo native is 1.2–2.2× faster than JS in CPU time at all sizes.**
+All three implementations produce **byte-identical HTML output** for the same input.
 
 #### Wall Clock Time
 
-| Input | markdown_it_yo (Native, libc) | markdown-it (Node.js) |
-| ----- | ----------------------------- | --------------------- |
-| 1 MB  | 0.11s                         | **0.11s**             |
-| 5 MB  | 0.54s                         | **0.40s**             |
-| 20 MB | 2.17s                         | **1.72s**             |
+| Input | markdown_it_yo (Native) | markdown_it_yo (WASM) | markdown-it (Node.js) |
+| ----- | ----------------------- | --------------------- | --------------------- |
+| 1 MB  | **0.11s**               | 0.16s                 | 0.10s                 |
+| 5 MB  | **0.56s**               | 0.64s                 | 0.40s                 |
+| 20 MB | **2.20s**               | 2.46s                 | 1.73s                 |
 
-JS has lower wall-clock time because Node.js V8 uses multi-threaded JIT/GC (user time > real time). Yo is single-threaded.
+#### CPU Time (user) — single-thread work
+
+| Input | markdown_it_yo (Native) | markdown_it_yo (WASM) | markdown-it (Node.js) |
+| ----- | ----------------------- | --------------------- | --------------------- |
+| 1 MB  | **0.10s**               | 0.31s                 | 0.20s                 |
+| 5 MB  | **0.51s**               | 0.78s                 | 0.63s                 |
+| 20 MB | **1.99s**               | 2.53s                 | 2.29s                 |
+
+**markdown_it_yo native uses the least CPU time at all sizes** (1.2–2.0× less than JS). JS has lower wall-clock time because Node.js V8 uses multi-threaded JIT/GC (user time > real time). Yo is single-threaded.
 
 #### Memory Usage (RSS)
 
-| Input | markdown_it_yo (Native, libc) | markdown-it (Node.js) |
-| ----- | ----------------------------- | --------------------- |
-| 1 MB  | **170 MB**                    | 207 MB                |
-| 5 MB  | 829 MB                        | **578 MB**            |
-| 20 MB | 3323 MB                       | **1767 MB**           |
+| Input | markdown_it_yo (Native) | markdown_it_yo (WASM) | markdown-it (Node.js) |
+| ----- | ----------------------- | --------------------- | --------------------- |
+| 1 MB  | **162 MB**              | 177 MB                | 194 MB                |
+| 5 MB  | 794 MB                  | **546 MB**            | 514 MB                |
+| 20 MB | 3196 MB                 | **1967 MB**           | 1614 MB               |
 
-At 1 MB, markdown_it_yo uses less memory than JS. At larger sizes, Yo's per-token RC String allocations dominate (~4 RC objects per token × ~100K tokens/MB).
+At 1 MB, both Yo targets use less memory than JS. At larger sizes, Yo's per-token RC String allocations dominate (~4 RC objects per token × ~100K tokens/MB). WASM uses less RSS than native because Emscripten's linear memory is more compact.
+
+#### WASM Build
+
+```bash
+# Compile to WASM (Emscripten)
+yo compile src/main.yo --release --cc emcc \
+  --cflags='-sALLOW_MEMORY_GROWTH=1 -sINITIAL_MEMORY=256MB -sMAXIMUM_MEMORY=4GB' \
+  -o yo-out/wasm/markdown_it_yo.js
+
+# Run with Node.js
+node yo-out/wasm/markdown_it_yo.js input.md
+```
 
 ### Optimizations Applied
 
