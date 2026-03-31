@@ -116,8 +116,9 @@ impl(MarkdownIt,
 
   // Render markdown source to HTML string.
   render_src : (fn(self: Self, src: String) -> String)({
+    (src_len : usize) = src.bytes_len();
     (tokens : ArrayList(Token)) = self.parse(src);
-    render(tokens, (&self.options))
+    render(tokens, (&self.options), src_len)
   })
 );
 

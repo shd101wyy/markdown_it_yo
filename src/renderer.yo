@@ -8,7 +8,7 @@ open import "std/string";
 { ArrayList } :: import "std/collections/array_list";
 { Token, TokenType, StringPair } :: import "./token.yo";
 { Options } :: import "./options.yo";
-{ escape_html, unescape_all, is_white_space, byte_substring } :: import "./common/utils.yo";
+{ escape_html, escape_html_to, unescape_all, is_white_space, byte_substring } :: import "./common/utils.yo";
 
 // Render attributes of a token, appending to result.
 // Appends strings like ` class="foo" id="bar"`.
@@ -19,13 +19,11 @@ render_attrs :: (fn(result: *(String), token: Token) -> unit)(
       (i : i32) = i32(0);
       while (i < i32(attrs.len())), {
         (pair : StringPair) = attrs.get(usize(i)).unwrap();
-        (ek : String) = escape_html(pair.name);
-        (ev : String) = escape_html(pair.value);
-        result.push_string(` `);
-        result.push_string(ek);
-        result.push_string(`="`);
-        result.push_string(ev);
-        result.push_string(`"`);
+        result.push_str(" ");
+        escape_html_to(result, pair.name);
+        result.push_str("=\"");
+        escape_html_to(result, pair.value);
+        result.push_str("\"");
         i = (i + i32(1));
       };
     }
@@ -46,16 +44,16 @@ render_token :: (fn(result: *(String), tokens: ArrayList(Token), idx: i32, optio
   if(((((token.*.block) && (token.*.nesting != i32(-1))) && (idx > i32(0)))), {
     (prev : *(Token)) = tokens.get_ptr(usize((idx - i32(1))));
     if(prev.*.hidden, {
-      result.push_string(`\n`);
+      result.push_str("\n");
     });
   });
 
   // Build tag
   if((token.*.nesting == i32(-1)), {
-    result.push_string(`</`);
+    result.push_str("</");
     result.push_string(token.*.tag);
   }, {
-    result.push_string(`<`);
+    result.push_str("<");
     result.push_string(token.*.tag);
   });
 
@@ -64,10 +62,10 @@ render_token :: (fn(result: *(String), tokens: ArrayList(Token), idx: i32, optio
 
   // Self-closing tag
   if(((token.*.nesting == i32(0)) && options.*.xhtml_out), {
-    result.push_string(` /`);
+    result.push_str(" /");
   });
 
-  result.push_string(`>`);
+  result.push_str(">");
 
   // Add newline after block-level tags
   if(token.*.block, {
@@ -87,7 +85,7 @@ render_token :: (fn(result: *(String), tokens: ArrayList(Token), idx: i32, optio
       });
     });
     if(need_lf, {
-      result.push_string(`\n`);
+      result.push_str("\n");
     });
   });
 });
@@ -98,32 +96,32 @@ render_token :: (fn(result: *(String), tokens: ArrayList(Token), idx: i32, optio
 
 _render_code_inline :: (fn(result: *(String), tokens: ArrayList(Token), idx: i32, options: *(Options)) -> unit)({
   (token : *(Token)) = tokens.get_ptr(usize(idx));
-  result.push_string(`<code`);
+  result.push_str("<code");
   render_attrs(result, token.*);
-  result.push_string(`>`);
-  result.push_string(escape_html(token.*.content));
-  result.push_string(`</code>`);
+  result.push_str(">");
+  escape_html_to(result, token.*.content);
+  result.push_str("</code>");
 });
 
 _render_code_block :: (fn(result: *(String), tokens: ArrayList(Token), idx: i32, options: *(Options)) -> unit)({
   (token : *(Token)) = tokens.get_ptr(usize(idx));
-  result.push_string(`<pre`);
+  result.push_str("<pre");
   render_attrs(result, token.*);
-  result.push_string(`><code>`);
-  result.push_string(escape_html(token.*.content));
-  result.push_string(`</code></pre>\n`);
+  result.push_str("><code>");
+  escape_html_to(result, token.*.content);
+  result.push_str("</code></pre>\n");
 });
 
 _render_fence :: (fn(result: *(String), tokens: ArrayList(Token), idx: i32, options: *(Options)) -> unit)({
   (token : *(Token)) = tokens.get_ptr(usize(idx));
   (info : String) = cond(
-    (token.*.info.len() > usize(0)) => unescape_all(token.*.info).trim(),
+    (token.*.info.bytes_len() > usize(0)) => unescape_all(token.*.info).trim(),
     true => ``
   );
 
   // Extract language name (first word of info string)
   (lang_name : String) = ``;
-  if((info.len() > usize(0)), {
+  if((info.bytes_len() > usize(0)), {
     // Split on first space
     (info_bytes : ArrayList(u8)) = info.as_bytes();
     (space_pos : i32) = i32(0);
@@ -144,23 +142,21 @@ _render_fence :: (fn(result: *(String), tokens: ArrayList(Token), idx: i32, opti
   });
 
   // TODO: highlight callback support
-  (highlighted : String) = escape_html(token.*.content);
-
-  if((lang_name.len() > usize(0)), {
-    result.push_string(`<pre><code class="`);
+  if((lang_name.bytes_len() > usize(0)), {
+    result.push_str("<pre><code class=\"");
     result.push_string(options.*.lang_prefix);
-    result.push_string(escape_html(lang_name));
-    result.push_string(`"`);
+    escape_html_to(result, lang_name);
+    result.push_str("\"");
     render_attrs(result, token.*);
-    result.push_string(`>`);
-    result.push_string(highlighted);
-    result.push_string(`</code></pre>\n`);
+    result.push_str(">");
+    escape_html_to(result, token.*.content);
+    result.push_str("</code></pre>\n");
   }, {
-    result.push_string(`<pre><code`);
+    result.push_str("<pre><code");
     render_attrs(result, token.*);
-    result.push_string(`>`);
-    result.push_string(highlighted);
-    result.push_string(`</code></pre>\n`);
+    result.push_str(">");
+    escape_html_to(result, token.*.content);
+    result.push_str("</code></pre>\n");
   });
 });
 
@@ -185,7 +181,7 @@ render_inline_as_text :: (fn(result: *(String), tokens: ArrayList(Token)) -> uni
         result.push_string(tok.*.content);
       },
       ((tn == .TT_SOFTBREAK) || (tn == .TT_HARDBREAK)) => {
-        result.push_string(`\n`);
+        result.push_str("\n");
       },
       true => ()
     );
@@ -225,23 +221,23 @@ _render_image :: (fn(result: *(String), tokens: ArrayList(Token), idx: i32, opti
 
 _render_hardbreak :: (fn(result: *(String), options: *(Options)) -> unit)(
   cond(
-    options.*.xhtml_out => result.push_string(`<br />\n`),
-    true => result.push_string(`<br>\n`)
+    options.*.xhtml_out => result.push_str("<br />\n"),
+    true => result.push_str("<br>\n")
   )
 );
 
 _render_softbreak :: (fn(result: *(String), options: *(Options)) -> unit)(
   cond(
     options.*.breaks => cond(
-      options.*.xhtml_out => result.push_string(`<br />\n`),
-      true => result.push_string(`<br>\n`)
+      options.*.xhtml_out => result.push_str("<br />\n"),
+      true => result.push_str("<br>\n")
     ),
-    true => result.push_string(`\n`)
+    true => result.push_str("\n")
   )
 );
 
 _render_text :: (fn(result: *(String), token: Token) -> unit)(
-  result.push_string(escape_html(token.content))
+  escape_html_to(result, token.content)
 );
 
 _render_html_block :: (fn(result: *(String), token: Token) -> unit)(
@@ -288,8 +284,10 @@ render_inline :: (fn(result: *(String), tokens: ArrayList(Token), options: *(Opt
 });
 
 // Main render function: render a token stream to HTML.
-render :: (fn(tokens: ArrayList(Token), options: *(Options)) -> String)({
-  (result : String) = ``;
+// Pre-allocates output buffer based on estimated output size.
+render :: (fn(tokens: ArrayList(Token), options: *(Options), src_byte_len: usize) -> String)({
+  // Pre-allocate: HTML output is typically 1.5-2x the source size
+  (result : String) = String.with_capacity((src_byte_len + (src_byte_len / usize(2))));
   (len : i32) = i32(tokens.len());
   (i : i32) = i32(0);
 
