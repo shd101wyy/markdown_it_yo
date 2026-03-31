@@ -61,7 +61,7 @@ new_markdown_it_with_options :: (fn(opts: Options) -> MarkdownIt)(
 _core_block :: (fn(state: *(StateCore), block_parser: ParserBlock, html_enabled: bool, enable_table: bool) -> unit)({
   if((state.*.inline_mode), {
     // In inline mode, wrap entire source as a single inline token
-    (token : Token) = Token.new(.TT_INLINE, ``, i32(0));
+    (token : Token) = Token.new(.TT_INLINE, "", i32(0));
     token.content = state.*.src;
     token.children = .Some(ArrayList(Token).new());
     _ := state.*.tokens.push(token);

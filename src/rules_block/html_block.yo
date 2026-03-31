@@ -5,7 +5,7 @@
 open import "std/string";
 { ArrayList } :: import "std/collections/array_list";
 { Regex } :: import "std/regex";
-{ Token, TokenType } :: import "../token.yo";
+{ Token, TokenType, MapRange } :: import "../token.yo";
 { StateBlock, block_push_token } :: import "./state_block.yo";
 { html_blocks } :: import "../common/html_blocks.yo";
 { html_re, HtmlRegexPatterns } :: import "../common/html_re.yo";
@@ -114,11 +114,11 @@ _cached_html_seqs := _build_html_sequences();
 
 // HTML block rule
 html_block :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: bool) -> bool)({
-  (pos : i32) = (state.*.b_marks.get(usize(start_line)).unwrap() + state.*.t_shift.get(usize(start_line)).unwrap());
-  (max : i32) = state.*.e_marks.get(usize(start_line)).unwrap();
+  (pos : i32) = (state.*.b_marks.get_unchecked(usize(start_line)) + state.*.t_shift.get_unchecked(usize(start_line)));
+  (max : i32) = state.*.e_marks.get_unchecked(usize(start_line));
 
   // if it's indented more than 3 spaces, it should be a code block
-  if(((state.*.s_count.get(usize(start_line)).unwrap() - state.*.blk_indent) >= i32(4)), {
+  if(((state.*.s_count.get_unchecked(usize(start_line)) - state.*.blk_indent) >= i32(4)), {
     return false;
   });
 
@@ -127,7 +127,7 @@ html_block :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: 
     return false;
   });
 
-  if((i32(state.*._src_bytes.get(usize(pos)).unwrap()) != i32(0x3C)), {
+  if((i32(state.*._src_bytes.get_unchecked(usize(pos))) != i32(0x3C)), {
     return false;
   });
 
@@ -142,7 +142,7 @@ html_block :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: 
   (seq_idx : i32) = i32(0);
   (found : bool) = false;
   while ((seq_idx < i32(seqs.*.len())) && (!(found))), {
-    (seq : HtmlSequence) = seqs.*.get(usize(seq_idx)).unwrap();
+    (seq : HtmlSequence) = seqs.*.get_unchecked(usize(seq_idx));
     if(seq.open_re.test(line_text), {
       found = true;
     }, {
@@ -156,7 +156,7 @@ html_block :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: 
 
   if(silent, {
     // true if this sequence can be a terminator, false otherwise
-    (seq : HtmlSequence) = seqs.*.get(usize(seq_idx)).unwrap();
+    (seq : HtmlSequence) = seqs.*.get_unchecked(usize(seq_idx));
     return seq.can_terminate;
   });
 
@@ -164,15 +164,15 @@ html_block :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: 
 
   // If we are here - we detected HTML block.
   // Let's roll down till block end.
-  (matched_seq : HtmlSequence) = seqs.*.get(usize(seq_idx)).unwrap();
+  (matched_seq : HtmlSequence) = seqs.*.get_unchecked(usize(seq_idx));
   if(!(matched_seq.close_re.test(line_text)), {
     (scanning : bool) = true;
     while ((next_line < end_line) && scanning), {
-      if((state.*.s_count.get(usize(next_line)).unwrap() < state.*.blk_indent), {
+      if((state.*.s_count.get_unchecked(usize(next_line)) < state.*.blk_indent), {
         scanning = false;
       }, {
-        (p : i32) = (state.*.b_marks.get(usize(next_line)).unwrap() + state.*.t_shift.get(usize(next_line)).unwrap());
-        (m : i32) = state.*.e_marks.get(usize(next_line)).unwrap();
+        (p : i32) = (state.*.b_marks.get_unchecked(usize(next_line)) + state.*.t_shift.get_unchecked(usize(next_line)));
+        (m : i32) = state.*.e_marks.get_unchecked(usize(next_line));
         (lb : ArrayList(u8)) = state.*._src_bytes.slice(usize(p), usize(m)).unwrap();
         (lt : String) = String.from_bytes(lb);
 
@@ -190,13 +190,10 @@ html_block :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: 
 
   state.*.line = next_line;
 
-  (token : Token) = Token.new(.TT_HTML_BLOCK, ``, i32(0));
+  (token : Token) = Token.new(.TT_HTML_BLOCK, "", i32(0));
   token.block = true;
   token.content = state.*.get_lines(start_line, next_line, state.*.blk_indent, true);
-  (map : ArrayList(i32)) = ArrayList(i32).new();
-  _ := map.push(start_line);
-  _ := map.push(next_line);
-  token.map = .Some(map);
+  token.map = .Some(MapRange(begin: start_line, end: next_line));
   block_push_token(state, token);
 
   true

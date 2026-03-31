@@ -4,12 +4,12 @@
 
 open import "std/string";
 { ArrayList } :: import "std/collections/array_list";
-{ Token, TokenType } :: import "../token.yo";
+{ Token, TokenType, MapRange } :: import "../token.yo";
 { StateBlock, block_push_token } :: import "./state_block.yo";
 
 // Indented code block rule
 code :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: bool) -> bool)({
-  if(((state.*.s_count.get(usize(start_line)).unwrap() - state.*.blk_indent) < i32(4)), {
+  if(((state.*.s_count.get_unchecked(usize(start_line)) - state.*.blk_indent) < i32(4)), {
     return false;
   });
 
@@ -20,7 +20,7 @@ code :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: bool) 
     if(state.*.is_empty(next_line), {
       next_line = (next_line + i32(1));
     }, {
-      if(((state.*.s_count.get(usize(next_line)).unwrap() - state.*.blk_indent) >= i32(4)), {
+      if(((state.*.s_count.get_unchecked(usize(next_line)) - state.*.blk_indent) >= i32(4)), {
         next_line = (next_line + i32(1));
         last = next_line;
       }, {
@@ -33,13 +33,11 @@ code :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: bool) 
 
   state.*.line = last;
 
-  (token : Token) = Token.new(.TT_CODE_BLOCK, `code`, i32(0));
-  token.content = `${state.*.get_lines(start_line, last, (i32(4) + state.*.blk_indent), false)}\n`;
+  (token : Token) = Token.new(.TT_CODE_BLOCK, "code", i32(0));
+  token.content = state.*.get_lines(start_line, last, (i32(4) + state.*.blk_indent), false);
+  (&(token.content)).push_byte(u8(0x0A));
   token.block = true;
-  (map : ArrayList(i32)) = ArrayList(i32).new();
-  _ := map.push(start_line);
-  _ := map.push(state.*.line);
-  token.map = .Some(map);
+  token.map = .Some(MapRange(begin: start_line, end: state.*.line));
   block_push_token(state, token);
 
   true

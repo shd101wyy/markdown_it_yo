@@ -5,7 +5,7 @@
 open import "std/string";
 { ArrayList } :: import "std/collections/array_list";
 { Token } :: import "../token.yo";
-{ StateBlock } :: import "./state_block.yo";
+{StateBlock, PARENT_REFERENCE} :: import "./state_block.yo";
 { is_space, normalize_reference, byte_substring } :: import "../common/utils.yo";
 { validate_link, normalize_link } :: import "../common/link_utils.yo";
 { LinkDestResult, parse_link_destination } :: import "../helpers/parse_link_destination.yo";
@@ -26,25 +26,25 @@ _try_get_next_line :: (fn(state: *(StateBlock), buf: *(String), str_max: *(i32),
   (is_continuation : bool) = false;
 
   // Code block indentation = lazy continuation after paragraph
-  if(((state.*.s_count.get(usize(next_line.*)).unwrap() - state.*.blk_indent) > i32(3)), {
+  if(((state.*.s_count.get_unchecked(usize(next_line.*)) - state.*.blk_indent) > i32(3)), {
     is_continuation = true;
   });
 
   // Quirk for blockquotes
-  if((state.*.s_count.get(usize(next_line.*)).unwrap() < i32(0)), {
+  if((state.*.s_count.get_unchecked(usize(next_line.*)) < i32(0)), {
     is_continuation = true;
   });
 
   if(!(is_continuation), {
     // Check if any terminator rule matches this line
-    (old_parent_type : String) = state.*.parent_type;
-    state.*.parent_type = `reference`;
+    (old_parent_type : i32) = state.*.parent_type;
+    state.*.parent_type = PARENT_REFERENCE;
 
     (terminate : bool) = false;
     (ti : usize) = usize(0);
     (tlen : usize) = terminator_rules.*.len();
     while ((ti < tlen) && !(terminate)), {
-      (rule : BlockRuleFn) = terminator_rules.*.get(ti).unwrap();
+      (rule : BlockRuleFn) = terminator_rules.*.get_unchecked(ti);
       if(rule(state, next_line.*, state.*.line_max, true), {
         terminate = true;
       });
@@ -55,8 +55,8 @@ _try_get_next_line :: (fn(state: *(StateBlock), buf: *(String), str_max: *(i32),
     if(terminate, { return false; });
   });
 
-  (line_pos : i32) = (state.*.b_marks.get(usize(next_line.*)).unwrap() + state.*.t_shift.get(usize(next_line.*)).unwrap());
-  (line_max : i32) = state.*.e_marks.get(usize(next_line.*)).unwrap();
+  (line_pos : i32) = (state.*.b_marks.get_unchecked(usize(next_line.*)) + state.*.t_shift.get_unchecked(usize(next_line.*)));
+  (line_max : i32) = state.*.e_marks.get_unchecked(usize(next_line.*));
   (line_content : String) = byte_substring(state.*._src_bytes, line_pos, (line_max + i32(1)));
   (&(buf.*)).push_string(line_content);
   str_max.* = i32(buf.*.as_bytes().len());
@@ -66,16 +66,16 @@ _try_get_next_line :: (fn(state: *(StateBlock), buf: *(String), str_max: *(i32),
 
 reference :: (fn(state: *(StateBlock), start_line: i32, _end_line: i32, silent: bool,
                 terminator_rules: *(RuleList)) -> bool)({
-  (pos : i32) = (state.*.b_marks.get(usize(start_line)).unwrap() + state.*.t_shift.get(usize(start_line)).unwrap());
-  (max : i32) = state.*.e_marks.get(usize(start_line)).unwrap();
+  (pos : i32) = (state.*.b_marks.get_unchecked(usize(start_line)) + state.*.t_shift.get_unchecked(usize(start_line)));
+  (max : i32) = state.*.e_marks.get_unchecked(usize(start_line));
   (next_line : i32) = (start_line + i32(1));
 
   // If indented more than 3 spaces, it should be a code block
-  if(((state.*.s_count.get(usize(start_line)).unwrap() - state.*.blk_indent) >= i32(4)), {
+  if(((state.*.s_count.get_unchecked(usize(start_line)) - state.*.blk_indent) >= i32(4)), {
     return false;
   });
 
-  if((i32(state.*._src_bytes.get(usize(pos)).unwrap()) != i32(0x5B)), {
+  if((i32(state.*._src_bytes.get_unchecked(usize(pos))) != i32(0x5B)), {
     return false;
   });
 
@@ -88,7 +88,7 @@ reference :: (fn(state: *(StateBlock), start_line: i32, _end_line: i32, silent: 
   (label_end : i32) = i32(-1);
   (scan : i32) = i32(1);
   while ((scan < str_max) && (label_end < i32(0))), {
-    (ch : i32) = i32(buf.as_bytes().get(usize(scan)).unwrap());
+    (ch : i32) = i32(buf.as_bytes().get_unchecked(usize(scan)));
     if((ch == i32(0x5B)), {
       return false;
     }, if((ch == i32(0x5D)), {
@@ -98,7 +98,7 @@ reference :: (fn(state: *(StateBlock), start_line: i32, _end_line: i32, silent: 
       scan = (scan + i32(1));
     }, if((ch == i32(0x5C)), {
       scan = (scan + i32(1));
-      if(((scan < str_max) && (i32(buf.as_bytes().get(usize(scan)).unwrap()) == i32(0x0A))), {
+      if(((scan < str_max) && (i32(buf.as_bytes().get_unchecked(usize(scan))) == i32(0x0A))), {
         _ := _try_get_next_line(state, (&buf), (&str_max), (&next_line), terminator_rules);
       });
       scan = (scan + i32(1));
@@ -110,13 +110,13 @@ reference :: (fn(state: *(StateBlock), start_line: i32, _end_line: i32, silent: 
   // No ']' found or no ':' after it
   if((label_end < i32(0)), { return false; });
   if(((label_end + i32(1)) >= str_max), { return false; });
-  if((i32(buf.as_bytes().get(usize((label_end + i32(1)))).unwrap()) != i32(0x3A)), { return false; });
+  if((i32(buf.as_bytes().get_unchecked(usize((label_end + i32(1))))) != i32(0x3A)), { return false; });
 
   // Skip whitespace after ':'
   scan = (label_end + i32(2));
   (skip_done : bool) = false;
   while ((scan < str_max) && !(skip_done)), {
-    (ch : i32) = i32(buf.as_bytes().get(usize(scan)).unwrap());
+    (ch : i32) = i32(buf.as_bytes().get_unchecked(usize(scan)));
     if((ch == i32(0x0A)), {
       _ := _try_get_next_line(state, (&buf), (&str_max), (&next_line), terminator_rules);
       scan = (scan + i32(1));
@@ -144,7 +144,7 @@ reference :: (fn(state: *(StateBlock), start_line: i32, _end_line: i32, silent: 
   (start : i32) = pos;
   skip_done = false;
   while ((pos < str_max) && !(skip_done)), {
-    (ch : i32) = i32(buf.as_bytes().get(usize(pos)).unwrap());
+    (ch : i32) = i32(buf.as_bytes().get_unchecked(usize(pos)));
     if((ch == i32(0x0A)), {
       _ := _try_get_next_line(state, (&buf), (&str_max), (&next_line), terminator_rules);
       pos = (pos + i32(1));
@@ -178,23 +178,23 @@ reference :: (fn(state: *(StateBlock), start_line: i32, _end_line: i32, silent: 
   });
 
   // Skip trailing spaces
-  while ((pos < str_max) && is_space(i32(buf.as_bytes().get(usize(pos)).unwrap()))), {
+  while ((pos < str_max) && is_space(i32(buf.as_bytes().get_unchecked(usize(pos))))), {
     pos = (pos + i32(1));
   };
 
-  if(((pos < str_max) && (i32(buf.as_bytes().get(usize(pos)).unwrap()) != i32(0x0A))), {
+  if(((pos < str_max) && (i32(buf.as_bytes().get_unchecked(usize(pos))) != i32(0x0A))), {
     if((title.len() > usize(0)), {
       // Garbage after title — roll back title
       title = ``;
       pos = dest_end_pos;
       next_line = dest_end_line_no;
-      while ((pos < str_max) && is_space(i32(buf.as_bytes().get(usize(pos)).unwrap()))), {
+      while ((pos < str_max) && is_space(i32(buf.as_bytes().get_unchecked(usize(pos))))), {
         pos = (pos + i32(1));
       };
     });
   });
 
-  if(((pos < str_max) && (i32(buf.as_bytes().get(usize(pos)).unwrap()) != i32(0x0A))), {
+  if(((pos < str_max) && (i32(buf.as_bytes().get_unchecked(usize(pos))) != i32(0x0A))), {
     return false;
   });
 

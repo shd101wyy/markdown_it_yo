@@ -112,7 +112,7 @@ _block_tokenize :: (fn(state: *(StateBlock), start_line: i32, end_line: i32) -> 
     if((line >= end_line), { return (); });
 
     // Termination condition for nested calls (blockquotes, lists)
-    if((state.*.s_count.get(usize(line)).unwrap() < state.*.blk_indent), {
+    if((state.*.s_count.get_unchecked(usize(line)) < state.*.blk_indent), {
       return ();
     });
 

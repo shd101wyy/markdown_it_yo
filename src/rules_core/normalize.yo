@@ -1,26 +1,88 @@
 // Ported from: lib/rules_core/normalize.mjs (markdown-it v14.1.1)
 //
 // Normalize input string: unify line endings, replace NULL chars.
+// Optimized: single-pass byte scan instead of 3x replace_all.
 
 open import "std/string";
 { ArrayList } :: import "std/collections/array_list";
 { Token } :: import "../token.yo";
-{ from_code_point } :: import "../common/char_utils.yo";
 { StateCore } :: import "./state_core.yo";
 
 normalize :: (fn(state: *(StateCore)) -> unit)({
-  (cr : String) = from_code_point(i32(0x0D));
-  (lf : String) = from_code_point(i32(0x0A));
-  (crlf : String) = `${cr}${lf}`;
-  (null_char : String) = from_code_point(i32(0x00));
-  (replacement : String) = from_code_point(i32(0xFFFD));
+  (src_bytes : ArrayList(u8)) = state.*.src.as_bytes();
+  (len : usize) = src_bytes.len();
 
-  // Normalize newlines: \r\n → \n, then remaining \r → \n
-  state.*.src = state.*.src.replace_all(crlf, lf);
-  state.*.src = state.*.src.replace_all(cr, lf);
+  if((len == usize(0)), { return (); });
 
-  // Replace NULL characters with U+FFFD
-  state.*.src = state.*.src.replace_all(null_char, replacement);
+  // Quick check: if no \r (0x0D) and no \0 (0x00), nothing to do
+  (needs_normalize : bool) = false;
+  (scan_i : usize) = usize(0);
+  match(src_bytes.ptr(),
+    .Some(src_ptr) => {
+      while ((scan_i < len) && !(needs_normalize)), {
+        (b : u8) = (src_ptr &+ scan_i).*;
+        if(((b == u8(0x0D)) || (b == u8(0x00))), {
+          needs_normalize = true;
+        });
+        scan_i = (scan_i + usize(1));
+      };
+    },
+    .None => ()
+  );
+
+  if(!(needs_normalize), { return (); });
+
+  // Single-pass: replace \r\n → \n, \r → \n, \0 → U+FFFD (0xEF 0xBF 0xBD in UTF-8)
+  (out : ArrayList(u8)) = ArrayList(u8).with_capacity(len);
+  (i : usize) = usize(0);
+  (run_start : usize) = usize(0);
+
+  match(src_bytes.ptr(),
+    .Some(src_ptr) => {
+      while (i < len), {
+        (b : u8) = (src_ptr &+ i).*;
+        cond(
+          (b == u8(0x0D)) => {
+            // Flush run before this \r
+            if((i > run_start), {
+              out.extend_from_ptr((src_ptr &+ run_start), (i - run_start));
+            });
+            // Emit \n
+            out.push(u8(0x0A));
+            // Skip \n after \r if present (CRLF)
+            if((((i + usize(1)) < len) && ((src_ptr &+ (i + usize(1))).* == u8(0x0A))), {
+              i = (i + usize(2));
+            }, {
+              i = (i + usize(1));
+            });
+            run_start = i;
+          },
+          (b == u8(0x00)) => {
+            // Flush run before this \0
+            if((i > run_start), {
+              out.extend_from_ptr((src_ptr &+ run_start), (i - run_start));
+            });
+            // Emit U+FFFD in UTF-8: 0xEF 0xBF 0xBD
+            out.push(u8(0xEF));
+            out.push(u8(0xBF));
+            out.push(u8(0xBD));
+            i = (i + usize(1));
+            run_start = i;
+          },
+          true => {
+            i = (i + usize(1));
+          }
+        );
+      };
+      // Flush remaining bytes
+      if((len > run_start), {
+        out.extend_from_ptr((src_ptr &+ run_start), (len - run_start));
+      });
+    },
+    .None => ()
+  );
+
+  state.*.src = String.from_bytes(out);
 });
 
 export normalize;

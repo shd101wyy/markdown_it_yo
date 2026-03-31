@@ -40,7 +40,7 @@ _process_inlines :: (fn(tokens: ArrayList(Token), quotes: ArrayList(String)) -> 
 
     // Trim stack to current nesting level
     (j : i32) = (i32(stack.len()) - i32(1));
-    while ((j >= i32(0)) && (stack.get(usize(j)).unwrap().level > this_level)), {
+    while ((j >= i32(0)) && (stack.get_unchecked(usize(j)).level > this_level)), {
       j = (j - i32(1));
     };
     // Truncate stack to j+1
@@ -175,18 +175,18 @@ _process_inlines :: (fn(tokens: ArrayList(Token), quotes: ArrayList(String)) -> 
               (sj : i32) = (i32(stack.len()) - i32(1));
               (matched : bool) = false;
               while ((sj >= i32(0)) && !(matched)), {
-                (item : _QuoteEntry) = stack.get(usize(sj)).unwrap();
+                (item : _QuoteEntry) = stack.get_unchecked(usize(sj));
                 if((item.level < this_level), {
                   sj = i32(-1);
                 }, {
                   if(((item.single == is_single) && (item.level == this_level)), {
                     (open_quote : String) = cond(
-                      is_single => quotes.get(usize(2)).unwrap(),
-                      true => quotes.get(usize(0)).unwrap()
+                      is_single => quotes.get_unchecked(usize(2)),
+                      true => quotes.get_unchecked(usize(0))
                     );
                     (close_quote : String) = cond(
-                      is_single => quotes.get(usize(3)).unwrap(),
-                      true => quotes.get(usize(1)).unwrap()
+                      is_single => quotes.get_unchecked(usize(3)),
+                      true => quotes.get_unchecked(usize(1))
                     );
 
                     // Replace closing quote first (before opening, in case same token)

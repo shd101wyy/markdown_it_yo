@@ -19,7 +19,7 @@ link_rule :: (fn(state: *(StateInline), silent: bool) -> bool)({
   (max : i32) = state.*.pos_max;
 
   // Must start with '['
-  if((i32(state.*._src_bytes.get(usize(pos)).unwrap()) != i32(0x5B)), {
+  if((i32(state.*._src_bytes.get_unchecked(usize(pos))) != i32(0x5B)), {
     return false;
   });
 
@@ -36,11 +36,11 @@ link_rule :: (fn(state: *(StateInline), silent: bool) -> bool)({
   (parse_reference : bool) = true;
 
   // Try inline link: [text](url "title")
-  if(((pos < max) && (i32(state.*._src_bytes.get(usize(pos)).unwrap()) == i32(0x28))), {
+  if(((pos < max) && (i32(state.*._src_bytes.get_unchecked(usize(pos))) == i32(0x28))), {
     parse_reference = false;
     // Skip spaces after '('
     pos = (pos + i32(1));
-    while (((pos < max) && (is_space(i32(state.*._src_bytes.get(usize(pos)).unwrap())) || (i32(state.*._src_bytes.get(usize(pos)).unwrap()) == i32(0x0A))))), {
+    while (((pos < max) && (is_space(i32(state.*._src_bytes.get_unchecked(usize(pos)))) || (i32(state.*._src_bytes.get_unchecked(usize(pos))) == i32(0x0A))))), {
       pos = (pos + i32(1));
     };
     if((pos >= max), { return false; });
@@ -57,7 +57,7 @@ link_rule :: (fn(state: *(StateInline), silent: bool) -> bool)({
 
       // Skip spaces after destination
       start = pos;
-      while (((pos < max) && (is_space(i32(state.*._src_bytes.get(usize(pos)).unwrap())) || (i32(state.*._src_bytes.get(usize(pos)).unwrap()) == i32(0x0A))))), {
+      while (((pos < max) && (is_space(i32(state.*._src_bytes.get_unchecked(usize(pos)))) || (i32(state.*._src_bytes.get_unchecked(usize(pos))) == i32(0x0A))))), {
         pos = (pos + i32(1));
       };
 
@@ -68,13 +68,13 @@ link_rule :: (fn(state: *(StateInline), silent: bool) -> bool)({
         pos = title_result.pos;
 
         // Skip spaces after title
-        while (((pos < max) && (is_space(i32(state.*._src_bytes.get(usize(pos)).unwrap())) || (i32(state.*._src_bytes.get(usize(pos)).unwrap()) == i32(0x0A))))), {
+        while (((pos < max) && (is_space(i32(state.*._src_bytes.get_unchecked(usize(pos)))) || (i32(state.*._src_bytes.get_unchecked(usize(pos))) == i32(0x0A))))), {
           pos = (pos + i32(1));
         };
       });
     });
 
-    if(((pos >= max) || (i32(state.*._src_bytes.get(usize(pos)).unwrap()) != i32(0x29))), {
+    if(((pos >= max) || (i32(state.*._src_bytes.get_unchecked(usize(pos))) != i32(0x29))), {
       // Failed to parse inline link, fallback to reference
       parse_reference = true;
     }, {
@@ -86,7 +86,7 @@ link_rule :: (fn(state: *(StateInline), silent: bool) -> bool)({
   if(parse_reference, {
     (ref_label : String) = ``;
 
-    if(((pos < max) && (i32(state.*._src_bytes.get(usize(pos)).unwrap()) == i32(0x5B))), {
+    if(((pos < max) && (i32(state.*._src_bytes.get_unchecked(usize(pos))) == i32(0x5B))), {
       // [link][ref] — full form or [link][] — collapsed form
       (ref_start : i32) = (pos + i32(1));
       (ref_end : i32) = parse_link_label(state.*._src_bytes, pos, max, false);
@@ -128,7 +128,7 @@ link_rule :: (fn(state: *(StateInline), silent: bool) -> bool)({
     state.*.pos_max = label_end;
 
     // link_open
-    (token_o : Token) = state_push(state, .TT_LINK_OPEN, `a`, i32(1));
+    (token_o : Token) = state_push(state, .TT_LINK_OPEN, "a", i32(1));
     (attrs : ArrayList(StringPair)) = ArrayList(StringPair).new();
     _ := attrs.push(StringPair(name: `href`, value: href));
     if((title.len() > usize(0)), {
@@ -146,7 +146,7 @@ link_rule :: (fn(state: *(StateInline), silent: bool) -> bool)({
     state.*.link_level = (state.*.link_level - i32(1));
 
     // link_close
-    _ := state_push(state, .TT_LINK_CLOSE, `a`, i32(-1));
+    _ := state_push(state, .TT_LINK_CLOSE, "a", i32(-1));
   });
 
   state.*.pos = pos;

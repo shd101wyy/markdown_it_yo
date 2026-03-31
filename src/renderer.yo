@@ -18,7 +18,7 @@ render_attrs :: (fn(result: *(String), token: Token) -> unit)(
     .Some(attrs) => {
       (i : i32) = i32(0);
       while (i < i32(attrs.len())), {
-        (pair : StringPair) = attrs.get(usize(i)).unwrap();
+        (pair : StringPair) = attrs.get_unchecked(usize(i));
         result.push_str(" ");
         escape_html_to(result, pair.name);
         result.push_str("=\"");
@@ -51,10 +51,10 @@ render_token :: (fn(result: *(String), tokens: ArrayList(Token), idx: i32, optio
   // Build tag
   if((token.*.nesting == i32(-1)), {
     result.push_str("</");
-    result.push_string(token.*.tag);
+    result.push_str(token.*.tag);
   }, {
     result.push_str("<");
-    result.push_string(token.*.tag);
+    result.push_str(token.*.tag);
   });
 
   // Render attributes
@@ -127,7 +127,7 @@ _render_fence :: (fn(result: *(String), tokens: ArrayList(Token), idx: i32, opti
     (space_pos : i32) = i32(0);
     (found_space : bool) = false;
     while (((space_pos < i32(info_bytes.len())) && !(found_space))), {
-      (b : i32) = i32(info_bytes.get(usize(space_pos)).unwrap());
+      (b : i32) = i32(info_bytes.get_unchecked(usize(space_pos)));
       if(((((b == i32(0x20)) || (b == i32(0x09))) || ((b == i32(0x0A)) || (b == i32(0x0B)))) || ((b == i32(0x0C)) || (b == i32(0x0D)))), {
         found_space = true;
       }, {
@@ -205,7 +205,7 @@ _render_image :: (fn(result: *(String), tokens: ArrayList(Token), idx: i32, opti
     .Some(attrs) => {
       (ai : i32) = i32(0);
       while (ai < i32(attrs.len())), {
-        (pair : StringPair) = attrs.get(usize(ai)).unwrap();
+        (pair : StringPair) = attrs.get_unchecked(usize(ai));
         if((pair.name == `alt`), {
           attrs.set(usize(ai), StringPair(name: `alt`, value: alt_text));
         });

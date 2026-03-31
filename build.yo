@@ -4,7 +4,7 @@ mod :: build.module({ name: "markdown_it_yo", root: "./src/lib.yo" });
 
 exe :: build.executable({ name: "markdown_it_yo", root: "./src/main.yo", optimize: build.Optimize.ReleaseFast, allocator: build.Allocator.Libc });
 
-wasm_exe :: build.executable({ name: "markdown_it_yo", root: "./src/main.yo", target: "wasm32-emscripten", optimize: build.Optimize.ReleaseFast, allocator: build.Allocator.Libc });
+wasm_exe :: build.executable({ name: "markdown_it_yo_wasm", root: "./src/main.yo", target: "wasm32-emscripten", optimize: build.Optimize.ReleaseFast, allocator: build.Allocator.Libc });
 wasm_exe.add_c_flags("-sALLOW_MEMORY_GROWTH=1 -sINITIAL_MEMORY=256MB -sMAXIMUM_MEMORY=4GB");
 
 lib :: build.static_library({ name: "markdown_it_yo-lib", root: "./src/lib.yo" });

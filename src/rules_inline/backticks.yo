@@ -11,7 +11,7 @@ open import "std/string";
 
 backtick :: (fn(state: *(StateInline), silent: bool) -> bool)({
   (pos : i32) = state.*.pos;
-  (ch : i32) = i32(state.*._src_bytes.get(usize(pos)).unwrap());
+  (ch : i32) = i32(state.*._src_bytes.get_unchecked(usize(pos)));
 
   if((ch != i32(0x60)), {
     return false;
@@ -22,7 +22,7 @@ backtick :: (fn(state: *(StateInline), silent: bool) -> bool)({
   (max : i32) = state.*.pos_max;
 
   // scan marker length
-  while (((pos < max) && (i32(state.*._src_bytes.get(usize(pos)).unwrap()) == i32(0x60)))), {
+  while (((pos < max) && (i32(state.*._src_bytes.get_unchecked(usize(pos))) == i32(0x60)))), {
     pos = (pos + i32(1));
   };
 
@@ -37,7 +37,7 @@ backtick :: (fn(state: *(StateInline), silent: bool) -> bool)({
       .Some(cached_pos) => {
         if((cached_pos <= start), {
           if(!(silent), {
-            state.*.pending = `${state.*.pending}${marker}`;
+            (&(state.*.pending)).push_string(marker);
           });
           state.*.pos = (state.*.pos + opener_length);
           return true;
@@ -58,7 +58,7 @@ backtick :: (fn(state: *(StateInline), silent: bool) -> bool)({
     (match_start : i32) = i32(-1);
     (scan : i32) = match_end;
     while (((scan < max) && (match_start == i32(-1)))), {
-      if((i32(state.*._src_bytes.get(usize(scan)).unwrap()) == i32(0x60)), {
+      if((i32(state.*._src_bytes.get_unchecked(usize(scan))) == i32(0x60)), {
         match_start = scan;
       }, {
         scan = (scan + i32(1));
@@ -72,7 +72,7 @@ backtick :: (fn(state: *(StateInline), silent: bool) -> bool)({
       match_end = (match_start + i32(1));
 
       // scan closer length
-      while (((match_end < max) && (i32(state.*._src_bytes.get(usize(match_end)).unwrap()) == i32(0x60)))), {
+      while (((match_end < max) && (i32(state.*._src_bytes.get_unchecked(usize(match_end))) == i32(0x60)))), {
         match_end = (match_end + i32(1));
       };
 
@@ -98,7 +98,7 @@ backtick :: (fn(state: *(StateInline), silent: bool) -> bool)({
 
           (token : Token) = Token(
             type_name: .TT_CODE_INLINE,
-            tag: `code`,
+            tag: "code",
             nesting: i32(0),
             attrs: .None,
             map: .None,
@@ -125,7 +125,7 @@ backtick :: (fn(state: *(StateInline), silent: bool) -> bool)({
   state.*.backticks_scanned = true;
 
   if(!(silent), {
-    state.*.pending = `${state.*.pending}${marker}`;
+    (&(state.*.pending)).push_string(marker);
   });
   state.*.pos = (state.*.pos + opener_length);
   true

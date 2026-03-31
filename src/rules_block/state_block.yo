@@ -8,6 +8,14 @@ open import "std/string";
 { is_space } :: import "../common/utils.yo";
 { Env } :: import "../env.yo";
 
+// Parent type constants (replaces String-based parent_type)
+PARENT_ROOT :: i32(0);
+PARENT_PARAGRAPH :: i32(1);
+PARENT_BLOCKQUOTE :: i32(2);
+PARENT_LIST :: i32(3);
+PARENT_REFERENCE :: i32(4);
+PARENT_TABLE :: i32(5);
+
 // Block parser state
 StateBlock :: struct(
   src : String,
@@ -28,7 +36,7 @@ StateBlock :: struct(
   tight : bool,
   dd_indent : i32,
   list_indent : i32,
-  parent_type : String,
+  parent_type : i32,
   level : i32,
 
   // Options pushed down from MarkdownIt
@@ -84,7 +92,7 @@ new_state_block :: (fn(src: String, env: *(Env), tokens: ArrayList(Token), html_
     (indent_found : bool) = false;
 
     while (pos < len), {
-      (ch : i32) = i32(bytes.get(usize(pos)).unwrap());
+      (ch : i32) = i32(bytes.get_unchecked(usize(pos)));
 
       if(!(indent_found), {
         if(is_space(ch), {
@@ -146,7 +154,7 @@ new_state_block :: (fn(src: String, env: *(Env), tokens: ArrayList(Token), html_
       tight: false,
       dd_indent: i32(-1),
       list_indent: i32(-1),
-      parent_type: `root`,
+      parent_type: PARENT_ROOT,
       level: i32(0),
       html_enabled: html_enabled,
       enable_table: enable_table,
@@ -175,7 +183,7 @@ impl(StateBlock,
 
   // Convenience: create a minimal block-level token and push it.
   // Returns a copy of the pushed token (not a reference into the list).
-  push : (fn(self: Self, type_name: TokenType, tag: String, nesting: i32) -> Token)({
+  push : (fn(self: Self, type_name: TokenType, tag: str, nesting: i32) -> Token)({
     (token : Token) = Token(
       type_name: type_name,
       tag: tag,
@@ -205,14 +213,14 @@ impl(StateBlock,
 
   // Check if line is empty
   is_empty : (fn(self: Self, line_idx: i32) -> bool)(
-    ((self.b_marks.get(usize(line_idx)).unwrap() + self.t_shift.get(usize(line_idx)).unwrap()) >= self.e_marks.get(usize(line_idx)).unwrap())
+    ((self.b_marks.get_unchecked(usize(line_idx)) + self.t_shift.get_unchecked(usize(line_idx))) >= self.e_marks.get_unchecked(usize(line_idx)))
   ),
 
   // Skip empty lines from given line number, return first non-empty line
   skip_empty_lines : (fn(self: Self, from: i32) -> i32)({
     (line : i32) = from;
     while (line < self.line_max), {
-      if(((self.b_marks.get(usize(line)).unwrap() + self.t_shift.get(usize(line)).unwrap()) < self.e_marks.get(usize(line)).unwrap()), {
+      if(((self.b_marks.get_unchecked(usize(line)) + self.t_shift.get_unchecked(usize(line))) < self.e_marks.get_unchecked(usize(line))), {
         return line;
       });
       line = (line + i32(1));
@@ -225,8 +233,7 @@ impl(StateBlock,
     (pos : i32) = pos_param;
     (max : i32) = i32(self._src_bytes.len());
     while (pos < max), {
-      (ch : i32) = i32(self._src_bytes.get(usize(pos)).unwrap());
-      if(!(is_space(ch)), {
+      if(!(is_space(i32(self._src_bytes.get_unchecked(usize(pos))))), {
         return pos;
       });
       pos = (pos + i32(1));
@@ -242,7 +249,7 @@ impl(StateBlock,
     });
     while (pos > min), {
       pos = (pos - i32(1));
-      if(!(is_space(i32(self._src_bytes.get(usize(pos)).unwrap()))), {
+      if(!(is_space(i32(self._src_bytes.get_unchecked(usize(pos))))), {
         return (pos + i32(1));
       });
     };
@@ -254,7 +261,7 @@ impl(StateBlock,
     (pos : i32) = pos_param;
     (max : i32) = i32(self._src_bytes.len());
     while (pos < max), {
-      if((i32(self._src_bytes.get(usize(pos)).unwrap()) != code), {
+      if((i32(self._src_bytes.get_unchecked(usize(pos))) != code), {
         return pos;
       });
       pos = (pos + i32(1));
@@ -270,7 +277,7 @@ impl(StateBlock,
     });
     while (pos > min), {
       pos = (pos - i32(1));
-      if((code != i32(self._src_bytes.get(usize(pos)).unwrap())), {
+      if((code != i32(self._src_bytes.get_unchecked(usize(pos)))), {
         return (pos + i32(1));
       });
     };
@@ -283,16 +290,16 @@ impl(StateBlock,
       return ``;
     });
 
-    (result : String) = ``;
+    (out : ArrayList(u8)) = ArrayList(u8).with_capacity(usize(256));
     (line : i32) = begin;
 
     while (line < end), {
       (line_indent : i32) = i32(0);
-      (line_start : i32) = self.b_marks.get(usize(line)).unwrap();
+      (line_start : i32) = self.b_marks.get_unchecked(usize(line));
       (first : i32) = line_start;
       (last_raw : i32) = cond(
-        (((line + i32(1)) < end) || keep_last_lf) => (self.e_marks.get(usize(line)).unwrap() + i32(1)),
-        true => self.e_marks.get(usize(line)).unwrap()
+        (((line + i32(1)) < end) || keep_last_lf) => (self.e_marks.get_unchecked(usize(line)) + i32(1)),
+        true => self.e_marks.get_unchecked(usize(line))
       );
       // Clamp to source length (last line may not have trailing newline)
       (last : i32) = cond(
@@ -302,16 +309,16 @@ impl(StateBlock,
 
       (done : bool) = false;
       while ((first < last) && ((line_indent < indent) && !(done))), {
-        (ch : i32) = i32(self._src_bytes.get(usize(first)).unwrap());
+        (ch : i32) = i32(self._src_bytes.get_unchecked(usize(first)));
         cond(
           is_space(ch) => {
             if((ch == i32(0x09)), {
-              line_indent = (line_indent + (i32(4) - ((line_indent + self.bs_count.get(usize(line)).unwrap()) % i32(4))));
+              line_indent = (line_indent + (i32(4) - ((line_indent + self.bs_count.get_unchecked(usize(line))) % i32(4))));
             }, {
               line_indent = (line_indent + i32(1));
             });
           },
-          ((first - line_start) < self.t_shift.get(usize(line)).unwrap()) => {
+          ((first - line_start) < self.t_shift.get_unchecked(usize(line))) => {
             line_indent = (line_indent + i32(1));
           },
           true => {
@@ -323,28 +330,30 @@ impl(StateBlock,
         });
       };
 
-      // Extract the line slice from source bytes
-      (line_bytes : ArrayList(u8)) = self._src_bytes.slice(usize(first), usize(last)).unwrap();
-      (line_str : String) = String.from_bytes(line_bytes);
-
       if((line_indent > indent), {
         // Partially expanding tabs: prepend spaces
         (spaces : i32) = (line_indent - indent);
         (s : i32) = i32(0);
         while (s < spaces), {
-          (&result).push_string(` `);
+          out.push(u8(0x20));
           s = (s + i32(1));
         };
-        (&result).push_string(line_str);
-      }, {
-        (&result).push_string(line_str);
+      });
+
+      // Copy the line bytes directly via pointer
+      if((last > first), {
+        match(self._src_bytes.ptr(),
+          .Some(p) => out.extend_from_ptr((p &+ usize(first)), usize((last - first))),
+          .None => ()
+        );
       });
 
       line = (line + i32(1));
     };
 
-    result
+    String.from_bytes(out)
   })
 );
 
-export StateBlock, new_state_block, BlockTokenizeFn, block_push_token;
+export StateBlock, new_state_block, BlockTokenizeFn, block_push_token,
+       PARENT_ROOT, PARENT_PARAGRAPH, PARENT_BLOCKQUOTE, PARENT_LIST, PARENT_REFERENCE, PARENT_TABLE;

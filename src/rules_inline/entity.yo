@@ -25,7 +25,7 @@ _parse_hex :: (fn(s: String) -> i32)({
   (i : usize) = usize(0);
   (len : usize) = bytes.len();
   while (i < len), {
-    (ch : u8) = bytes.get(i).unwrap();
+    (ch : u8) = bytes.get_unchecked(i);
     (digit : i32) = cond(
       ((ch >= u8(0x30)) && (ch <= u8(0x39))) => (i32(ch) - i32(0x30)),
       ((ch >= u8(0x61)) && (ch <= u8(0x66))) => ((i32(ch) - i32(0x61)) + i32(10)),
@@ -45,7 +45,7 @@ _parse_dec :: (fn(s: String) -> i32)({
   (i : usize) = usize(0);
   (len : usize) = bytes.len();
   while (i < len), {
-    (ch : u8) = bytes.get(i).unwrap();
+    (ch : u8) = bytes.get_unchecked(i);
     (digit : i32) = (i32(ch) - i32(0x30));
     result = ((result * i32(10)) + digit);
     i = (i + usize(1));
@@ -57,7 +57,7 @@ entity :: (fn(state: *(StateInline), silent: bool) -> bool)({
   (pos : i32) = state.*.pos;
   (max : i32) = state.*.pos_max;
 
-  if((i32(state.*._src_bytes.get(usize(pos)).unwrap()) != i32(0x26)), {
+  if((i32(state.*._src_bytes.get_unchecked(usize(pos))) != i32(0x26)), {
     return false;
   });
 
@@ -65,7 +65,7 @@ entity :: (fn(state: *(StateInline), silent: bool) -> bool)({
     return false;
   });
 
-  (ch : i32) = i32(state.*._src_bytes.get(usize((pos + i32(1)))).unwrap());
+  (ch : i32) = i32(state.*._src_bytes.get_unchecked(usize((pos + i32(1)))));
 
   if((ch == i32(0x23)), {
     // Numeric entity: &#...;
@@ -76,7 +76,7 @@ entity :: (fn(state: *(StateInline), silent: bool) -> bool)({
         if(!(silent), {
           (group1 : String) = match_result.group(usize(1)).unwrap();
           (first_byte : ArrayList(u8)) = group1.as_bytes();
-          (first_ch : u8) = first_byte.get(usize(0)).unwrap();
+          (first_ch : u8) = first_byte.get_unchecked(usize(0));
           (code : i32) = cond(
             ((first_ch == u8(0x78)) || (first_ch == u8(0x58))) =>
               _parse_hex(group1.substring(usize(1), group1.len())),
@@ -90,7 +90,7 @@ entity :: (fn(state: *(StateInline), silent: bool) -> bool)({
 
           (token : Token) = Token(
             type_name: .TT_TEXT_SPECIAL,
-            tag: ``,
+            tag: "",
             nesting: i32(0),
             attrs: .None,
             map: .None,
@@ -121,7 +121,7 @@ entity :: (fn(state: *(StateInline), silent: bool) -> bool)({
           if(!(silent), {
             (token : Token) = Token(
               type_name: .TT_TEXT_SPECIAL,
-              tag: ``,
+              tag: "",
               nesting: i32(0),
               attrs: .None,
               map: .None,

@@ -31,8 +31,19 @@ fragments_join :: (fn(state: *(StateInline)) -> unit)({
     if(((tok.*.type_name == .TT_TEXT) && ((curr + i32(1)) < max)), {
       (next_tok : *(Token)) = tokens.get_ptr(usize((curr + i32(1))));
       if((next_tok.*.type_name == .TT_TEXT), {
-        // collapse two adjacent text nodes
-        next_tok.*.content = `${tok.*.content}${next_tok.*.content}`;
+        // collapse two adjacent text nodes: next.content = tok.content + next.content
+        (tok_bytes : ArrayList(u8)) = tok.*.content.as_bytes();
+        (next_bytes : ArrayList(u8)) = next_tok.*.content.as_bytes();
+        (combined : ArrayList(u8)) = ArrayList(u8).with_capacity((tok_bytes.len() + next_bytes.len()));
+        match(tok_bytes.ptr(),
+          .Some(p) => combined.extend_from_ptr(p, tok_bytes.len()),
+          .None => ()
+        );
+        match(next_bytes.ptr(),
+          .Some(p) => combined.extend_from_ptr(p, next_bytes.len()),
+          .None => ()
+        );
+        next_tok.*.content = String.from_bytes(combined);
       }, {
         if((curr != last), {
           tokens.set(usize(last), tok.*);

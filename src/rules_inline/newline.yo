@@ -12,7 +12,7 @@ open import "std/string";
 newline :: (fn(state: *(StateInline), silent: bool) -> bool)({
   (pos : i32) = state.*.pos;
 
-  if((i32(state.*._src_bytes.get(usize(pos)).unwrap()) != i32(0x0A)), {
+  if((i32(state.*._src_bytes.get_unchecked(usize(pos))) != i32(0x0A)), {
     return false;
   });
 
@@ -23,29 +23,29 @@ newline :: (fn(state: *(StateInline), silent: bool) -> bool)({
     (pmax : i32) = (i32(pending_bytes.len()) - i32(1));
 
     // '  \n' -> hardbreak
-    if(((pmax >= i32(0)) && (i32(pending_bytes.get(usize(pmax)).unwrap()) == i32(0x20))), {
-      if(((pmax >= i32(1)) && (i32(pending_bytes.get(usize((pmax - i32(1)))).unwrap()) == i32(0x20))), {
+    if(((pmax >= i32(0)) && (i32(pending_bytes.get_unchecked(usize(pmax))) == i32(0x20))), {
+      if(((pmax >= i32(1)) && (i32(pending_bytes.get_unchecked(usize((pmax - i32(1))))) == i32(0x20))), {
         // Find whitespace tail of pending chars.
         (ws : i32) = (pmax - i32(1));
-        while (((ws >= i32(1)) && (i32(pending_bytes.get(usize((ws - i32(1)))).unwrap()) == i32(0x20)))), {
+        while (((ws >= i32(1)) && (i32(pending_bytes.get_unchecked(usize((ws - i32(1))))) == i32(0x20)))), {
           ws = (ws - i32(1));
         };
         state.*.pending = String.from_bytes(pending_bytes.slice(usize(0), usize(ws)).unwrap());
-        inline_push_token(state, Token.new(.TT_HARDBREAK, `br`, i32(0)));
+        inline_push_token(state, Token.new(.TT_HARDBREAK, "br", i32(0)));
       }, {
         // Single trailing space
         state.*.pending = String.from_bytes(pending_bytes.slice(usize(0), usize(pmax)).unwrap());
-        inline_push_token(state, Token.new(.TT_SOFTBREAK, `br`, i32(0)));
+        inline_push_token(state, Token.new(.TT_SOFTBREAK, "br", i32(0)));
       });
     }, {
-      inline_push_token(state, Token.new(.TT_SOFTBREAK, `br`, i32(0)));
+      inline_push_token(state, Token.new(.TT_SOFTBREAK, "br", i32(0)));
     });
   });
 
   pos = (pos + i32(1));
 
   // skip heading spaces for next line
-  while (((pos < max) && is_space(i32(state.*._src_bytes.get(usize(pos)).unwrap())))), {
+  while (((pos < max) && is_space(i32(state.*._src_bytes.get_unchecked(usize(pos)))))), {
     pos = (pos + i32(1));
   };
 

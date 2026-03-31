@@ -19,37 +19,76 @@ escape_html :: (fn(input: String) -> String)(
     (bytes : ArrayList(u8)) = input.as_bytes();
     (i : usize) = usize(0);
     (len : usize) = bytes.len();
-    (has_special : bool) = false;
+
+    if((len == usize(0)), { return input; });
 
     // Quick test — if no special chars, return as-is
-    while ((i < len) && (!(has_special))), {
-      (ch : u8) = bytes.get(i).unwrap();
-      if(((ch == u8(0x26)) || ((ch == u8(0x3C)) || ((ch == u8(0x3E)) || (ch == u8(0x22))))), {
-        has_special = true;
-      });
-      i = (i + usize(1));
-    };
+    (has_special : bool) = false;
+    match(bytes.ptr(),
+      .Some(p) => {
+        while ((i < len) && (!(has_special))), {
+          (ch : u8) = (p &+ i).*;
+          if(((ch == u8(0x26)) || ((ch == u8(0x3C)) || ((ch == u8(0x3E)) || (ch == u8(0x22))))), {
+            has_special = true;
+          });
+          i = (i + usize(1));
+        };
+      },
+      .None => ()
+    );
 
     if(!(has_special), {
       return input;
     });
 
-    // Pre-allocate with some headroom for entity expansion
+    // Run-based approach: copy non-special runs via extend_from_ptr
     (out : ArrayList(u8)) = ArrayList(u8).with_capacity((len + (len / usize(8))));
     i = usize(0);
-    while (i < len), {
-      (ch : u8) = bytes.get(i).unwrap();
-      cond(
-        (ch == u8(0x26)) => out.extend_from_ptr(*(u8)("&amp;"), usize(5)),
-        (ch == u8(0x3C)) => out.extend_from_ptr(*(u8)("&lt;"), usize(4)),
-        (ch == u8(0x3E)) => out.extend_from_ptr(*(u8)("&gt;"), usize(4)),
-        (ch == u8(0x22)) => out.extend_from_ptr(*(u8)("&quot;"), usize(6)),
-        true => {
-          _ := out.push(ch);
-        }
-      );
-      i = (i + usize(1));
-    };
+    (run_start : usize) = usize(0);
+    match(bytes.ptr(),
+      .Some(src_ptr) => {
+        while (i < len), {
+          (ch : u8) = (src_ptr &+ i).*;
+          cond(
+            (ch == u8(0x26)) => {
+              if((i > run_start), {
+                out.extend_from_ptr((src_ptr &+ run_start), (i - run_start));
+              });
+              out.extend_from_ptr(*(u8)("&amp;"), usize(5));
+              run_start = (i + usize(1));
+            },
+            (ch == u8(0x3C)) => {
+              if((i > run_start), {
+                out.extend_from_ptr((src_ptr &+ run_start), (i - run_start));
+              });
+              out.extend_from_ptr(*(u8)("&lt;"), usize(4));
+              run_start = (i + usize(1));
+            },
+            (ch == u8(0x3E)) => {
+              if((i > run_start), {
+                out.extend_from_ptr((src_ptr &+ run_start), (i - run_start));
+              });
+              out.extend_from_ptr(*(u8)("&gt;"), usize(4));
+              run_start = (i + usize(1));
+            },
+            (ch == u8(0x22)) => {
+              if((i > run_start), {
+                out.extend_from_ptr((src_ptr &+ run_start), (i - run_start));
+              });
+              out.extend_from_ptr(*(u8)("&quot;"), usize(6));
+              run_start = (i + usize(1));
+            },
+            true => ()
+          );
+          i = (i + usize(1));
+        };
+        // Flush remaining
+        if((len > run_start), {
+          out.extend_from_ptr((src_ptr &+ run_start), (len - run_start));
+        });
+      },
+      .None => ()
+    );
 
     String.from_bytes(out)
   }
@@ -68,77 +107,71 @@ escape_html_to :: (fn(result: *(String), input: String) -> unit)(
 
     // Quick test — if no special chars, append as-is
     (has_special : bool) = false;
-    while ((i < len) && (!(has_special))), {
-      (ch : u8) = bytes.get(i).unwrap();
-      if(((ch == u8(0x26)) || ((ch == u8(0x3C)) || ((ch == u8(0x3E)) || (ch == u8(0x22))))), {
-        has_special = true;
-      });
-      i = (i + usize(1));
-    };
+    match(bytes.ptr(),
+      .Some(p) => {
+        while ((i < len) && (!(has_special))), {
+          (ch : u8) = (p &+ i).*;
+          if(((ch == u8(0x26)) || ((ch == u8(0x3C)) || ((ch == u8(0x3E)) || (ch == u8(0x22))))), {
+            has_special = true;
+          });
+          i = (i + usize(1));
+        };
+      },
+      .None => ()
+    );
 
     if(!(has_special), {
       result.push_string(input);
       return ();
     });
 
-    // Reserve space and escape byte by byte
     result.reserve((len + (len / usize(8))));
     i = usize(0);
     (run_start : usize) = usize(0);
-    while (i < len), {
-      (ch : u8) = bytes.get(i).unwrap();
-      cond(
-        (ch == u8(0x26)) => {
-          if((i > run_start), {
-            match(bytes.ptr(),
-              .Some(p) => result.*._bytes.extend_from_ptr((p &+ run_start), (i - run_start)),
-              .None => ()
-            );
-          });
-          result.push_str("&amp;");
-          run_start = (i + usize(1));
-        },
-        (ch == u8(0x3C)) => {
-          if((i > run_start), {
-            match(bytes.ptr(),
-              .Some(p) => result.*._bytes.extend_from_ptr((p &+ run_start), (i - run_start)),
-              .None => ()
-            );
-          });
-          result.push_str("&lt;");
-          run_start = (i + usize(1));
-        },
-        (ch == u8(0x3E)) => {
-          if((i > run_start), {
-            match(bytes.ptr(),
-              .Some(p) => result.*._bytes.extend_from_ptr((p &+ run_start), (i - run_start)),
-              .None => ()
-            );
-          });
-          result.push_str("&gt;");
-          run_start = (i + usize(1));
-        },
-        (ch == u8(0x22)) => {
-          if((i > run_start), {
-            match(bytes.ptr(),
-              .Some(p) => result.*._bytes.extend_from_ptr((p &+ run_start), (i - run_start)),
-              .None => ()
-            );
-          });
-          result.push_str("&quot;");
-          run_start = (i + usize(1));
-        },
-        true => ()
-      );
-      i = (i + usize(1));
-    };
-    // Flush remaining non-special bytes
-    if((len > run_start), {
-      match(bytes.ptr(),
-        .Some(p) => result.*._bytes.extend_from_ptr((p &+ run_start), (len - run_start)),
-        .None => ()
-      );
-    });
+    (result_al : ArrayList(u8)) = result.*._bytes.unwrap();
+    match(bytes.ptr(),
+      .Some(src_ptr) => {
+        while (i < len), {
+          (ch : u8) = (src_ptr &+ i).*;
+          cond(
+            (ch == u8(0x26)) => {
+              if((i > run_start), {
+                result_al.extend_from_ptr((src_ptr &+ run_start), (i - run_start));
+              });
+              result.push_str("&amp;");
+              run_start = (i + usize(1));
+            },
+            (ch == u8(0x3C)) => {
+              if((i > run_start), {
+                result_al.extend_from_ptr((src_ptr &+ run_start), (i - run_start));
+              });
+              result.push_str("&lt;");
+              run_start = (i + usize(1));
+            },
+            (ch == u8(0x3E)) => {
+              if((i > run_start), {
+                result_al.extend_from_ptr((src_ptr &+ run_start), (i - run_start));
+              });
+              result.push_str("&gt;");
+              run_start = (i + usize(1));
+            },
+            (ch == u8(0x22)) => {
+              if((i > run_start), {
+                result_al.extend_from_ptr((src_ptr &+ run_start), (i - run_start));
+              });
+              result.push_str("&quot;");
+              run_start = (i + usize(1));
+            },
+            true => ()
+          );
+          i = (i + usize(1));
+        };
+        if((len > run_start), {
+          result_al.extend_from_ptr((src_ptr &+ run_start), (len - run_start));
+        });
+      },
+      .None => ()
+    );
   }
 );
 
@@ -239,21 +272,21 @@ array_replace_at :: (fn(forall(T : Type), src: ArrayList(T), pos: i32, new_eleme
 
     (i : i32) = i32(0);
     while (i < pos), {
-      result.push(src.get(usize(i)).unwrap());
+      result.push(src.get_unchecked(usize(i)));
       i = (i + i32(1));
     };
 
     (j : i32) = i32(0);
     (new_len : i32) = i32(new_elements.len());
     while (j < new_len), {
-      result.push(new_elements.get(usize(j)).unwrap());
+      result.push(new_elements.get_unchecked(usize(j)));
       j = (j + i32(1));
     };
 
     (k : i32) = (pos + i32(1));
     (src_len : i32) = i32(src.len());
     while (k < src_len), {
-      result.push(src.get(usize(k)).unwrap());
+      result.push(src.get_unchecked(usize(k)));
       k = (k + i32(1));
     };
 
@@ -383,79 +416,111 @@ _is_md_punct_char :: (fn(ch: u8) -> bool)(
 
 unescape_all :: (fn(input: String) -> String)(
   {
-    // Fast path: no backslash or ampersand means nothing to unescape
-    if((!(input.contains(`\\`)) && !(input.contains(`&`))), {
-      return input;
-    });
-
     (bytes : ArrayList(u8)) = input.as_bytes();
-    (result : String) = ``;
-    (i : usize) = usize(0);
     (len : usize) = bytes.len();
 
-    while (i < len), {
-      (ch : u8) = bytes.get(i).unwrap();
+    if((len == usize(0)), { return input; });
 
-      cond(
-        // Backslash escape: \X where X is a markdown punctuation char
-        ((ch == u8(0x5C)) && ((i + usize(1)) < len)) => {
-          (next : u8) = bytes.get((i + usize(1))).unwrap();
-          if(_is_md_punct_char(next), {
-            result = `${result}${from_code_point(i32(next))}`;
-            i = (i + usize(2));
-          }, {
-            result = `${result}\\`;
-            i = (i + usize(1));
+    // Fast path: scan for backslash or ampersand using raw pointer
+    (has_special : bool) = false;
+    match(bytes.ptr(),
+      .Some(p) => {
+        (si : usize) = usize(0);
+        while ((si < len) && !(has_special)), {
+          (b : u8) = (p &+ si).*;
+          if(((b == u8(0x5C)) || (b == u8(0x26))), {
+            has_special = true;
           });
-        },
+          si = (si + usize(1));
+        };
+      },
+      .None => ()
+    );
 
-        // Ampersand: try to decode HTML entity
-        (ch == u8(0x26)) => {
-          // Find the extent of the potential entity: &...;
-          // Collect from & to ; (max 32 chars for entity name)
-          (entity_start : usize) = i;
-          (j : usize) = (i + usize(1));
-          (found_semi : bool) = false;
-          (max_entity : usize) = cond(
-            ((i + usize(34)) < len) => (i + usize(34)),
-            true => len
-          );
+    if(!(has_special), { return input; });
 
-          while ((j < max_entity) && !(found_semi)), {
-            (ech : u8) = bytes.get(j).unwrap();
-            if((ech == u8(0x3B)), {
-              found_semi = true;
-            }, {
-              j = (j + usize(1));
-            });
-          };
+    // Build result using ArrayList(u8) with run-based flushing
+    (out : ArrayList(u8)) = ArrayList(u8).with_capacity(len);
+    (i : usize) = usize(0);
+    (run_start : usize) = usize(0);
 
-          if(found_semi, {
-            // Extract the entity substring including & and ;
-            (entity_str : String) = input.substring(entity_start, (j + usize(1)));
-            (decoded : String) = decode_html(entity_str);
-            // If decode_html changed the string, it was a valid entity
-            if(!(decoded == entity_str), {
-              result = `${result}${decoded}`;
-              i = (j + usize(1));
-            }, {
-              result = `${result}&`;
+    match(bytes.ptr(),
+      .Some(src_ptr) => {
+        while (i < len), {
+          (ch : u8) = (src_ptr &+ i).*;
+
+          cond(
+            ((ch == u8(0x5C)) && ((i + usize(1)) < len)) => {
+              (next : u8) = (src_ptr &+ (i + usize(1))).*;
+              if(_is_md_punct_char(next), {
+                // Flush run before backslash
+                if((i > run_start), {
+                  out.extend_from_ptr((src_ptr &+ run_start), (i - run_start));
+                });
+                // Emit the unescaped character (single ASCII byte)
+                out.push(next);
+                i = (i + usize(2));
+                run_start = i;
+              }, {
+                // Not a punctuation escape, keep the backslash
+                i = (i + usize(1));
+              });
+            },
+
+            (ch == u8(0x26)) => {
+              (j : usize) = (i + usize(1));
+              (found_semi : bool) = false;
+              (max_entity : usize) = cond(
+                ((i + usize(34)) < len) => (i + usize(34)),
+                true => len
+              );
+
+              while ((j < max_entity) && !(found_semi)), {
+                if(((src_ptr &+ j).* == u8(0x3B)), {
+                  found_semi = true;
+                }, {
+                  j = (j + usize(1));
+                });
+              };
+
+              if(found_semi, {
+                (entity_str : String) = input.substring(i, (j + usize(1)));
+                (decoded : String) = decode_html(entity_str);
+                if(!(decoded == entity_str), {
+                  // Flush run before entity
+                  if((i > run_start), {
+                    out.extend_from_ptr((src_ptr &+ run_start), (i - run_start));
+                  });
+                  // Emit decoded entity bytes
+                  (dec_bytes : ArrayList(u8)) = decoded.as_bytes();
+                  match(dec_bytes.ptr(),
+                    .Some(dp) => out.extend_from_ptr(dp, dec_bytes.len()),
+                    .None => ()
+                  );
+                  i = (j + usize(1));
+                  run_start = i;
+                }, {
+                  i = (i + usize(1));
+                });
+              }, {
+                i = (i + usize(1));
+              });
+            },
+
+            true => {
               i = (i + usize(1));
-            });
-          }, {
-            result = `${result}&`;
-            i = (i + usize(1));
-          });
-        },
+            }
+          );
+        };
+        // Flush remaining bytes
+        if((len > run_start), {
+          out.extend_from_ptr((src_ptr &+ run_start), (len - run_start));
+        });
+      },
+      .None => ()
+    );
 
-        true => {
-          result = `${result}${from_code_point(i32(ch))}`;
-          i = (i + usize(1));
-        }
-      );
-    };
-
-    result
+    String.from_bytes(out)
   }
 );
 
@@ -463,12 +528,12 @@ unescape_all :: (fn(input: String) -> String)(
 // and return it as a String. This is needed because String.substring uses
 // character positions, but our parser works with byte positions.
 byte_substring :: (fn(bytes: ArrayList(u8), start: i32, end: i32) -> String)({
-  (out : ArrayList(u8)) = ArrayList(u8).with_capacity(usize((end - start)));
-  (i : i32) = start;
-  while (i < end), {
-    out.push(bytes.get(usize(i)).unwrap());
-    i = (i + i32(1));
-  };
+  (count : usize) = usize((end - start));
+  (out : ArrayList(u8)) = ArrayList(u8).with_capacity(count);
+  match(bytes.ptr(),
+    .Some(p) => out.extend_from_ptr((p &+ usize(start)), count),
+    .None => ()
+  );
   String.from_bytes(out)
 });
 

@@ -4,22 +4,22 @@
 
 open import "std/string";
 { ArrayList } :: import "std/collections/array_list";
-{ Token, TokenType } :: import "../token.yo";
+{ Token, TokenType, MapRange } :: import "../token.yo";
 { StateBlock, block_push_token } :: import "./state_block.yo";
 { is_space } :: import "../common/utils.yo";
 
 // Horizontal rule block rule
 hr :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: bool) -> bool)({
-  (max : i32) = state.*.e_marks.get(usize(start_line)).unwrap();
+  (max : i32) = state.*.e_marks.get_unchecked(usize(start_line));
 
   // if it's indented more than 3 spaces, it should be a code block
-  if(((state.*.s_count.get(usize(start_line)).unwrap() - state.*.blk_indent) >= i32(4)), {
+  if(((state.*.s_count.get_unchecked(usize(start_line)) - state.*.blk_indent) >= i32(4)), {
     return false;
   });
 
-  (pos : i32) = (state.*.b_marks.get(usize(start_line)).unwrap() + state.*.t_shift.get(usize(start_line)).unwrap());
+  (pos : i32) = (state.*.b_marks.get_unchecked(usize(start_line)) + state.*.t_shift.get_unchecked(usize(start_line)));
 
-  (marker : i32) = i32(state.*._src_bytes.get(usize(pos)).unwrap());
+  (marker : i32) = i32(state.*._src_bytes.get_unchecked(usize(pos)));
   pos = (pos + i32(1));
 
   // Check hr marker: * - _
@@ -30,7 +30,7 @@ hr :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: bool) ->
   // markers can be mixed with spaces, but there should be at least 3 of them
   (cnt : i32) = i32(1);
   while (pos < max), {
-    (ch : i32) = i32(state.*._src_bytes.get(usize(pos)).unwrap());
+    (ch : i32) = i32(state.*._src_bytes.get_unchecked(usize(pos)));
     pos = (pos + i32(1));
     if(((ch != marker) && (!(is_space(ch)))), {
       return false;
@@ -55,17 +55,14 @@ hr :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: bool) ->
   (markup : String) = ``;
   (mi : i32) = i32(0);
   while (mi < cnt), {
-    _ := (&markup)._bytes.push(u8(marker));
+    (&markup).push_byte(u8(marker));
     mi = (mi + i32(1));
   };
 
-  (token : Token) = Token.new(.TT_HR, `hr`, i32(0));
+  (token : Token) = Token.new(.TT_HR, "hr", i32(0));
   token.block = true;
   token.markup = markup;
-  (map : ArrayList(i32)) = ArrayList(i32).new();
-  _ := map.push(start_line);
-  _ := map.push(state.*.line);
-  token.map = .Some(map);
+  token.map = .Some(MapRange(begin: start_line, end: state.*.line));
   block_push_token(state, token);
 
   true

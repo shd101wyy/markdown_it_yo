@@ -28,13 +28,13 @@ parse_link_destination :: (fn(input: String, start: i32, max: i32) -> LinkDestRe
       return result;
     });
 
-    (code : u8) = bytes.get(usize(pos)).unwrap();
+    (code : u8) = bytes.get_unchecked(usize(pos));
 
     // Parse <url> form
     if((code == u8(0x3C)), {
       pos = (pos + i32(1));
       while (pos < max), {
-        code = bytes.get(usize(pos)).unwrap();
+        code = bytes.get_unchecked(usize(pos));
         cond(
           // \n - not allowed inside <...>
           (code == u8(0x0A)) => {
@@ -72,7 +72,7 @@ parse_link_destination :: (fn(input: String, start: i32, max: i32) -> LinkDestRe
     (level : i32) = i32(0);
     (done : bool) = false;
     while ((pos < max) && !(done)), {
-      code = bytes.get(usize(pos)).unwrap();
+      code = bytes.get_unchecked(usize(pos));
 
       cond(
         // space - end of url
@@ -85,7 +85,7 @@ parse_link_destination :: (fn(input: String, start: i32, max: i32) -> LinkDestRe
         },
         // backslash escape
         ((code == u8(0x5C)) && ((pos + i32(1)) < max)) => {
-          if((bytes.get(usize((pos + i32(1)))).unwrap() == u8(0x20)), {
+          if((bytes.get_unchecked(usize((pos + i32(1)))) == u8(0x20)), {
             done = true;
           }, {
             pos = (pos + i32(2));

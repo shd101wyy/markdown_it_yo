@@ -24,11 +24,11 @@ process_delimiters :: (fn(delimiters: ArrayList(Delimiter)) -> unit)({
 
   (closer_idx : i32) = i32(0);
   while (closer_idx < max), {
-    (closer : Delimiter) = delimiters.get(usize(closer_idx)).unwrap();
+    (closer : Delimiter) = delimiters.get_unchecked(usize(closer_idx));
     _ := jumps.push(i32(0));
 
     // markers belong to same delimiter run if adjacent tokens and same marker
-    (hdr : Delimiter) = delimiters.get(usize(header_idx)).unwrap();
+    (hdr : Delimiter) = delimiters.get_unchecked(usize(header_idx));
     if(((hdr.marker != closer.marker) || (last_token_idx != (closer.token_idx - i32(1)))), {
       header_idx = closer_idx;
     });
@@ -57,14 +57,14 @@ process_delimiters :: (fn(delimiters: ArrayList(Delimiter)) -> unit)({
         closer.open => (i32(3) + (closer.length % i32(3))),
         true => (closer.length % i32(3))
       );
-      (min_opener_idx : i32) = bottom_arr.get(usize(bottom_idx)).unwrap();
+      (min_opener_idx : i32) = bottom_arr.get_unchecked(usize(bottom_idx));
 
-      (opener_idx : i32) = ((header_idx - jumps.get(usize(header_idx)).unwrap()) - i32(1));
+      (opener_idx : i32) = ((header_idx - jumps.get_unchecked(usize(header_idx))) - i32(1));
       (new_min_opener_idx : i32) = opener_idx;
       (found_match : bool) = false;
 
       while (((opener_idx > min_opener_idx) && (found_match == false))), {
-        (opener : Delimiter) = delimiters.get(usize(opener_idx)).unwrap();
+        (opener : Delimiter) = delimiters.get_unchecked(usize(opener_idx));
 
         if(((opener.marker == closer.marker) && (opener.open && (opener.end < i32(0)))), {
           (is_odd_match : bool) = false;
@@ -79,8 +79,8 @@ process_delimiters :: (fn(delimiters: ArrayList(Delimiter)) -> unit)({
 
           if((is_odd_match == false), {
             (last_jump : i32) = cond(
-              ((opener_idx > i32(0)) && (delimiters.get(usize((opener_idx - i32(1)))).unwrap().open == false))
-                => (jumps.get(usize((opener_idx - i32(1)))).unwrap() + i32(1)),
+              ((opener_idx > i32(0)) && (delimiters.get_unchecked(usize((opener_idx - i32(1)))).open == false))
+                => (jumps.get_unchecked(usize((opener_idx - i32(1)))) + i32(1)),
               true => i32(0)
             );
 
@@ -101,7 +101,7 @@ process_delimiters :: (fn(delimiters: ArrayList(Delimiter)) -> unit)({
         });
 
         if((found_match == false), {
-          opener_idx = ((opener_idx - jumps.get(usize(opener_idx)).unwrap()) - i32(1));
+          opener_idx = ((opener_idx - jumps.get_unchecked(usize(opener_idx))) - i32(1));
         });
       };
 
@@ -122,7 +122,7 @@ link_pairs :: (fn(state: *(StateInline)) -> unit)({
 
   (curr : i32) = i32(0);
   while (curr < max), {
-    match(tokens_meta.get(usize(curr)).unwrap(),
+    match(tokens_meta.get_unchecked(usize(curr)),
       .Some(tm) => process_delimiters(tm.delimiters),
       .None => ()
     );

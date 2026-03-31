@@ -4,8 +4,8 @@
 
 open import "std/string";
 { ArrayList } :: import "std/collections/array_list";
-{ Token, StringPair, TokenType } :: import "../token.yo";
-{ StateBlock, block_push_token } :: import "./state_block.yo";
+{ Token, StringPair, TokenType, MapRange } :: import "../token.yo";
+{StateBlock, block_push_token, PARENT_TABLE} :: import "./state_block.yo";
 { BlockRuleFn } :: import "./lheading.yo";
 { is_space } :: import "../common/utils.yo";
 { table_get_line, escaped_split } :: import "./table_helpers.yo";
@@ -26,34 +26,34 @@ table :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: bool,
 
   (next_line : i32) = (start_line + i32(1));
 
-  if((state.*.s_count.get(usize(next_line)).unwrap() < state.*.blk_indent), {
+  if((state.*.s_count.get_unchecked(usize(next_line)) < state.*.blk_indent), {
     return false;
   });
 
   // if it's indented more than 3 spaces, it should be a code block
-  if(((state.*.s_count.get(usize(next_line)).unwrap() - state.*.blk_indent) >= i32(4)), {
+  if(((state.*.s_count.get_unchecked(usize(next_line)) - state.*.blk_indent) >= i32(4)), {
     return false;
   });
 
   // first character of the second line should be '|', '-', ':',
   // and no other characters are allowed but spaces;
   // basically, this is the equivalent of /^[-:|][-:|\s]*$/
-  (pos : i32) = (state.*.b_marks.get(usize(next_line)).unwrap() + state.*.t_shift.get(usize(next_line)).unwrap());
-  if((pos >= state.*.e_marks.get(usize(next_line)).unwrap()), {
+  (pos : i32) = (state.*.b_marks.get_unchecked(usize(next_line)) + state.*.t_shift.get_unchecked(usize(next_line)));
+  if((pos >= state.*.e_marks.get_unchecked(usize(next_line))), {
     return false;
   });
 
-  (first_ch : i32) = i32(state.*._src_bytes.get(usize(pos)).unwrap());
+  (first_ch : i32) = i32(state.*._src_bytes.get_unchecked(usize(pos)));
   pos = (pos + i32(1));
   if((((first_ch != i32(0x7C)) && (first_ch != i32(0x2D))) && (first_ch != i32(0x3A))), {
     return false;
   });
 
-  if((pos >= state.*.e_marks.get(usize(next_line)).unwrap()), {
+  if((pos >= state.*.e_marks.get_unchecked(usize(next_line))), {
     return false;
   });
 
-  (second_ch : i32) = i32(state.*._src_bytes.get(usize(pos)).unwrap());
+  (second_ch : i32) = i32(state.*._src_bytes.get_unchecked(usize(pos)));
   pos = (pos + i32(1));
   if(((((second_ch != i32(0x7C)) && (second_ch != i32(0x2D))) && (second_ch != i32(0x3A))) && !(is_space(second_ch))), {
     return false;
@@ -67,8 +67,8 @@ table :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: bool,
   // check remaining chars on separator line
   (check_pos : i32) = pos;
   (sep_valid : bool) = true;
-  while ((check_pos < state.*.e_marks.get(usize(next_line)).unwrap()) && sep_valid), {
-    (ch : i32) = i32(state.*._src_bytes.get(usize(check_pos)).unwrap());
+  while ((check_pos < state.*.e_marks.get_unchecked(usize(next_line))) && sep_valid), {
+    (ch : i32) = i32(state.*._src_bytes.get_unchecked(usize(check_pos)));
     if(((((ch != i32(0x7C)) && (ch != i32(0x2D))) && (ch != i32(0x3A))) && !(is_space(ch))), {
       sep_valid = false;
     }, {
@@ -87,7 +87,7 @@ table :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: bool,
   (ci : i32) = i32(0);
   (col_valid : bool) = true;
   while ((ci < i32(columns.len())) && col_valid), {
-    (t : String) = columns.get(usize(ci)).unwrap().trim();
+    (t : String) = columns.get_unchecked(usize(ci)).trim();
     if((t.len() == usize(0)), {
       // allow empty columns before and after table, but not in between
       if(((ci == i32(0)) || (ci == (i32(columns.len()) - i32(1)))), {
@@ -100,14 +100,14 @@ table :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: bool,
       (t_bytes : ArrayList(u8)) = t.as_bytes();
       (t_len : i32) = i32(t_bytes.len());
       (ti : i32) = i32(0);
-      (first_colon : bool) = (i32(t_bytes.get(usize(0)).unwrap()) == i32(0x3A));
+      (first_colon : bool) = (i32(t_bytes.get_unchecked(usize(0))) == i32(0x3A));
       if(first_colon, {
         ti = i32(1);
       });
       (has_dash : bool) = false;
       (pattern_ok : bool) = true;
       while ((ti < t_len) && pattern_ok), {
-        (tc : i32) = i32(t_bytes.get(usize(ti)).unwrap());
+        (tc : i32) = i32(t_bytes.get_unchecked(usize(ti)));
         if((tc == i32(0x2D)), {
           has_dash = true;
           ti = (ti + i32(1));
@@ -122,7 +122,7 @@ table :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: bool,
       if((!(pattern_ok) || !(has_dash)), {
         col_valid = false;
       }, {
-        (last_colon : bool) = (i32(t_bytes.get(usize((t_len - i32(1)))).unwrap()) == i32(0x3A));
+        (last_colon : bool) = (i32(t_bytes.get_unchecked(usize((t_len - i32(1))))) == i32(0x3A));
         if(last_colon, {
           if(first_colon, {
             _ := aligns.push(`center`);
@@ -149,17 +149,17 @@ table :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: bool,
   if(header_text.index_of(`|`).is_none(), {
     return false;
   });
-  if(((state.*.s_count.get(usize(start_line)).unwrap() - state.*.blk_indent) >= i32(4)), {
+  if(((state.*.s_count.get_unchecked(usize(start_line)) - state.*.blk_indent) >= i32(4)), {
     return false;
   });
 
   (header_columns : ArrayList(String)) = escaped_split(header_text);
   // trim leading empty
-  if(((header_columns.len() > usize(0)) && (header_columns.get(usize(0)).unwrap().len() == usize(0))), {
+  if(((header_columns.len() > usize(0)) && (header_columns.get_unchecked(usize(0)).len() == usize(0))), {
     _ := header_columns.remove(usize(0));
   });
   // trim trailing empty
-  if(((header_columns.len() > usize(0)) && (header_columns.get(usize((i32(header_columns.len()) - i32(1)))).unwrap().len() == usize(0))), {
+  if(((header_columns.len() > usize(0)) && (header_columns.get_unchecked(usize((i32(header_columns.len()) - i32(1)))).len() == usize(0))), {
     _ := header_columns.remove(usize((i32(header_columns.len()) - i32(1))));
   });
 
@@ -172,54 +172,45 @@ table :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: bool,
     return true;
   });
 
-  (old_parent_type : String) = state.*.parent_type;
-  state.*.parent_type = `table`;
+  (old_parent_type : i32) = state.*.parent_type;
+  state.*.parent_type = PARENT_TABLE;
 
   // table_open
-  (token_to : Token) = Token.new(.TT_TABLE_OPEN, `table`, i32(1));
-  (table_lines : ArrayList(i32)) = ArrayList(i32).new();
-  _ := table_lines.push(start_line);
-  _ := table_lines.push(i32(0));
-  token_to.map = .Some(table_lines);
+  (token_to : Token) = Token.new(.TT_TABLE_OPEN, "table", i32(1));
+  token_to.map = .Some(MapRange(begin: start_line, end: i32(0)));
   block_push_token(state, token_to);
 
   // thead_open
-  (token_tho : Token) = Token.new(.TT_THEAD_OPEN, `thead`, i32(1));
-  (thead_map : ArrayList(i32)) = ArrayList(i32).new();
-  _ := thead_map.push(start_line);
-  _ := thead_map.push((start_line + i32(1)));
-  token_tho.map = .Some(thead_map);
+  (token_tho : Token) = Token.new(.TT_THEAD_OPEN, "thead", i32(1));
+  token_tho.map = .Some(MapRange(begin: start_line, end: (start_line + i32(1))));
   block_push_token(state, token_tho);
 
   // tr_open
-  (token_htro : Token) = Token.new(.TT_TR_OPEN, `tr`, i32(1));
-  (tr_map : ArrayList(i32)) = ArrayList(i32).new();
-  _ := tr_map.push(start_line);
-  _ := tr_map.push((start_line + i32(1)));
-  token_htro.map = .Some(tr_map);
+  (token_htro : Token) = Token.new(.TT_TR_OPEN, "tr", i32(1));
+  token_htro.map = .Some(MapRange(begin: start_line, end: (start_line + i32(1))));
   block_push_token(state, token_htro);
 
   // header cells
   (hi : i32) = i32(0);
   while (hi < i32(header_columns.len())), {
-    (token_ho : Token) = Token.new(.TT_TH_OPEN, `th`, i32(1));
-    (align_val : String) = aligns.get(usize(hi)).unwrap();
+    (token_ho : Token) = Token.new(.TT_TH_OPEN, "th", i32(1));
+    (align_val : String) = aligns.get_unchecked(usize(hi));
     if((align_val.len() > usize(0)), {
       token_ho.attr_push(StringPair(name: `style`, value: `text-align:${align_val}`));
     });
     block_push_token(state, token_ho);
 
-    (token_il : Token) = Token.new(.TT_INLINE, ``, i32(0));
-    token_il.content = header_columns.get(usize(hi)).unwrap().trim();
+    (token_il : Token) = Token.new(.TT_INLINE, "", i32(0));
+    token_il.content = header_columns.get_unchecked(usize(hi)).trim();
     token_il.children = .Some(ArrayList(Token).new());
     block_push_token(state, token_il);
 
-    block_push_token(state, Token.new(.TT_TH_CLOSE, `th`, i32(-1)));
+    block_push_token(state, Token.new(.TT_TH_CLOSE, "th", i32(-1)));
     hi = (hi + i32(1));
   };
 
-  block_push_token(state, Token.new(.TT_TR_CLOSE, `tr`, i32(-1)));
-  block_push_token(state, Token.new(.TT_THEAD_CLOSE, `thead`, i32(-1)));
+  block_push_token(state, Token.new(.TT_TR_CLOSE, "tr", i32(-1)));
+  block_push_token(state, Token.new(.TT_THEAD_CLOSE, "thead", i32(-1)));
 
   // Body rows
   (tbody_opened : bool) = false;
@@ -229,7 +220,7 @@ table :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: bool,
   next_line = (start_line + i32(2));
   (body_done : bool) = false;
   while ((next_line < end_line) && !(body_done)), {
-    if((state.*.s_count.get(usize(next_line)).unwrap() < state.*.blk_indent), {
+    if((state.*.s_count.get_unchecked(usize(next_line)) < state.*.blk_indent), {
       body_done = true;
     }, {
       // check terminator rules
@@ -237,7 +228,7 @@ table :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: bool,
       (ti : i32) = i32(0);
       while ((ti < i32(terminator_rules.*.len())) && !(terminate)), {
         // Workaround: separate .unwrap() from call to avoid evaluator chained-call bug
-        (rule_fn : BlockRuleFn) = terminator_rules.*.get(usize(ti)).unwrap();
+        (rule_fn : BlockRuleFn) = terminator_rules.*.get_unchecked(usize(ti));
         if(rule_fn((&state.*), next_line, end_line, true), {
           terminate = true;
         }, {
@@ -251,14 +242,14 @@ table :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: bool,
         if((row_text.len() == usize(0)), {
           body_done = true;
         }, {
-          if(((state.*.s_count.get(usize(next_line)).unwrap() - state.*.blk_indent) >= i32(4)), {
+          if(((state.*.s_count.get_unchecked(usize(next_line)) - state.*.blk_indent) >= i32(4)), {
             body_done = true;
           }, {
             (row_columns : ArrayList(String)) = escaped_split(row_text);
-            if(((row_columns.len() > usize(0)) && (row_columns.get(usize(0)).unwrap().len() == usize(0))), {
+            if(((row_columns.len() > usize(0)) && (row_columns.get_unchecked(usize(0)).len() == usize(0))), {
               _ := row_columns.remove(usize(0));
             });
-            if(((row_columns.len() > usize(0)) && (row_columns.get(usize((i32(row_columns.len()) - i32(1)))).unwrap().len() == usize(0))), {
+            if(((row_columns.len() > usize(0)) && (row_columns.get_unchecked(usize((i32(row_columns.len()) - i32(1)))).len() == usize(0))), {
               _ := row_columns.remove(usize((i32(row_columns.len()) - i32(1))));
             });
 
@@ -267,45 +258,39 @@ table :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: bool,
               body_done = true;
             }, {
               if(!(tbody_opened), {
-                (token_tbo : Token) = Token.new(.TT_TBODY_OPEN, `tbody`, i32(1));
-                (tbody_map : ArrayList(i32)) = ArrayList(i32).new();
-                _ := tbody_map.push(tbody_start_line);
-                _ := tbody_map.push(i32(0));
-                token_tbo.map = .Some(tbody_map);
+                (token_tbo : Token) = Token.new(.TT_TBODY_OPEN, "tbody", i32(1));
+                token_tbo.map = .Some(MapRange(begin: tbody_start_line, end: i32(0)));
                 block_push_token(state, token_tbo);
                 tbody_opened = true;
               });
 
-              (token_tro : Token) = Token.new(.TT_TR_OPEN, `tr`, i32(1));
-              (tro_map : ArrayList(i32)) = ArrayList(i32).new();
-              _ := tro_map.push(next_line);
-              _ := tro_map.push((next_line + i32(1)));
-              token_tro.map = .Some(tro_map);
+              (token_tro : Token) = Token.new(.TT_TR_OPEN, "tr", i32(1));
+              token_tro.map = .Some(MapRange(begin: next_line, end: (next_line + i32(1))));
               block_push_token(state, token_tro);
 
               (ri : i32) = i32(0);
               while (ri < column_count), {
-                (token_tdo : Token) = Token.new(.TT_TD_OPEN, `td`, i32(1));
-                (a_val : String) = aligns.get(usize(ri)).unwrap();
+                (token_tdo : Token) = Token.new(.TT_TD_OPEN, "td", i32(1));
+                (a_val : String) = aligns.get_unchecked(usize(ri));
                 if((a_val.len() > usize(0)), {
                   token_tdo.attr_push(StringPair(name: `style`, value: `text-align:${a_val}`));
                 });
                 block_push_token(state, token_tdo);
 
-                (token_il : Token) = Token.new(.TT_INLINE, ``, i32(0));
+                (token_il : Token) = Token.new(.TT_INLINE, "", i32(0));
                 if((ri < i32(row_columns.len())), {
-                  token_il.content = row_columns.get(usize(ri)).unwrap().trim();
+                  token_il.content = row_columns.get_unchecked(usize(ri)).trim();
                 }, {
                   token_il.content = ``;
                 });
                 token_il.children = .Some(ArrayList(Token).new());
                 block_push_token(state, token_il);
 
-                block_push_token(state, Token.new(.TT_TD_CLOSE, `td`, i32(-1)));
+                block_push_token(state, Token.new(.TT_TD_CLOSE, "td", i32(-1)));
                 ri = (ri + i32(1));
               };
 
-              block_push_token(state, Token.new(.TT_TR_CLOSE, `tr`, i32(-1)));
+              block_push_token(state, Token.new(.TT_TR_CLOSE, "tr", i32(-1)));
               next_line = (next_line + i32(1));
             });
           });
@@ -315,12 +300,12 @@ table :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: bool,
   };
 
   if(tbody_opened, {
-    block_push_token(state, Token.new(.TT_TBODY_CLOSE, `tbody`, i32(-1)));
+    block_push_token(state, Token.new(.TT_TBODY_CLOSE, "tbody", i32(-1)));
     // Update tbody_map end line — we can't easily update in-place through the token list,
     // so we skip this for now (it's only used for source map)
   });
 
-  block_push_token(state, Token.new(.TT_TABLE_CLOSE, `table`, i32(-1)));
+  block_push_token(state, Token.new(.TT_TABLE_CLOSE, "table", i32(-1)));
   // Update table_lines end line — same caveat as above
 
   state.*.parent_type = old_parent_type;

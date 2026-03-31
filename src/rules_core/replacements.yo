@@ -59,82 +59,128 @@ _replace_scoped_abbrs :: (fn(content: String) -> String)({
 
 // Collapse runs of 2+ dots into a single ellipsis character (U+2026)
 _collapse_dots :: (fn(content: String) -> String)({
-  (ellipsis : String) = from_code_point(i32(0x2026));
-  (result : String) = ``;
+  (bytes : ArrayList(u8)) = content.as_bytes();
+  (len : usize) = bytes.len();
+  (out : ArrayList(u8)) = ArrayList(u8).with_capacity(len);
   (i : usize) = usize(0);
-  (len : usize) = content.len();
-  while (i < len), {
-    (ch : rune) = content.at(i).unwrap();
-    if((ch == rune(u32('.'))), {
-      (run_start : usize) = i;
-      while ((i < len) && (content.at(i).unwrap() == rune(u32('.')))), {
-        i = (i + usize(1));
+  (run_start : usize) = usize(0);
+
+  match(bytes.ptr(),
+    .Some(src_ptr) => {
+      while (i < len), {
+        if(((src_ptr &+ i).* == u8(0x2E)), {
+          // Flush bytes before dot run
+          if((i > run_start), {
+            out.extend_from_ptr((src_ptr &+ run_start), (i - run_start));
+          });
+          (dot_start : usize) = i;
+          while ((i < len) && ((src_ptr &+ i).* == u8(0x2E))), {
+            i = (i + usize(1));
+          };
+          if(((i - dot_start) >= usize(2)), {
+            // U+2026 ellipsis in UTF-8: 0xE2 0x80 0xA6
+            out.push(u8(0xE2));
+            out.push(u8(0x80));
+            out.push(u8(0xA6));
+          }, {
+            out.push(u8(0x2E));
+          });
+          run_start = i;
+        }, {
+          i = (i + usize(1));
+        });
       };
-      if(((i - run_start) >= usize(2)), {
-        (&result).push_string(ellipsis);
-      }, {
-        _ := (&result)._bytes.push(u8('.'));
+      if((len > run_start), {
+        out.extend_from_ptr((src_ptr &+ run_start), (len - run_start));
       });
-    }, {
-      (&result).push_string(`${ch}`);
-      i = (i + usize(1));
-    });
-  };
-  result
+    },
+    .None => ()
+  );
+
+  String.from_bytes(out)
 });
 
 // Collapse runs of 4+ ? or ! into 3 of the same character
 _collapse_excl_question :: (fn(content: String) -> String)({
-  (result : String) = ``;
+  (bytes : ArrayList(u8)) = content.as_bytes();
+  (len : usize) = bytes.len();
+  (out : ArrayList(u8)) = ArrayList(u8).with_capacity(len);
   (i : usize) = usize(0);
-  (len : usize) = content.len();
-  while (i < len), {
-    (ch : rune) = content.at(i).unwrap();
-    if(((ch == rune(u32('?'))) || (ch == rune(u32('!')))), {
-      (run_start : usize) = i;
-      (run_char : rune) = ch;
-      (run_byte : u8) = u8(run_char.to_u32());
-      while ((i < len) && (content.at(i).unwrap() == run_char)), {
-        i = (i + usize(1));
+  (run_start : usize) = usize(0);
+
+  match(bytes.ptr(),
+    .Some(src_ptr) => {
+      while (i < len), {
+        (b : u8) = (src_ptr &+ i).*;
+        if(((b == u8(0x3F)) || (b == u8(0x21))), {
+          // Flush bytes before this run
+          if((i > run_start), {
+            out.extend_from_ptr((src_ptr &+ run_start), (i - run_start));
+          });
+          (char_start : usize) = i;
+          while ((i < len) && ((src_ptr &+ i).* == b)), {
+            i = (i + usize(1));
+          };
+          (run_len : usize) = (i - char_start);
+          if((run_len >= usize(4)), {
+            out.push(b);
+            out.push(b);
+            out.push(b);
+          }, {
+            (j : usize) = usize(0);
+            while (j < run_len), {
+              out.push(b);
+              j = (j + usize(1));
+            };
+          });
+          run_start = i;
+        }, {
+          i = (i + usize(1));
+        });
       };
-      (run_len : usize) = (i - run_start);
-      if((run_len >= usize(4)), {
-        _ := (&result)._bytes.push(run_byte);
-        _ := (&result)._bytes.push(run_byte);
-        _ := (&result)._bytes.push(run_byte);
-      }, {
-        (j : usize) = usize(0);
-        while (j < run_len), {
-          _ := (&result)._bytes.push(run_byte);
-          j = (j + usize(1));
-        };
+      if((len > run_start), {
+        out.extend_from_ptr((src_ptr &+ run_start), (len - run_start));
       });
-    }, {
-      (&result).push_string(`${ch}`);
-      i = (i + usize(1));
-    });
-  };
-  result
+    },
+    .None => ()
+  );
+
+  String.from_bytes(out)
 });
 
 // Collapse runs of 2+ commas into a single comma
 _collapse_commas :: (fn(content: String) -> String)({
-  (result : String) = ``;
+  (bytes : ArrayList(u8)) = content.as_bytes();
+  (len : usize) = bytes.len();
+  (out : ArrayList(u8)) = ArrayList(u8).with_capacity(len);
   (i : usize) = usize(0);
-  (len : usize) = content.len();
-  while (i < len), {
-    (ch : rune) = content.at(i).unwrap();
-    if((ch == rune(u32(','))), {
-      while ((i < len) && (content.at(i).unwrap() == rune(u32(',')))), {
-        i = (i + usize(1));
+  (run_start : usize) = usize(0);
+
+  match(bytes.ptr(),
+    .Some(src_ptr) => {
+      while (i < len), {
+        if(((src_ptr &+ i).* == u8(0x2C)), {
+          // Flush bytes before comma run
+          if((i > run_start), {
+            out.extend_from_ptr((src_ptr &+ run_start), (i - run_start));
+          });
+          while ((i < len) && ((src_ptr &+ i).* == u8(0x2C))), {
+            i = (i + usize(1));
+          };
+          out.push(u8(0x2C));
+          run_start = i;
+        }, {
+          i = (i + usize(1));
+        });
       };
-      _ := (&result)._bytes.push(u8(','));
-    }, {
-      (&result).push_string(`${ch}`);
-      i = (i + usize(1));
-    });
-  };
-  result
+      if((len > run_start), {
+        out.extend_from_ptr((src_ptr &+ run_start), (len - run_start));
+      });
+    },
+    .None => ()
+  );
+
+  String.from_bytes(out)
 });
 
 // Replace --- with em-dash (U+2014) and -- with en-dash (U+2013), context-dependent.
@@ -142,105 +188,92 @@ _collapse_commas :: (fn(content: String) -> String)({
 // Em-dash rule:  (^|[^-])---(?=[^-]|$)  with multiline
 // En-dash rule 7: (^|\s)--(?=\s|$)       with multiline
 // En-dash rule 8: (^|[^-\s])--(?=[^-\s]|$) with multiline
+// Check if byte is ASCII whitespace
+_is_ws_byte :: (fn(b: u8) -> bool)(
+  (((b == u8(0x20)) || (b == u8(0x09))) || ((b == u8(0x0A)) || (b == u8(0x0D))))
+);
+
 _replace_dashes :: (fn(content: String) -> String)({
-  (em_dash : String) = from_code_point(i32(0x2014));
-  (en_dash : String) = from_code_point(i32(0x2013));
-  (result : String) = ``;
+  (bytes : ArrayList(u8)) = content.as_bytes();
+  (len : usize) = bytes.len();
+  (out : ArrayList(u8)) = ArrayList(u8).with_capacity(len);
   (i : usize) = usize(0);
-  (len : usize) = content.len();
-  while (i < len), {
-    (ch : rune) = content.at(i).unwrap();
-    if((ch == rune(u32('-'))), {
-      // Count consecutive dashes
-      (dash_start : usize) = i;
-      while ((i < len) && (content.at(i).unwrap() == rune(u32('-')))), {
-        i = (i + usize(1));
-      };
-      (dash_count : usize) = (i - dash_start);
+  (run_start : usize) = usize(0);
 
-      // Get surrounding context characters
-      (prev : Option(rune)) = .None;
-      if((dash_start > usize(0)), {
-        prev = content.at((dash_start - usize(1)));
-      });
-      (next_ch : Option(rune)) = .None;
-      if((i < len), {
-        next_ch = content.at(i);
-      });
-
-      cond(
-        (dash_count == usize(3)) => {
-          // Em-dash: not preceded or followed by dash
-          (prev_ok : bool) = match(prev,
-            .None => true,
-            .Some(p) => (p != rune(u32('-')))
-          );
-          (next_ok : bool) = match(next_ch,
-            .None => true,
-            .Some(n) => (n != rune(u32('-')))
-          );
-          if((prev_ok && next_ok), {
-            (&result).push_string(em_dash);
-          }, {
-            (&result).push_string(`---`);
+  match(bytes.ptr(),
+    .Some(src_ptr) => {
+      while (i < len), {
+        if(((src_ptr &+ i).* == u8(0x2D)), {
+          // Flush bytes before dash run
+          if((i > run_start), {
+            out.extend_from_ptr((src_ptr &+ run_start), (i - run_start));
           });
-        },
-
-        (dash_count == usize(2)) => {
-          // Multiline: ^ matches after \n and at start of string
-          (is_line_start : bool) = match(prev,
-            .None => true,
-            .Some(p) => (p == rune(u32('\n')))
-          );
-          // Multiline: $ matches before \n and at end of string
-          (is_line_end : bool) = match(next_ch,
-            .None => true,
-            .Some(n) => (n == rune(u32('\n')))
-          );
-
-          // Rule 7: preceded by whitespace or line start, followed by whitespace or line end
-          (prev_ws : bool) = match(prev,
-            .None => true,
-            .Some(p) => _is_whitespace(p)
-          );
-          (next_ws : bool) = match(next_ch,
-            .None => true,
-            .Some(n) => _is_whitespace(n)
-          );
-
-          // Rule 8: preceded by non-dash-non-whitespace or line start,
-          //          followed by non-dash-non-whitespace or line end
-          (prev_nds : bool) = (is_line_start || match(prev,
-            .None => false,
-            .Some(p) => ((p != rune(u32('-'))) && !(_is_whitespace(p)))
-          ));
-          (next_nds : bool) = (is_line_end || match(next_ch,
-            .None => false,
-            .Some(n) => ((n != rune(u32('-'))) && !(_is_whitespace(n)))
-          ));
-
-          if(((prev_ws && next_ws) || (prev_nds && next_nds)), {
-            (&result).push_string(en_dash);
-          }, {
-            (&result).push_string(`--`);
-          });
-        },
-
-        true => {
-          // 1 or 4+ dashes: emit literally
-          (d : usize) = usize(0);
-          while (d < dash_count), {
-            _ := (&result)._bytes.push(u8('-'));
-            d = (d + usize(1));
+          (dash_start : usize) = i;
+          while ((i < len) && ((src_ptr &+ i).* == u8(0x2D))), {
+            i = (i + usize(1));
           };
-        }
-      );
-    }, {
-      (&result).push_string(`${ch}`);
-      i = (i + usize(1));
-    });
-  };
-  result
+          (dash_count : usize) = (i - dash_start);
+
+          // Get prev/next bytes for context
+          (has_prev : bool) = (dash_start > usize(0));
+          (prev_byte : u8) = cond(has_prev => (src_ptr &+ (dash_start - usize(1))).*, true => u8(0));
+          (has_next : bool) = (i < len);
+          (next_byte : u8) = cond(has_next => (src_ptr &+ i).*, true => u8(0));
+
+          cond(
+            (dash_count == usize(3)) => {
+              (prev_ok : bool) = (!(has_prev) || (prev_byte != u8(0x2D)));
+              (next_ok : bool) = (!(has_next) || (next_byte != u8(0x2D)));
+              if((prev_ok && next_ok), {
+                // U+2014 em-dash in UTF-8: 0xE2 0x80 0x94
+                out.push(u8(0xE2));
+                out.push(u8(0x80));
+                out.push(u8(0x94));
+              }, {
+                out.push(u8(0x2D));
+                out.push(u8(0x2D));
+                out.push(u8(0x2D));
+              });
+            },
+            (dash_count == usize(2)) => {
+              (is_line_start : bool) = (!(has_prev) || (prev_byte == u8(0x0A)));
+              (is_line_end : bool) = (!(has_next) || (next_byte == u8(0x0A)));
+              (prev_ws : bool) = (!(has_prev) || _is_ws_byte(prev_byte));
+              (next_ws : bool) = (!(has_next) || _is_ws_byte(next_byte));
+              (prev_nds : bool) = (is_line_start || (has_prev && ((prev_byte != u8(0x2D)) && !(_is_ws_byte(prev_byte)))));
+              (next_nds : bool) = (is_line_end || (has_next && ((next_byte != u8(0x2D)) && !(_is_ws_byte(next_byte)))));
+
+              if(((prev_ws && next_ws) || (prev_nds && next_nds)), {
+                // U+2013 en-dash in UTF-8: 0xE2 0x80 0x93
+                out.push(u8(0xE2));
+                out.push(u8(0x80));
+                out.push(u8(0x93));
+              }, {
+                out.push(u8(0x2D));
+                out.push(u8(0x2D));
+              });
+            },
+            true => {
+              (d : usize) = usize(0);
+              while (d < dash_count), {
+                out.push(u8(0x2D));
+                d = (d + usize(1));
+              };
+            }
+          );
+          run_start = i;
+        }, {
+          i = (i + usize(1));
+        });
+      };
+      if((len > run_start), {
+        out.extend_from_ptr((src_ptr &+ run_start), (len - run_start));
+      });
+    },
+    .None => ()
+  );
+
+  String.from_bytes(out)
 });
 
 // Apply all rare character replacements in the correct order
