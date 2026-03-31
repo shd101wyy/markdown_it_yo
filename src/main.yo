@@ -113,7 +113,7 @@ main :: (fn() -> unit)({
 
   // No arguments — show help
   if((argv.len() <= usize(1)), {
-    _ := fputs(*(char)(*(u8)("markdown-it-yo — Markdown to HTML converter\n\nUsage:\n  markdown-it-yo [options] <file>   Render file to stdout\n  cat file.md | markdown-it-yo     Read from stdin\n\nOptions:\n  --html            Enable HTML tags in source\n  --typographer     Enable typographic replacements\n  --no-lang-prefix  Remove language prefix from fenced code blocks\n  --commonmark      Use CommonMark preset\n  -h, --help        Show this help\n")), stdout);
+    _ := fputs(*(char)(*(u8)("markdown_it_yo — Markdown to HTML converter\n\nUsage:\n  markdown_it_yo [options] <file>   Render file to stdout\n  cat file.md | markdown_it_yo     Read from stdin\n\nOptions:\n  --html            Enable HTML tags in source\n  --typographer     Enable typographic replacements\n  --no-lang-prefix  Remove language prefix from fenced code blocks\n  --commonmark      Use CommonMark preset\n  -h, --help        Show this help\n")), stdout);
     return ();
   });
 
@@ -130,7 +130,7 @@ main :: (fn() -> unit)({
     (arg : String) = argv.get(ai).unwrap();
     cond(
       ((arg == `--help`) || (arg == `-h`)) => {
-        _ := fputs(*(char)(*(u8)("markdown-it-yo — Markdown to HTML converter\n\nUsage:\n  markdown-it-yo [options] <file>   Render file to stdout\n  cat file.md | markdown-it-yo -   Read from stdin\n\nOptions:\n  --html            Enable HTML tags in source\n  --typographer     Enable typographic replacements\n  --no-lang-prefix  Remove language prefix from fenced code blocks\n  --commonmark      Use CommonMark preset\n  -h, --help        Show this help\n")), stdout);
+        _ := fputs(*(char)(*(u8)("markdown_it_yo — Markdown to HTML converter\n\nUsage:\n  markdown_it_yo [options] <file>   Render file to stdout\n  cat file.md | markdown_it_yo -   Read from stdin\n\nOptions:\n  --html            Enable HTML tags in source\n  --typographer     Enable typographic replacements\n  --no-lang-prefix  Remove language prefix from fenced code blocks\n  --commonmark      Use CommonMark preset\n  -h, --help        Show this help\n")), stdout);
         return ();
       },
       (arg == `-`) => { read_from_stdin = true; },

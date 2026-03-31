@@ -1,9 +1,9 @@
 ---
 applyTo: "**/*.yo"
-description: "Yo language coding conventions specific to the markdown-it-yo project. Covers struct design, memory management, naming, and module organization."
+description: "Yo language coding conventions specific to the markdown_it_yo project. Covers struct design, memory management, naming, and module organization."
 ---
 
-# Yo Coding Conventions for markdown-it-yo
+# Yo Coding Conventions for markdown_it_yo
 
 ## Module Organization
 

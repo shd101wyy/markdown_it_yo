@@ -8,7 +8,7 @@ Port [markdown-it](https://github.com/markdown-it/markdown-it) (v14.1.1) — a m
 
 1. **100% behavioral parity** with markdown-it's JS implementation (same input → same HTML output)
 2. **Full test suite** ported from markdown-it's Mocha/fixture-based tests to Yo test files
-3. **Benchmark harness** comparing markdown-it-yo (native + WASM) against markdown-it (Node.js)
+3. **Benchmark harness** comparing markdown_it_yo (native + WASM) against markdown-it (Node.js)
 4. **Compilation targets:** native (macOS/Linux) and WASM (Emscripten / WASI)
 
 ---
@@ -464,13 +464,13 @@ The `use()` plugin API relies on JS dynamic dispatch. We'll defer the plugin sys
 
 ```bash
 # Convert a markdown string
-./markdown-it-yo "# Hello **world**"
+./markdown_it_yo "# Hello **world**"
 
 # Convert a file
-./markdown-it-yo input.md
+./markdown_it_yo input.md
 
 # Read from stdin (pipe)
-cat README.md | ./markdown-it-yo
+cat README.md | ./markdown_it_yo
 ```
 
 This enables easy manual testing during development: write markdown, see HTML output, compare against `npx markdown-it`.
@@ -501,7 +501,7 @@ yo build -Dtarget=wasm-wasi
 
 # Compare benchmarks
 node benchmark/bench_runner.js  # markdown-it (JS)
-./benchmark/bench               # markdown-it-yo (native)
+./benchmark/bench               # markdown_it_yo (native)
 ```
 
 ---

@@ -1,10 +1,10 @@
 build :: import "std/build";
 
-mod :: build.module({ name: "markdown-it-yo", root: "./src/lib.yo" });
+mod :: build.module({ name: "markdown_it_yo", root: "./src/lib.yo" });
 
-exe :: build.executable({ name: "markdown-it-yo", root: "./src/main.yo", optimize: build.Optimize.ReleaseFast, allocator: build.Allocator.Libc });
+exe :: build.executable({ name: "markdown_it_yo", root: "./src/main.yo", optimize: build.Optimize.ReleaseFast, allocator: build.Allocator.Libc });
 
-lib :: build.static_library({ name: "markdown-it-yo-lib", root: "./src/lib.yo" });
+lib :: build.static_library({ name: "markdown_it_yo-lib", root: "./src/lib.yo" });
 
 tests :: build.test({ name: "tests", root: "./tests/" });
 

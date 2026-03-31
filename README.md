@@ -1,6 +1,6 @@
-# markdown-it-yo
+# markdown_it_yo
 
-A high-performance Markdown parser written in [Yo](https://github.com/nicholasgasior/yo) programming language — a direct port of the popular [markdown-it](https://github.com/markdown-it/markdown-it) JavaScript library.
+A high-performance Markdown parser written in [Yo](https://github.com/shd101wyy/yo) programming language — a direct port of the popular [markdown-it](https://github.com/markdown-it/markdown-it) JavaScript library.
 
 ## Features
 
@@ -25,24 +25,24 @@ yo build run      # Build and run (reads from stdin)
 
 ```bash
 # Read from stdin
-echo "# Hello **World**" | ./yo-out/markdown-it-yo/markdown-it-yo
+echo "# Hello **World**" | ./yo-out/$TARGET/markdown_it_yo
 
 # Read from file
-./yo-out/markdown-it-yo/markdown-it-yo README.md
+./yo-out/$TARGET/markdown_it_yo README.md
 
 # CLI options
-./yo-out/markdown-it-yo/markdown-it-yo --html --typographer input.md
-./yo-out/markdown-it-yo/markdown-it-yo --commonmark input.md
-./yo-out/markdown-it-yo/markdown-it-yo --no-lang-prefix input.md
+./yo-out/$TARGET/markdown_it_yo --html --typographer input.md
+./yo-out/$TARGET/markdown_it_yo --commonmark input.md
+./yo-out/$TARGET/markdown_it_yo --no-lang-prefix input.md
 ```
 
 ### CLI Flags
 
-| Flag | Description |
-|------|-------------|
-| `--html` | Enable HTML tags in source |
-| `--typographer` | Enable typographic replacements |
-| `--commonmark` | Use CommonMark preset |
+| Flag               | Description                                   |
+| ------------------ | --------------------------------------------- |
+| `--html`           | Enable HTML tags in source                    |
+| `--typographer`    | Enable typographic replacements               |
+| `--commonmark`     | Use CommonMark preset                         |
 | `--no-lang-prefix` | Disable language prefix on fenced code blocks |
 
 ## Test
@@ -80,7 +80,7 @@ node benchmark/run.js
 
 ```bash
 # Build with system allocator for best performance on macOS
-clang -std=c11 -w -O3 yo-out/aarch64-macos/bin/markdown-it-yo.c -o bench_native
+clang -std=c11 -w -O3 yo-out/aarch64-macos/bin/markdown_it_yo.c -o bench_native
 
 # Time native execution
 /usr/bin/time bench_native bench_1mb.md > /dev/null
@@ -93,33 +93,33 @@ clang -std=c11 -w -O3 yo-out/aarch64-macos/bin/markdown-it-yo.c -o bench_native
 
 #### CPU Time (user) — single-thread work
 
-| Input | Yo Native (libc) | JS/Node.js | Speedup |
-|-------|------------------|------------|---------|
-| 1 MB  | **0.10s**        | 0.22s      | 2.2×    |
-| 5 MB  | **0.49s**        | 0.69s      | 1.4×    |
-| 20 MB | **1.97s**        | 2.37s      | 1.2×    |
+| Input | markdown_it_yo (Native, libc) | markdown-it (Node.js) | Speedup |
+| ----- | ----------------------------- | --------------------- | ------- |
+| 1 MB  | **0.10s**                     | 0.22s                 | 2.2×    |
+| 5 MB  | **0.49s**                     | 0.69s                 | 1.4×    |
+| 20 MB | **1.97s**                     | 2.37s                 | 1.2×    |
 
-**Yo native is 1.2–2.2× faster than JS in CPU time at all sizes.**
+**markdown_it_yo native is 1.2–2.2× faster than JS in CPU time at all sizes.**
 
 #### Wall Clock Time
 
-| Input | Yo Native (libc) | JS/Node.js |
-|-------|------------------|------------|
-| 1 MB  | 0.11s            | **0.11s**  |
-| 5 MB  | 0.54s            | **0.40s**  |
-| 20 MB | 2.17s            | **1.72s**  |
+| Input | markdown_it_yo (Native, libc) | markdown-it (Node.js) |
+| ----- | ----------------------------- | --------------------- |
+| 1 MB  | 0.11s                         | **0.11s**             |
+| 5 MB  | 0.54s                         | **0.40s**             |
+| 20 MB | 2.17s                         | **1.72s**             |
 
 JS has lower wall-clock time because Node.js V8 uses multi-threaded JIT/GC (user time > real time). Yo is single-threaded.
 
 #### Memory Usage (RSS)
 
-| Input | Yo Native (libc) | JS/Node.js |
-|-------|------------------|------------|
-| 1 MB  | **170 MB**       | 207 MB     |
-| 5 MB  | 829 MB           | **578 MB** |
-| 20 MB | 3323 MB          | **1767 MB**|
+| Input | markdown_it_yo (Native, libc) | markdown-it (Node.js) |
+| ----- | ----------------------------- | --------------------- |
+| 1 MB  | **170 MB**                    | 207 MB                |
+| 5 MB  | 829 MB                        | **578 MB**            |
+| 20 MB | 3323 MB                       | **1767 MB**           |
 
-At 1 MB, Yo uses less memory than JS. At larger sizes, Yo's per-token RC String allocations dominate (~4 RC objects per token × ~100K tokens/MB).
+At 1 MB, markdown_it_yo uses less memory than JS. At larger sizes, Yo's per-token RC String allocations dominate (~4 RC objects per token × ~100K tokens/MB).
 
 ### Optimizations Applied
 

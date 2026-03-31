@@ -1,6 +1,6 @@
 ---
 applyTo: "tests/**"
-description: "Testing conventions for the markdown-it-yo project. Covers test file structure, fixture-based testing, and benchmark patterns."
+description: "Testing conventions for the markdown_it_yo project. Covers test file structure, fixture-based testing, and benchmark patterns."
 ---
 
 # Testing Conventions

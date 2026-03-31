@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Benchmark: markdown-it (JS) vs markdown-it-yo (native)
+// Benchmark: markdown-it (JS) vs markdown_it_yo (native)
 //
 // Runs both implementations on the same markdown input multiple times
 // and reports average throughput.
@@ -122,7 +122,7 @@ function fmt(ms) {
 
 function main() {
   console.log("═══════════════════════════════════════════════════════");
-  console.log("  markdown-it (JS) vs markdown-it-yo (native) benchmark");
+  console.log("  markdown-it (JS) vs markdown_it_yo (native) benchmark");
   console.log("═══════════════════════════════════════════════════════\n");
 
   // Resolve Yo binary — search yo-out/<target>/bin/
@@ -130,7 +130,7 @@ function main() {
   let yoBinary = null;
   if (fs.existsSync(yoOutDir)) {
     for (const target of fs.readdirSync(yoOutDir)) {
-      const candidate = path.join(yoOutDir, target, "bin", "markdown-it-yo");
+      const candidate = path.join(yoOutDir, target, "bin", "markdown_it_yo");
       if (fs.existsSync(candidate)) {
         yoBinary = candidate;
         break;
@@ -139,7 +139,7 @@ function main() {
   }
   if (!yoBinary) {
     console.error(
-      `ERROR: Binary not found in yo-out/*/bin/markdown-it-yo\nRun \`yo build\` first.`
+      `ERROR: Binary not found in yo-out/*/bin/markdown_it_yo\nRun \`yo build\` first.`
     );
     process.exit(1);
   }
@@ -157,7 +157,7 @@ function main() {
   console.log(" done");
 
   // Benchmark Yo (native)
-  process.stdout.write("Running markdown-it-yo (native)...");
+  process.stdout.write("Running markdown_it_yo (native)...");
   const yoTimes = benchmarkYo(markdown, ITERATIONS, yoBinary);
   const yoStats = stats(yoTimes);
   console.log(" done\n");
@@ -171,7 +171,7 @@ function main() {
     `  markdown-it (JS):     avg ${fmt(jsStats.avg)}  median ${fmt(jsStats.median)}  min ${fmt(jsStats.min)}  max ${fmt(jsStats.max)}  stddev ${fmt(jsStats.stddev)}`
   );
   console.log(
-    `  markdown-it-yo:       avg ${fmt(yoStats.avg)}  median ${fmt(yoStats.median)}  min ${fmt(yoStats.min)}  max ${fmt(yoStats.max)}  stddev ${fmt(yoStats.stddev)}`
+    `  markdown_it_yo:       avg ${fmt(yoStats.avg)}  median ${fmt(yoStats.median)}  min ${fmt(yoStats.min)}  max ${fmt(yoStats.max)}  stddev ${fmt(yoStats.stddev)}`
   );
   console.log("─────────────────────────────────────────────────────");
 
