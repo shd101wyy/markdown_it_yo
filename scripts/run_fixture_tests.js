@@ -141,7 +141,7 @@ function parseFixtures(content) {
 
 function runYo(input, flags) {
   try {
-    return execSync([yoBin, ...flags].join(" "), {
+    return execSync([yoBin, ...flags, "-"].join(" "), {
       input,
       encoding: "utf8",
       timeout: 10000,
