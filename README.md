@@ -25,15 +25,15 @@ yo build run      # Build and run (reads from stdin)
 
 ```bash
 # Read from stdin
-echo "# Hello **World**" | ./yo-out/$TARGET/markdown_it_yo
+echo "# Hello **World**" | ./yo-out/$TARGET/bin/markdown_it_yo -
 
 # Read from file
-./yo-out/$TARGET/markdown_it_yo README.md
+./yo-out/$TARGET/bin/markdown_it_yo README.md
 
 # CLI options
-./yo-out/$TARGET/markdown_it_yo --html --typographer input.md
-./yo-out/$TARGET/markdown_it_yo --commonmark input.md
-./yo-out/$TARGET/markdown_it_yo --no-lang-prefix input.md
+./yo-out/$TARGET/bin/markdown_it_yo --html --typographer input.md
+./yo-out/$TARGET/bin/markdown_it_yo --commonmark input.md
+./yo-out/$TARGET/bin/markdown_it_yo --no-lang-prefix input.md
 ```
 
 ### CLI Flags
