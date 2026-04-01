@@ -28,3 +28,4 @@ bench_*.md
 .DS_Store
 .devenv*
 Thumbs.db
+*.c
