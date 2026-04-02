@@ -64,17 +64,4 @@ for (const [name, targetSize] of Object.entries(SIZES)) {
   );
 }
 
-// Also write to repo root for manual testing
-for (const [name, targetSize] of Object.entries(SIZES)) {
-  const outPath = path.join(__dirname, "..", `bench_${name}.md`);
-  if (!fs.existsSync(outPath)) {
-    const repeats = Math.ceil(targetSize / baseBytes);
-    let content = "";
-    for (let i = 0; i < repeats; i++) content += base;
-    content = content.slice(0, targetSize);
-    fs.writeFileSync(outPath, content);
-    console.log(`Generated ${outPath}`);
-  }
-}
-
 console.log("Done.");
