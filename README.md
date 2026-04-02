@@ -78,30 +78,19 @@ node benchmark/generate_samples.js
 node benchmark/run.js
 ```
 
-### Manual Benchmarking
-
-```bash
-# Build with system allocator for best performance on macOS
-clang -std=c11 -w -O3 yo-out/aarch64-macos/bin/markdown_it_yo.c -o bench_native
-
-# Time native execution
-/usr/bin/time bench_native bench_1mb.md > /dev/null
-
-# Time JavaScript execution
-/usr/bin/time node -e "const md = require('markdown-it')(); const fs = require('fs'); md.render(fs.readFileSync('bench_1mb.md', 'utf8'));"
-```
-
 ### Results (Apple M4, macOS)
 
-Parse time only — median of 10 runs, 3 warmup, `--repeat` to amortize process startup:
+**Parse time only** — median of 10 runs, 3 warmup, `--repeat` to amortize process startup:
 
 | Input | markdown-it (JS) | markdown_it_yo (Native) | Ratio |
 | ----- | ----------------- | ----------------------- | ----- |
-| 1 MB  | 14.6 ms           | 129 ms                  | 0.1×  |
-| 5 MB  | 73 ms             | 656 ms                  | 0.1×  |
-| 20 MB | 342 ms            | 2646 ms                 | 0.1×  |
+| 1 MB  | 13.8 ms           | 115.3 ms                | 0.12× |
+| 5 MB  | 69.4 ms           | 594.9 ms                | 0.12× |
+| 20 MB | 334.0 ms          | 2444.2 ms               | 0.14× |
 
-The 1:1 port is currently ~9× slower than the JS original due to reference counting overhead on the Token-based AST (each Token is a heap-allocated RC object with String fields). See [markdown_yo](https://github.com/shd101wyy/markdown_yo) for a custom implementation that is **2-2.5× faster** than JS through a SAX architecture with value-type tokens.
+The 1:1 port is currently ~8× slower than the JS original, primarily due to reference counting overhead in the regex engine (~96% of heap allocations come from NfaThread objects during regex matching). See [markdown_yo](https://github.com/shd101wyy/markdown_yo) for a custom implementation that is **2-2.5× faster** than JS through a SAX architecture with value-type tokens.
+
+> **Note on wall-clock benchmarks:** Single-run wall-clock timings (e.g., `/usr/bin/time`) can be misleading — Node.js startup adds ~60-150ms of overhead (VM init, JIT compilation, module loading) that amortizes away on repeated runs. The numbers above measure **parse time only** after JIT warmup using `--repeat` and `process.hrtime.bigint()` per iteration.
 
 ### Optimizations Applied
 
@@ -117,8 +106,20 @@ Despite being a faithful 1:1 port, several optimizations have been applied to re
 8. **Bulk memory operations** — `String.substring` and `String.trim` use `memcpy`/`extend_from_ptr` instead of byte-by-byte copying
 9. **Pointer-based access** — `ArrayList.get_ptr` returns pointers to elements without copying, avoiding RC overhead in hot loops
 10. **Regex caching** — Compiled regex patterns cached as module-level variables
+11. **Regex VM buffer reuse** — NfaVm hoisted outside search loops, seen/next_seen arrays pre-allocated as VM fields, swap+clear pattern for current/next thread lists (reduced NfaVm allocations by 81%)
 
-The remaining performance gap is primarily due to reference counting overhead on Token objects — each of the ~3 tokens/line is a heap-allocated RC object. V8's generational GC handles this pattern more efficiently.
+### Performance Analysis
+
+Profiling with instrumented C code reveals that **~96% of heap allocations** come from the regex engine, not the parser itself:
+
+| Allocator         | Count (1 MB parse) | Notes                                  |
+| ----------------- | ------------------- | -------------------------------------- |
+| NfaThread         | 2,060,663           | **Dominant bottleneck** — fork creates new RC object + slots |
+| ArrayList(usize)  | 2,004,328           | NfaThread capture slots (one per fork) |
+| ArrayList(NfaThread) | 394,168          | Thread lists for NFA simulation        |
+| Token-related     | ~50,000             | Actual parser allocations              |
+
+V8's generational GC handles these short-lived objects nearly for free (young generation collection), while reference counting incurs per-operation overhead on every increment/decrement. This is the fundamental cost of RC vs tracing GC for allocation-heavy workloads.
 
 ### Verifying Correctness
 
