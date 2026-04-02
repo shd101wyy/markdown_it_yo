@@ -91,69 +91,34 @@ clang -std=c11 -w -O3 yo-out/aarch64-macos/bin/markdown_it_yo.c -o bench_native
 /usr/bin/time node -e "const md = require('markdown-it')(); const fs = require('fs'); md.render(fs.readFileSync('bench_1mb.md', 'utf8'));"
 ```
 
-### Results (Apple M4, macOS 26.3.1)
+### Results (Apple M4, macOS)
 
-All implementations produce **byte-identical HTML output** for the same input.
+Parse time only — median of 10 runs, 3 warmup, `--repeat` to amortize process startup:
 
-#### Wall Clock Time
+| Input | markdown-it (JS) | markdown_it_yo (Native) | Ratio |
+| ----- | ----------------- | ----------------------- | ----- |
+| 1 MB  | 14.6 ms           | 129 ms                  | 0.1×  |
+| 5 MB  | 73 ms             | 656 ms                  | 0.1×  |
+| 20 MB | 342 ms            | 2646 ms                 | 0.1×  |
 
-| Input | markdown_it_yo (Native) | markdown_it_yo (WASM) | markdown-it (Node.js) |
-| ----- | ----------------------- | --------------------- | --------------------- |
-| 1 MB  | **0.06s**               | 0.22s                 | 0.11s                 |
-| 5 MB  | **0.32s**               | 0.93s                 | 0.42s                 |
-| 20 MB | **1.29s**               | 3.60s                 | 1.67s                 |
-
-#### CPU Time (user) — single-thread work
-
-| Input | markdown_it_yo (Native) | markdown_it_yo (WASM) | markdown-it (Node.js) |
-| ----- | ----------------------- | --------------------- | --------------------- |
-| 1 MB  | **0.05s**               | 0.36s                 | 0.21s                 |
-| 5 MB  | **0.29s**               | 0.97s                 | 0.69s                 |
-| 20 MB | **1.17s**               | 3.28s                 | 2.45s                 |
-
-**markdown_it_yo native is the fastest** — 1.3–1.8× faster wall clock and 2–4× less CPU time than JS. WASM is ~2–3× slower than native due to Emscripten overhead.
-
-#### Memory Usage (RSS)
-
-| Input | markdown_it_yo (Native) | markdown_it_yo (WASM) | markdown-it (Node.js) |
-| ----- | ----------------------- | --------------------- | --------------------- |
-| 1 MB  | **96 MB**               | 132 MB                | 194 MB                |
-| 5 MB  | 467 MB                  | **334 MB**            | 549 MB                |
-| 20 MB | 1844 MB                 | **1095 MB**           | 1683 MB               |
-
-WASM has the **lowest memory usage** at 5 MB and 20 MB thanks to Emscripten's compact linear memory. Native uses less memory than JS at 1 MB (2× less). At 20 MB, native's per-token RC objects consume slightly more than V8's generational GC.
-
-#### WASM Build
-
-```bash
-# Using build system
-yo build wasm
-
-# Or compile directly with Emscripten
-yo compile src/main.yo --release --cc emcc \
-  --cflags='-sALLOW_MEMORY_GROWTH=1 -sINITIAL_MEMORY=256MB -sMAXIMUM_MEMORY=4GB' \
-  -o yo-out/wasm/markdown_it_yo.js
-
-# Run with Node.js
-node yo-out/wasm/markdown_it_yo.js input.md
-```
+The 1:1 port is currently ~9× slower than the JS original due to reference counting overhead on the Token-based AST (each Token is a heap-allocated RC object with String fields). See [markdown_yo](https://github.com/shd101wyy/markdown_yo) for a custom implementation that is **2-2.5× faster** than JS through a SAX architecture with value-type tokens.
 
 ### Optimizations Applied
 
-The port achieves competitive performance through several key optimizations:
+Despite being a faithful 1:1 port, several optimizations have been applied to reduce overhead:
 
-1. **Enum token types** — Token `type_name` uses an `enum` instead of `String`, eliminating millions of string allocations and comparisons (2× speedup)
-2. **Value-type token tags** — Token `tag` uses `str` (16-byte value type, pointer+length) instead of `String` (RC heap object), eliminating heap allocations for every token creation
+1. **Enum token types** — Token `type_name` uses an `enum` instead of `String`, eliminating millions of string allocations and comparisons
+2. **Value-type token tags** — Token `tag` uses `str` (16-byte value type, pointer+length) instead of `String` (RC heap object)
 3. **Buffer-pattern renderer** — Renderer appends to a pre-allocated `String` buffer via `push_str`/`push_string` instead of string concatenation
-4. **Zero-allocation HTML escaping** — `escape_html_to()` appends escaped content directly to the output buffer using run-batching and `extend_from_ptr`, avoiding intermediate String objects
-5. **`push_str` for literals** — All string literal appends use `push_str("...")` (str type) instead of `push_string(\`...\`)` (String type), avoiding RC object creation
-6. **libc allocator** — macOS system malloc outperforms mimalloc by 3.3× for this allocation pattern (many small RC objects). Set via `build.Allocator.Libc` in `build.yo`
-7. **Pre-allocated buffers** — Render buffer pre-allocated to 1.5× source size; `escape_html` pre-allocates with headroom
-8. **O(1) length checks** — `bytes_len()` for byte count instead of `len()` which counts Unicode characters
-9. **Bulk memory operations** — `String.substring` and `String.trim` use `memcpy`/`extend_from_ptr` instead of byte-by-byte copying
-10. **Pointer-based access** — `ArrayList.get_ptr` returns pointers to elements without copying, avoiding RC overhead in hot loops
-11. **Regex caching** — Compiled regex patterns cached as module-level variables instead of recompiled per call
-12. **Pre-allocated arrays** — Parser state arrays pre-allocated to expected capacity
+4. **Zero-allocation HTML escaping** — `escape_html_to()` appends escaped content directly to the output buffer
+5. **`push_str` for literals** — String literal appends use `push_str("...")` (str type) instead of `push_string(\`...\`)` (String type)
+6. **libc allocator** — System malloc outperforms mimalloc for this allocation pattern (many small RC objects). Set via `build.Allocator.Libc` in `build.yo`
+7. **Pre-allocated buffers** — Render buffer pre-allocated to 1.5× source size
+8. **Bulk memory operations** — `String.substring` and `String.trim` use `memcpy`/`extend_from_ptr` instead of byte-by-byte copying
+9. **Pointer-based access** — `ArrayList.get_ptr` returns pointers to elements without copying, avoiding RC overhead in hot loops
+10. **Regex caching** — Compiled regex patterns cached as module-level variables
+
+The remaining performance gap is primarily due to reference counting overhead on Token objects — each of the ~3 tokens/line is a heap-allocated RC object. V8's generational GC handles this pattern more efficiently.
 
 ### Verifying Correctness
 

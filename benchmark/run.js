@@ -93,16 +93,30 @@ function benchmarkJS(content, warmup, iterations) {
   return times;
 }
 
-function benchmarkNative(filePath, warmup, iterations) {
+const REPEAT_BY_SIZE = { "1mb": 20, "5mb": 10, "20mb": 3 };
+
+function getRepeat(sizeName) {
+  const key = sizeName.toLowerCase();
+  return REPEAT_BY_SIZE[key] || 10;
+}
+
+function benchmarkNative(filePath, sizeName, warmup, iterations) {
+  const repeat = getRepeat(sizeName);
   for (let i = 0; i < warmup; i++) {
-    execFileSync(yoBinary, [filePath], { stdio: ["pipe", "pipe", "pipe"], maxBuffer: 200 * 1024 * 1024 });
+    execFileSync(yoBinary, ["--repeat", String(repeat), filePath], {
+      stdio: ["pipe", "pipe", "pipe"],
+      maxBuffer: 200 * 1024 * 1024,
+    });
   }
   const times = [];
   for (let i = 0; i < iterations; i++) {
     const start = process.hrtime.bigint();
-    execFileSync(yoBinary, [filePath], { stdio: ["pipe", "pipe", "pipe"], maxBuffer: 200 * 1024 * 1024 });
+    execFileSync(yoBinary, ["--repeat", String(repeat), filePath], {
+      stdio: ["pipe", "pipe", "pipe"],
+      maxBuffer: 200 * 1024 * 1024,
+    });
     const end = process.hrtime.bigint();
-    times.push(Number(end - start) / 1e6);
+    times.push(Number(end - start) / 1e6 / repeat);
   }
   return times;
 }
@@ -140,7 +154,7 @@ for (const sample of samples) {
   process.stdout.write(`    JS       ${jsStats.median.toFixed(1).padStart(8)} ms  (baseline)\n`);
 
   // Native benchmark
-  const nativeTimes = benchmarkNative(filePath, WARMUP, ITERATIONS);
+  const nativeTimes = benchmarkNative(filePath, sizeName, WARMUP, ITERATIONS);
   const nativeStats = stats(nativeTimes);
   const speedup = (jsStats.median / nativeStats.median).toFixed(1);
   process.stdout.write(`    Native   ${nativeStats.median.toFixed(1).padStart(8)} ms  ${speedup}×\n`);
