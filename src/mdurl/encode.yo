@@ -62,12 +62,12 @@ encode :: (fn(input: String, exclude: str, keep_escaped: bool) -> String)({
   (len : usize) = bytes.len();
 
   while (i < len), {
-    (b : u8) = bytes.get_unchecked(i);
+    (b : u8) = bytes(i);
 
     // Check for already-encoded %XX sequence
     if(((keep_escaped && (b == u8(0x25))) && ((i + usize(2)) < len)), {
-      (h1 : u8) = bytes.get_unchecked((i + usize(1)));
-      (h2 : u8) = bytes.get_unchecked((i + usize(2)));
+      (h1 : u8) = bytes((i + usize(1)));
+      (h2 : u8) = bytes((i + usize(2)));
       if((_is_hex_digit(h1) && _is_hex_digit(h2)), {
         result.push(b);
         result.push(h1);

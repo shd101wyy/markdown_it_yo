@@ -15,7 +15,7 @@ BlockRuleFn :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent:
 lheading :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: bool,
                terminator_rules: *(ArrayList(BlockRuleFn))) -> bool)({
   // if it's indented more than 3 spaces, it should be a code block
-  if(((state.*.s_count.get_unchecked(usize(start_line)) - state.*.blk_indent) >= i32(4)), {
+  if(((state.*.s_count(usize(start_line)) - state.*.blk_indent) >= i32(4)), {
     return false;
   });
 
@@ -31,17 +31,17 @@ lheading :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: bo
   while (((next_line < end_line) && (!(state.*.is_empty(next_line)))) && searching), {
     // this would be a code block normally, but after paragraph
     // it's considered a lazy continuation regardless of what's there
-    if(((state.*.s_count.get_unchecked(usize(next_line)) - state.*.blk_indent) > i32(3)), {
+    if(((state.*.s_count(usize(next_line)) - state.*.blk_indent) > i32(3)), {
       next_line = (next_line + i32(1));
     }, {
       // Check for underline in setext header
       (found_underline : bool) = false;
-      if((state.*.s_count.get_unchecked(usize(next_line)) >= state.*.blk_indent), {
-        (pos : i32) = (state.*.b_marks.get_unchecked(usize(next_line)) + state.*.t_shift.get_unchecked(usize(next_line)));
-        (max : i32) = state.*.e_marks.get_unchecked(usize(next_line));
+      if((state.*.s_count(usize(next_line)) >= state.*.blk_indent), {
+        (pos : i32) = (state.*.b_marks(usize(next_line)) + state.*.t_shift(usize(next_line)));
+        (max : i32) = state.*.e_marks(usize(next_line));
 
         if((pos < max), {
-          marker = i32(state.*._src_bytes.get_unchecked(usize(pos)));
+          marker = i32(state.*._src_bytes(usize(pos)));
 
           if(((marker == i32(0x2D)) || (marker == i32(0x3D))), {
             pos = state.*.skip_chars(pos, marker);
@@ -62,7 +62,7 @@ lheading :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: bo
         searching = false;
       }, {
         // quirk for blockquotes, this line should already be checked by that rule
-        if((state.*.s_count.get_unchecked(usize(next_line)) < i32(0)), {
+        if((state.*.s_count(usize(next_line)) < i32(0)), {
           next_line = (next_line + i32(1));
         }, {
           // Some tags can terminate paragraph without empty line.
@@ -70,7 +70,7 @@ lheading :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: bo
           (ti : usize) = usize(0);
           (tlen : usize) = terminator_rules.*.len();
           while ((ti < tlen) && (!(terminate))), {
-            (rule : BlockRuleFn) = terminator_rules.*.get_unchecked(ti);
+            (rule : BlockRuleFn) = terminator_rules.*(ti);
             if(rule(state, next_line, end_line, true), {
               terminate = true;
             });

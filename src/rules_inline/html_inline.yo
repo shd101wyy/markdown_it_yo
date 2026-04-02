@@ -44,14 +44,14 @@ html_inline :: (fn(state: *(StateInline), silent: bool) -> bool)({
   (max : i32) = state.*.pos_max;
 
   // Must start with '<'
-  if((i32(state.*._src_bytes.get_unchecked(usize(pos))) != i32(0x3C)), {
+  if((i32(state.*._src_bytes(usize(pos))) != i32(0x3C)), {
     return false;
   });
 
   if(((pos + i32(2)) >= max), { return false; });
 
   // Quick fail on second char
-  (ch : i32) = i32(state.*._src_bytes.get_unchecked(usize((pos + i32(1)))));
+  (ch : i32) = i32(state.*._src_bytes(usize((pos + i32(1)))));
   if((((ch != i32(0x21)) && (ch != i32(0x3F))) && ((ch != i32(0x2F)) && !(_is_letter(ch)))), {
     return false;
   });
@@ -65,7 +65,7 @@ html_inline :: (fn(state: *(StateInline), silent: bool) -> bool)({
       if(!(silent), {
         (tok : Token) = state_push(state, .TT_HTML_INLINE, "", i32(0));
         tok.content = m.value();
-        state.*.tokens.set(usize((i32(state.*.tokens.len()) - i32(1))), tok);
+        &(state.*.tokens(usize((i32(state.*.tokens.len()) - i32(1))))).* = tok;
 
         if(_is_link_open(m.value()), {
           state.*.link_level = (state.*.link_level + i32(1));

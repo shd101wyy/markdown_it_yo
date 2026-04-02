@@ -148,7 +148,7 @@ impl(Token,
         (len : i32) = i32(attrs.len());
         (result : i32) = i32(-1);
         while ((i < len) && (result == i32(-1))), {
-          (pair : StringPair) = attrs.get_unchecked(usize(i));
+          (pair : StringPair) = attrs(usize(i));
           if((pair.name == name), {
             result = i;
           });
@@ -183,7 +183,7 @@ impl(Token,
     }, {
       match(self.*.attrs,
         .Some(attrs) => {
-          attrs.set(usize(idx), attr_data);
+          &(attrs(usize(idx))).* = attr_data;
         },
         .None => ()
       );
@@ -223,10 +223,10 @@ impl(Token,
       match(self.*.attrs,
         .Some(attrs) => {
           (existing : StringPair) = attrs.get(usize(idx)).unwrap();
-          attrs.set(usize(idx), StringPair(
+          &(attrs(usize(idx))).* = StringPair(
             name: name,
             value: `${existing.value} ${value}`
-          ));
+          );
           ();
         },
         .None => ()

@@ -81,9 +81,9 @@ _append_replacement :: (fn(result: *(ArrayList(u8))) -> unit)({
 // Returns the decoded byte value, or -1 if not a valid %XX.
 _read_percent_byte :: (fn(bytes: *(ArrayList(u8)), i: usize, len: usize) -> i32)({
   if(!(((i + usize(2)) < len)), { return i32(-1); });
-  if(!((bytes.*.get_unchecked(i) == u8(0x25))), { return i32(-1); });
-  (h1 : i32) = _hex_val(bytes.*.get_unchecked((i + usize(1))));
-  (h2 : i32) = _hex_val(bytes.*.get_unchecked((i + usize(2))));
+  if(!((bytes.*(i) == u8(0x25))), { return i32(-1); });
+  (h1 : i32) = _hex_val(bytes.*((i + usize(1))));
+  (h2 : i32) = _hex_val(bytes.*((i + usize(2))));
   if(((h1 < i32(0)) || (h2 < i32(0))), { return i32(-1); });
   ((h1 << i32(4)) | h2)
 });
@@ -99,7 +99,7 @@ decode :: (fn(input: String, exclude: str) -> String)({
   (len : usize) = bytes.len();
 
   while (i < len), {
-    (b : u8) = bytes.get_unchecked(i);
+    (b : u8) = bytes(i);
 
     if(!((b == u8(0x25))), {
       // Not a percent sign — copy as-is
@@ -116,9 +116,9 @@ decode :: (fn(input: String, exclude: str) -> String)({
         // Single-byte ASCII
         if(_should_keep_encoded(u8(b1), exclude), {
           // Keep it encoded
-          result.push(bytes.get_unchecked(i));
-          result.push(bytes.get_unchecked((i + usize(1))));
-          result.push(bytes.get_unchecked((i + usize(2))));
+          result.push(bytes(i));
+          result.push(bytes((i + usize(1))));
+          result.push(bytes((i + usize(2))));
         }, {
           result.push(u8(b1));
         });

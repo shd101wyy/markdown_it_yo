@@ -12,7 +12,7 @@ open import "std/string";
 newline :: (fn(state: *(StateInline), silent: bool) -> bool)({
   (pos : i32) = state.*.pos;
 
-  if((i32(state.*._src_bytes.get_unchecked(usize(pos))) != i32(0x0A)), {
+  if((i32(state.*._src_bytes(usize(pos))) != i32(0x0A)), {
     return false;
   });
 
@@ -23,11 +23,11 @@ newline :: (fn(state: *(StateInline), silent: bool) -> bool)({
     (pmax : i32) = (i32(pending_bytes.len()) - i32(1));
 
     // '  \n' -> hardbreak
-    if(((pmax >= i32(0)) && (i32(pending_bytes.get_unchecked(usize(pmax))) == i32(0x20))), {
-      if(((pmax >= i32(1)) && (i32(pending_bytes.get_unchecked(usize((pmax - i32(1))))) == i32(0x20))), {
+    if(((pmax >= i32(0)) && (i32(pending_bytes(usize(pmax))) == i32(0x20))), {
+      if(((pmax >= i32(1)) && (i32(pending_bytes(usize((pmax - i32(1))))) == i32(0x20))), {
         // Find whitespace tail of pending chars.
         (ws : i32) = (pmax - i32(1));
-        while (((ws >= i32(1)) && (i32(pending_bytes.get_unchecked(usize((ws - i32(1))))) == i32(0x20)))), {
+        while (((ws >= i32(1)) && (i32(pending_bytes(usize((ws - i32(1))))) == i32(0x20)))), {
           ws = (ws - i32(1));
         };
         state.*.pending = String.from_bytes(pending_bytes.slice(usize(0), usize(ws)).unwrap());
@@ -45,7 +45,7 @@ newline :: (fn(state: *(StateInline), silent: bool) -> bool)({
   pos = (pos + i32(1));
 
   // skip heading spaces for next line
-  while (((pos < max) && is_space(i32(state.*._src_bytes.get_unchecked(usize(pos)))))), {
+  while (((pos < max) && is_space(i32(state.*._src_bytes(usize(pos)))))), {
     pos = (pos + i32(1));
   };
 

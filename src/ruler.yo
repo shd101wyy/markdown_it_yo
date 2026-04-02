@@ -159,12 +159,12 @@ impl(forall(F : Type), Ruler(F),
     assert((index != i32(-1)), "Parser rule not found");
 
     (old_rule : RuleEntry(F)) = self.*._rules.get(usize(index)).unwrap();
-    self.*._rules.set(usize(index), RuleEntry(F)(
+    &(self.*._rules(usize(index))).* = RuleEntry(F)(
       name: name,
       enabled: old_rule.enabled,
       rule_fn: rule_fn,
       alt: alt
-    ));
+    );
     self.*._cache = .None;
   }),
 
@@ -223,12 +223,12 @@ impl(forall(F : Type), Ruler(F),
         });
       }, {
         (rule : RuleEntry(F)) = self.*._rules.get(usize(idx)).unwrap();
-        self.*._rules.set(usize(idx), RuleEntry(F)(
+        &(self.*._rules(usize(idx))).* = RuleEntry(F)(
           name: rule.name,
           enabled: true,
           rule_fn: rule.rule_fn,
           alt: rule.alt
-        ));
+        );
         result.push(name);
       });
 
@@ -245,12 +245,12 @@ impl(forall(F : Type), Ruler(F),
     (len : i32) = i32(self.*._rules.len());
     while (i < len), {
       (rule : RuleEntry(F)) = self.*._rules.get(usize(i)).unwrap();
-      self.*._rules.set(usize(i), RuleEntry(F)(
+      &(self.*._rules(usize(i))).* = RuleEntry(F)(
         name: rule.name,
         enabled: false,
         rule_fn: rule.rule_fn,
         alt: rule.alt
-      ));
+      );
       i = (i + i32(1));
     };
 
@@ -274,12 +274,12 @@ impl(forall(F : Type), Ruler(F),
         });
       }, {
         (rule : RuleEntry(F)) = self.*._rules.get(usize(idx)).unwrap();
-        self.*._rules.set(usize(idx), RuleEntry(F)(
+        &(self.*._rules(usize(idx))).* = RuleEntry(F)(
           name: rule.name,
           enabled: false,
           rule_fn: rule.rule_fn,
           alt: rule.alt
-        ));
+        );
         result.push(name);
       });
 

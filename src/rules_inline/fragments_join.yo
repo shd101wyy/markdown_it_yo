@@ -17,7 +17,7 @@ fragments_join :: (fn(state: *(StateInline)) -> unit)({
   (last : i32) = i32(0);
 
   while (curr < max), {
-    (tok : *(Token)) = tokens.get_ptr(usize(curr));
+    (tok : *(Token)) = &(tokens(usize(curr)));
 
     // re-calculate levels
     if((tok.*.nesting < i32(0)), {
@@ -29,7 +29,7 @@ fragments_join :: (fn(state: *(StateInline)) -> unit)({
     });
 
     if(((tok.*.type_name == .TT_TEXT) && ((curr + i32(1)) < max)), {
-      (next_tok : *(Token)) = tokens.get_ptr(usize((curr + i32(1))));
+      (next_tok : *(Token)) = &(tokens(usize((curr + i32(1)))));
       if((next_tok.*.type_name == .TT_TEXT), {
         // collapse two adjacent text nodes: next.content = tok.content + next.content
         (tok_bytes : ArrayList(u8)) = tok.*.content.as_bytes();
@@ -46,13 +46,13 @@ fragments_join :: (fn(state: *(StateInline)) -> unit)({
         next_tok.*.content = String.from_bytes(combined);
       }, {
         if((curr != last), {
-          tokens.set(usize(last), tok.*);
+          &(tokens(usize(last))).* = tok.*;
         });
         last = (last + i32(1));
       });
     }, {
       if((curr != last), {
-        tokens.set(usize(last), tok.*);
+        &(tokens(usize(last))).* = tok.*;
       });
       last = (last + i32(1));
     });

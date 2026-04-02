@@ -12,7 +12,7 @@ open import "std/string";
 // Insert each marker as a separate text token, and add it to delimiter list
 strikethrough_tokenize :: (fn(state: *(StateInline), silent: bool) -> bool)({
   (start : i32) = state.*.pos;
-  (marker : i32) = i32(state.*._src_bytes.get_unchecked(usize(start)));
+  (marker : i32) = i32(state.*._src_bytes(usize(start)));
 
   if(silent, {
     return false;
@@ -71,13 +71,13 @@ _post_process_strikethrough :: (fn(tokens: ArrayList(Token), delimiters: ArrayLi
 
   (i : i32) = i32(0);
   while (i < max), {
-    (start_delim : Delimiter) = delimiters.get_unchecked(usize(i));
+    (start_delim : Delimiter) = delimiters(usize(i));
 
     if(((start_delim.marker == i32(0x7E)) && (start_delim.end != i32(-1))), {
-      (end_delim : Delimiter) = delimiters.get_unchecked(usize(start_delim.end));
+      (end_delim : Delimiter) = delimiters(usize(start_delim.end));
 
       // Opening token
-      (token_o : *(Token)) = tokens.get_ptr(usize(start_delim.token_idx));
+      (token_o : *(Token)) = &(tokens(usize(start_delim.token_idx)));
       token_o.*.type_name = .TT_S_OPEN;
       (s_tag : str) = "s";
       token_o.*.tag = s_tag;
@@ -86,7 +86,7 @@ _post_process_strikethrough :: (fn(tokens: ArrayList(Token), delimiters: ArrayLi
       token_o.*.content = ``;
 
       // Closing token
-      (token_c : *(Token)) = tokens.get_ptr(usize(end_delim.token_idx));
+      (token_c : *(Token)) = &(tokens(usize(end_delim.token_idx)));
       token_c.*.type_name = .TT_S_CLOSE;
       token_c.*.tag = s_tag;
       token_c.*.nesting = i32(-1);
@@ -95,7 +95,7 @@ _post_process_strikethrough :: (fn(tokens: ArrayList(Token), delimiters: ArrayLi
 
       // Check for lone marker before closing token
       if(((end_delim.token_idx - i32(1)) >= i32(0)), {
-        (prev_tok : *(Token)) = tokens.get_ptr(usize((end_delim.token_idx - i32(1))));
+        (prev_tok : *(Token)) = &(tokens(usize((end_delim.token_idx - i32(1)))));
         if(((prev_tok.*.type_name == .TT_TEXT) && (prev_tok.*.content == `~`)), {
           _ := lone_markers.push((end_delim.token_idx - i32(1)));
         });
@@ -109,13 +109,13 @@ _post_process_strikethrough :: (fn(tokens: ArrayList(Token), delimiters: ArrayLi
   while (lone_markers.len() > usize(0)), {
     (idx : i32) = lone_markers.pop().unwrap();
     (j : i32) = (idx + i32(1));
-    while (((j < i32(tokens.len())) && (tokens.get_ptr(usize(j)).*.type_name == .TT_S_CLOSE))), {
+    while (((j < i32(tokens.len())) && (&(tokens(usize(j))).*.type_name == .TT_S_CLOSE))), {
       j = (j + i32(1));
     };
     j = (j - i32(1));
     if((idx != j), {
-      (tok_j : *(Token)) = tokens.get_ptr(usize(j));
-      (tok_i : *(Token)) = tokens.get_ptr(usize(idx));
+      (tok_j : *(Token)) = &(tokens(usize(j)));
+      (tok_i : *(Token)) = &(tokens(usize(idx)));
       (temp : Token) = tok_j.*;
       tok_j.* = tok_i.*;
       tok_i.* = temp;
@@ -131,7 +131,7 @@ strikethrough_post_process :: (fn(state: *(StateInline)) -> unit)({
 
   (curr : i32) = i32(0);
   while (curr < max), {
-    match(tokens_meta.get_unchecked(usize(curr)),
+    match(tokens_meta(usize(curr)),
       .Some(tm) => _post_process_strikethrough(state.*.tokens, tm.delimiters),
       .None => ()
     );

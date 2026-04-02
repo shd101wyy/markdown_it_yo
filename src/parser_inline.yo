@@ -47,7 +47,7 @@ _inline_tokenize :: (fn(state: *(StateInline)) -> unit)({
 
     if(!(ok), {
       // No rule matched — consume character as pending text
-      (ch_byte : u8) = state.*._src_bytes.get_unchecked(usize(state.*.pos));
+      (ch_byte : u8) = state.*._src_bytes(usize(state.*.pos));
       (&(state.*.pending)).push_byte(ch_byte);
       state.*.pos = (state.*.pos + i32(1));
     });

@@ -47,7 +47,7 @@ _index_of :: (fn(s: *(String), ch: u8) -> i32)({
   (bytes : ArrayList(u8)) = s.*.as_bytes();
   (i : usize) = usize(0);
   while (i < bytes.len()), {
-    if((bytes.get_unchecked(i) == ch), { return i32(i); });
+    if((bytes(i) == ch), { return i32(i); });
     i = (i + usize(1));
   };
   i32(-1)
@@ -58,7 +58,7 @@ _last_index_of :: (fn(s: *(String), ch: u8) -> i32)({
   (bytes : ArrayList(u8)) = s.*.as_bytes();
   (i : i32) = (i32(bytes.len()) - i32(1));
   while (i >= i32(0)), {
-    if((bytes.get_unchecked(usize(i)) == ch), { return i; });
+    if((bytes(usize(i)) == ch), { return i; });
     i = (i - i32(1));
   };
   i32(-1)
@@ -69,7 +69,7 @@ _last_index_of_before :: (fn(s: *(String), ch: u8, before: i32) -> i32)({
   (bytes : ArrayList(u8)) = s.*.as_bytes();
   (i : i32) = (before - i32(1));
   while (i >= i32(0)), {
-    if((bytes.get_unchecked(usize(i)) == ch), { return i; });
+    if((bytes(usize(i)) == ch), { return i; });
     i = (i - i32(1));
   };
   i32(-1)
@@ -93,7 +93,7 @@ _find_earliest :: (fn(bytes: *(ArrayList(u8)), set: str, start: usize) -> i32)({
     (ch : u8) = set.bytes(j);
     (i : usize) = start;
     while (i < bytes.*.len()), {
-      if((bytes.*.get_unchecked(i) == ch), {
+      if((bytes.*(i) == ch), {
         (pos : i32) = i32(i);
         if(((result == i32(-1)) || (pos < result)), {
           result = pos;
@@ -144,7 +144,7 @@ _valid_hostname_part :: (fn(part: *(String)) -> bool)({
   if((bytes.len() > usize(63)), { return false; });
   (i : usize) = usize(0);
   while (i < bytes.len()), {
-    (b : u8) = bytes.get_unchecked(i);
+    (b : u8) = bytes(i);
     (valid : bool) = cond(
       ((b >= u8(0x61)) && (b <= u8(0x7A))) => true,
       ((b >= u8(0x41)) && (b <= u8(0x5A))) => true,
@@ -170,7 +170,7 @@ _hostname_part_start :: (fn(part: *(String)) -> Option(String))({
     true => usize(63)
   );
   while (i < limit), {
-    (b : u8) = bytes.get_unchecked(i);
+    (b : u8) = bytes(i);
     (valid : bool) = cond(
       ((b >= u8(0x61)) && (b <= u8(0x7A))) => true,
       ((b >= u8(0x41)) && (b <= u8(0x5A))) => true,
@@ -203,7 +203,7 @@ _split_dot :: (fn(s: *(String)) -> ArrayList(String))({
   (start : usize) = usize(0);
   (i : usize) = usize(0);
   while (i < bytes.len()), {
-    if((bytes.get_unchecked(i) == u8(0x2E)), {
+    if((bytes(i) == u8(0x2E)), {
       parts.push(_byte_substr(s, start, i));
       start = (i + usize(1));
     });
@@ -221,7 +221,7 @@ _join_dot :: (fn(parts: *(ArrayList(String))) -> String)({
     if((i > usize(0)), {
       result = (result + `.`);
     });
-    result = (result + parts.*.get_unchecked(i));
+    result = (result + parts.*(i));
     i = (i + usize(1));
   };
   result
@@ -234,7 +234,7 @@ _parse_host :: (fn(url: *(Url), host: String) -> unit)({
   (port_start : i32) = i32(-1);
   (i : i32) = (i32(bytes.len()) - i32(1));
   while (i >= i32(0)), {
-    (b : u8) = bytes.get_unchecked(usize(i));
+    (b : u8) = bytes(usize(i));
     cond(
       (b == u8(0x3A)) => {
         port_start = i;
@@ -269,13 +269,13 @@ _parse_host :: (fn(url: *(Url), host: String) -> unit)({
 _has_auth_pattern :: (fn(rest: *(String)) -> bool)({
   (bytes : ArrayList(u8)) = rest.*.as_bytes();
   if((bytes.len() < usize(5)), { return false; });
-  if((bytes.get_unchecked(usize(0)) != u8(0x2F)), { return false; });
-  if((bytes.get_unchecked(usize(1)) != u8(0x2F)), { return false; });
+  if((bytes(usize(0)) != u8(0x2F)), { return false; });
+  if((bytes(usize(1)) != u8(0x2F)), { return false; });
   // Check for pattern //[^@/]+@[^@/]+
   (i : usize) = usize(2);
   (found_non_at : bool) = false;
   while (i < bytes.len()), {
-    (b : u8) = bytes.get_unchecked(i);
+    (b : u8) = bytes(i);
     cond(
       (b == u8(0x40)) => {
         if(found_non_at, { return true; });
@@ -300,7 +300,7 @@ parse :: (fn(url_str: String, slashes_denote_host: bool) -> Url)({
   if((!(slashes_denote_host) && (_index_of(&(url_str), u8(0x23)) < i32(0))), {
     // Try simple path: /path?query or //path?query
     (rest_bytes : ArrayList(u8)) = rest.as_bytes();
-    if(((rest_bytes.len() > usize(0)) && (rest_bytes.get_unchecked(usize(0)) == u8(0x2F))), {
+    if(((rest_bytes.len() > usize(0)) && (rest_bytes(usize(0)) == u8(0x2F))), {
       // Starts with /
       (qm : i32) = _index_of(&(rest), u8(0x3F));
       if((qm >= i32(0)), {
@@ -317,7 +317,7 @@ parse :: (fn(url_str: String, slashes_denote_host: bool) -> Url)({
         (has_ws : bool) = false;
         (wi : usize) = usize(0);
         while (wi < rest_bytes.len()), {
-          (wb : u8) = rest_bytes.get_unchecked(wi);
+          (wb : u8) = rest_bytes(wi);
           if(((((wb == u8(0x20)) || (wb == u8(0x09))) || (wb == u8(0x0A))) || (wb == u8(0x0D))), {
             has_ws = true;
             wi = rest_bytes.len();
@@ -342,7 +342,7 @@ parse :: (fn(url_str: String, slashes_denote_host: bool) -> Url)({
     (found_colon : bool) = false;
     (valid_proto : bool) = true;
     while ((pi < rest_bytes2.len()) && !(found_colon)), {
-      (b : u8) = rest_bytes2.get_unchecked(pi);
+      (b : u8) = rest_bytes2(pi);
       cond(
         (b == u8(0x3A)) => {
           if((pi > usize(0)), {
@@ -387,7 +387,7 @@ parse :: (fn(url_str: String, slashes_denote_host: bool) -> Url)({
   (slashes : bool) = false;
   if(((slashes_denote_host || has_proto) || _has_auth_pattern(&(rest))), {
     (rest_bytes3 : ArrayList(u8)) = rest.as_bytes();
-    (starts_slashes : bool) = (((rest_bytes3.len() >= usize(2)) && (rest_bytes3.get_unchecked(usize(0)) == u8(0x2F))) && (rest_bytes3.get_unchecked(usize(1)) == u8(0x2F)));
+    (starts_slashes : bool) = (((rest_bytes3.len() >= usize(2)) && (rest_bytes3(usize(0)) == u8(0x2F))) && (rest_bytes3(usize(1)) == u8(0x2F)));
     if(starts_slashes, {
       (is_hostless : bool) = match(proto, .Some(p) => _is_hostless(&(p)), .None => false);
       if(!(is_hostless), {
@@ -429,7 +429,7 @@ parse :: (fn(url_str: String, slashes_denote_host: bool) -> Url)({
     });
 
     // Trailing colon
-    if(((host_end > i32(0)) && (rest_bytes5.get_unchecked(usize((host_end - i32(1)))) == u8(0x3A))), {
+    if(((host_end > i32(0)) && (rest_bytes5(usize((host_end - i32(1)))) == u8(0x3A))), {
       host_end = (host_end - i32(1));
     });
 
@@ -451,7 +451,7 @@ parse :: (fn(url_str: String, slashes_denote_host: bool) -> Url)({
       .None => ``
     );
     (hn_bytes : ArrayList(u8)) = hn.as_bytes();
-    (is_ipv6 : bool) = (((hn_bytes.len() >= usize(2)) && (hn_bytes.get_unchecked(usize(0)) == u8(0x5B))) && (hn_bytes.get_unchecked((hn_bytes.len() - usize(1))) == u8(0x5D)));
+    (is_ipv6 : bool) = (((hn_bytes.len() >= usize(2)) && (hn_bytes(usize(0)) == u8(0x5B))) && (hn_bytes((hn_bytes.len() - usize(1))) == u8(0x5D)));
 
     // Validate hostname parts (non-IPv6)
     if(!(is_ipv6), {
@@ -459,7 +459,7 @@ parse :: (fn(url_str: String, slashes_denote_host: bool) -> Url)({
       (pi2 : usize) = usize(0);
       (done : bool) = false;
       while ((pi2 < parts.len()) && !(done)), {
-        (part : String) = parts.get_unchecked(pi2);
+        (part : String) = parts(pi2);
         if((part.as_bytes().len() > usize(0)), {
           if(!(_valid_hostname_part(&(part))), {
             // Check if it's just non-ASCII chars causing issues
@@ -467,7 +467,7 @@ parse :: (fn(url_str: String, slashes_denote_host: bool) -> Url)({
             (new_part : ArrayList(u8)) = ArrayList(u8).with_capacity(part_bytes.len());
             (pj : usize) = usize(0);
             while (pj < part_bytes.len()), {
-              (pb : u8) = part_bytes.get_unchecked(pj);
+              (pb : u8) = part_bytes(pj);
               if((pb > u8(127)), {
                 new_part.push(u8(0x78));
               }, {
@@ -481,13 +481,13 @@ parse :: (fn(url_str: String, slashes_denote_host: bool) -> Url)({
               (valid_parts : ArrayList(String)) = ArrayList(String).new();
               (vk : usize) = usize(0);
               while (vk < pi2), {
-                valid_parts.push(parts.get_unchecked(vk));
+                valid_parts.push(parts(vk));
                 vk = (vk + usize(1));
               };
               (not_host : ArrayList(String)) = ArrayList(String).new();
               (nk : usize) = (pi2 + usize(1));
               while (nk < parts.len()), {
-                not_host.push(parts.get_unchecked(nk));
+                not_host.push(parts(nk));
                 nk = (nk + usize(1));
               };
 
@@ -502,7 +502,7 @@ parse :: (fn(url_str: String, slashes_denote_host: bool) -> Url)({
                     new_not_host.push(remainder);
                     (nh2 : usize) = usize(0);
                     while (nh2 < not_host.len()), {
-                      new_not_host.push(not_host.get_unchecked(nh2));
+                      new_not_host.push(not_host(nh2));
                       nh2 = (nh2 + usize(1));
                     };
                     not_host = new_not_host;

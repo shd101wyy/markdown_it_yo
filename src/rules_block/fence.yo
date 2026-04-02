@@ -9,11 +9,11 @@ open import "std/string";
 
 // Fenced code block rule
 fence :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: bool) -> bool)({
-  (pos : i32) = (state.*.b_marks.get_unchecked(usize(start_line)) + state.*.t_shift.get_unchecked(usize(start_line)));
-  (max : i32) = state.*.e_marks.get_unchecked(usize(start_line));
+  (pos : i32) = (state.*.b_marks(usize(start_line)) + state.*.t_shift(usize(start_line)));
+  (max : i32) = state.*.e_marks(usize(start_line));
 
   // if it's indented more than 3 spaces, it should be a code block
-  if(((state.*.s_count.get_unchecked(usize(start_line)) - state.*.blk_indent) >= i32(4)), {
+  if(((state.*.s_count(usize(start_line)) - state.*.blk_indent) >= i32(4)), {
     return false;
   });
 
@@ -21,7 +21,7 @@ fence :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: bool)
     return false;
   });
 
-  (marker : i32) = i32(state.*._src_bytes.get_unchecked(usize(pos)));
+  (marker : i32) = i32(state.*._src_bytes(usize(pos)));
 
   if(((marker != i32(0x7E)) && (marker != i32(0x60))), {
     return false;
@@ -49,7 +49,7 @@ fence :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: bool)
     (pi : usize) = usize(0);
     (has_backtick : bool) = false;
     while (pi < params_al.len()), {
-      if((params_al.get_unchecked(pi) == u8(0x60)), {
+      if((params_al(pi) == u8(0x60)), {
         has_backtick = true;
       });
       pi = (pi + usize(1));
@@ -75,19 +75,19 @@ fence :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: bool)
       // unclosed block should be autoclosed by end of document
       searching = false;
     }, {
-      pos = (state.*.b_marks.get_unchecked(usize(next_line)) + state.*.t_shift.get_unchecked(usize(next_line)));
+      pos = (state.*.b_marks(usize(next_line)) + state.*.t_shift(usize(next_line)));
       mem = pos;
-      max = state.*.e_marks.get_unchecked(usize(next_line));
+      max = state.*.e_marks(usize(next_line));
 
-      if(((pos < max) && ((state.*.s_count.get_unchecked(usize(next_line)) - state.*.blk_indent) < i32(0))), {
+      if(((pos < max) && ((state.*.s_count(usize(next_line)) - state.*.blk_indent) < i32(0))), {
         // non-empty line with negative indent should stop the list
         searching = false;
       }, {
-        if((i32(state.*._src_bytes.get_unchecked(usize(pos))) != marker), {
+        if((i32(state.*._src_bytes(usize(pos))) != marker), {
           // not our marker, continue searching
           ();
         }, {
-          if(((state.*.s_count.get_unchecked(usize(next_line)) - state.*.blk_indent) >= i32(4)), {
+          if(((state.*.s_count(usize(next_line)) - state.*.blk_indent) >= i32(4)), {
             // closing fence should be indented less than 4 spaces
             ();
           }, {
@@ -110,7 +110,7 @@ fence :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: bool)
   };
 
   // If a fence has heading spaces, they should be removed from its inner block
-  (fence_indent : i32) = state.*.s_count.get_unchecked(usize(start_line));
+  (fence_indent : i32) = state.*.s_count(usize(start_line));
 
   state.*.line = (next_line + cond(have_end_marker => i32(1), true => i32(0)));
 

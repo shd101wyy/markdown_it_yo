@@ -46,7 +46,7 @@ parse_link_title :: (fn(input: String, start_param: i32, max: i32, prev_state: O
           return state;
         });
 
-        (marker_byte : u8) = bytes.get_unchecked(usize(pos));
+        (marker_byte : u8) = bytes(usize(pos));
         (marker : i32) = i32(marker_byte);
 
         // Must start with ", ', or (
@@ -73,7 +73,7 @@ parse_link_title :: (fn(input: String, start_param: i32, max: i32, prev_state: O
     );
 
     while (pos < max), {
-      (code : u8) = bytes.get_unchecked(usize(pos));
+      (code : u8) = bytes(usize(pos));
 
       cond(
         // Found closing marker

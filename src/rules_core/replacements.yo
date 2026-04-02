@@ -303,7 +303,7 @@ _replace_scoped :: (fn(inline_tokens: ArrayList(Token)) -> unit)({
   (inside_autolink : i32) = i32(0);
   (i : i32) = (i32(inline_tokens.len()) - i32(1));
   while (i >= i32(0)), {
-    (token : *(Token)) = inline_tokens.get_ptr(usize(i));
+    (token : *(Token)) = &(inline_tokens(usize(i)));
     if(((token.*.type_name == .TT_TEXT) && (inside_autolink == i32(0))), {
       token.*.content = _replace_scoped_abbrs(token.*.content);
     });
@@ -323,7 +323,7 @@ _replace_rare_tokens :: (fn(inline_tokens: ArrayList(Token)) -> unit)({
   (inside_autolink : i32) = i32(0);
   (i : i32) = (i32(inline_tokens.len()) - i32(1));
   while (i >= i32(0)), {
-    (token : *(Token)) = inline_tokens.get_ptr(usize(i));
+    (token : *(Token)) = &(inline_tokens(usize(i)));
     if(((token.*.type_name == .TT_TEXT) && (inside_autolink == i32(0))), {
       if(_has_rare_chars(token.*.content), {
         token.*.content = _replace_rare(token.*.content);
@@ -344,7 +344,7 @@ replacements :: (fn(state: *(StateCore)) -> unit)({
   (block_tokens : ArrayList(Token)) = state.*.tokens;
   (blk_idx : i32) = (i32(block_tokens.len()) - i32(1));
   while (blk_idx >= i32(0)), {
-    (block_tok : *(Token)) = block_tokens.get_ptr(usize(blk_idx));
+    (block_tok : *(Token)) = &(block_tokens(usize(blk_idx)));
     if((block_tok.*.type_name == .TT_INLINE), {
       match(block_tok.*.children,
         .Some(children) => {

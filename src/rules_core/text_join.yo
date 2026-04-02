@@ -15,7 +15,7 @@ text_join :: (fn(state: *(StateCore)) -> unit)({
 
   (j : i32) = i32(0);
   while (j < l), {
-    (block_tok : *(Token)) = block_tokens.get_ptr(usize(j));
+    (block_tok : *(Token)) = &(block_tokens(usize(j)));
 
     if((block_tok.*.type_name == .TT_INLINE), {
       match(block_tok.*.children,
@@ -25,7 +25,7 @@ text_join :: (fn(state: *(StateCore)) -> unit)({
           // First pass: rename text_special → text
           (curr : i32) = i32(0);
           while (curr < max), {
-            (tok : *(Token)) = tokens.get_ptr(usize(curr));
+            (tok : *(Token)) = &(tokens(usize(curr)));
             if((tok.*.type_name == .TT_TEXT_SPECIAL), {
               tok.*.type_name = .TT_TEXT;
             });
@@ -36,17 +36,17 @@ text_join :: (fn(state: *(StateCore)) -> unit)({
           curr = i32(0);
           (last : i32) = i32(0);
           while (curr < max), {
-            (tok : *(Token)) = tokens.get_ptr(usize(curr));
+            (tok : *(Token)) = &(tokens(usize(curr)));
             if((((tok.*.type_name == .TT_TEXT) && ((curr + i32(1)) < max))
-                && (tokens.get_ptr(usize((curr + i32(1)))).*.type_name == .TT_TEXT)), {
+                && (&(tokens(usize((curr + i32(1))))).*.type_name == .TT_TEXT)), {
               // Collapse two adjacent text nodes
-              (next_tok : *(Token)) = tokens.get_ptr(usize((curr + i32(1))));
+              (next_tok : *(Token)) = &(tokens(usize((curr + i32(1)))));
               (merged : String) = tok.*.content;
               (&merged).push_string(next_tok.*.content);
               next_tok.*.content = merged;
             }, {
               if((curr != last), {
-                tokens.set(usize(last), tok.*);
+                &(tokens(usize(last))).* = tok.*;
               });
               last = (last + i32(1));
             });

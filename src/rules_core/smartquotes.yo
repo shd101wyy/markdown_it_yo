@@ -35,12 +35,12 @@ _process_inlines :: (fn(tokens: ArrayList(Token), quotes: ArrayList(String)) -> 
   (tokens_len : i32) = i32(tokens.len());
 
   while (i < tokens_len), {
-    (token : *(Token)) = tokens.get_ptr(usize(i));
+    (token : *(Token)) = &(tokens(usize(i)));
     (this_level : i32) = token.*.level;
 
     // Trim stack to current nesting level
     (j : i32) = (i32(stack.len()) - i32(1));
-    while ((j >= i32(0)) && (stack.get_unchecked(usize(j)).level > this_level)), {
+    while ((j >= i32(0)) && (stack(usize(j)).level > this_level)), {
       j = (j - i32(1));
     };
     // Truncate stack to j+1
@@ -88,7 +88,7 @@ _process_inlines :: (fn(tokens: ArrayList(Token), quotes: ArrayList(String)) -> 
             (pj : i32) = (i - i32(1));
             (found_prev : bool) = false;
             while ((pj >= i32(0)) && !(found_prev)), {
-              (prev_tok : *(Token)) = tokens.get_ptr(usize(pj));
+              (prev_tok : *(Token)) = &(tokens(usize(pj)));
               if(((prev_tok.*.type_name == .TT_SOFTBREAK) || (prev_tok.*.type_name == .TT_HARDBREAK)), {
                 found_prev = true;
               }, {
@@ -111,7 +111,7 @@ _process_inlines :: (fn(tokens: ArrayList(Token), quotes: ArrayList(String)) -> 
             (nj : i32) = (i + i32(1));
             (found_next : bool) = false;
             while ((nj < tokens_len) && !(found_next)), {
-              (next_tok : *(Token)) = tokens.get_ptr(usize(nj));
+              (next_tok : *(Token)) = &(tokens(usize(nj)));
               if(((next_tok.*.type_name == .TT_SOFTBREAK) || (next_tok.*.type_name == .TT_HARDBREAK)), {
                 found_next = true;
               }, {
@@ -175,18 +175,18 @@ _process_inlines :: (fn(tokens: ArrayList(Token), quotes: ArrayList(String)) -> 
               (sj : i32) = (i32(stack.len()) - i32(1));
               (matched : bool) = false;
               while ((sj >= i32(0)) && !(matched)), {
-                (item : _QuoteEntry) = stack.get_unchecked(usize(sj));
+                (item : _QuoteEntry) = stack(usize(sj));
                 if((item.level < this_level), {
                   sj = i32(-1);
                 }, {
                   if(((item.single == is_single) && (item.level == this_level)), {
                     (open_quote : String) = cond(
-                      is_single => quotes.get_unchecked(usize(2)),
-                      true => quotes.get_unchecked(usize(0))
+                      is_single => quotes(usize(2)),
+                      true => quotes(usize(0))
                     );
                     (close_quote : String) = cond(
-                      is_single => quotes.get_unchecked(usize(3)),
-                      true => quotes.get_unchecked(usize(1))
+                      is_single => quotes(usize(3)),
+                      true => quotes(usize(1))
                     );
 
                     // Replace closing quote first (before opening, in case same token)
@@ -194,7 +194,7 @@ _process_inlines :: (fn(tokens: ArrayList(Token), quotes: ArrayList(String)) -> 
                     token.*.content = text;
 
                     // Replace opening quote
-                    (open_tok : *(Token)) = tokens.get_ptr(usize(item.token_idx));
+                    (open_tok : *(Token)) = &(tokens(usize(item.token_idx)));
                     open_tok.*.content = _replace_at(open_tok.*.content, item.pos, open_quote);
 
                     // Adjust position if same token
@@ -204,7 +204,7 @@ _process_inlines :: (fn(tokens: ArrayList(Token), quotes: ArrayList(String)) -> 
                     });
 
                     // Re-read text after modification
-                    text = tokens.get_ptr(usize(i)).*.content;
+                    text = &(tokens(usize(i))).*.content;
                     max = text.len();
 
                     // Truncate stack
@@ -244,7 +244,7 @@ _process_inlines :: (fn(tokens: ArrayList(Token), quotes: ArrayList(String)) -> 
 smartquotes :: (fn(state: *(StateCore), quotes: ArrayList(String)) -> unit)({
   (blk_idx : i32) = (i32(state.*.tokens.len()) - i32(1));
   while (blk_idx >= i32(0)), {
-    (block_tok : *(Token)) = state.*.tokens.get_ptr(usize(blk_idx));
+    (block_tok : *(Token)) = &(state.*.tokens(usize(blk_idx)));
     if((block_tok.*.type_name == .TT_INLINE), {
       // Quick test: does content contain any quotes?
       (has_quotes : bool) = false;

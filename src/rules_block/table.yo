@@ -26,34 +26,34 @@ table :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: bool,
 
   (next_line : i32) = (start_line + i32(1));
 
-  if((state.*.s_count.get_unchecked(usize(next_line)) < state.*.blk_indent), {
+  if((state.*.s_count(usize(next_line)) < state.*.blk_indent), {
     return false;
   });
 
   // if it's indented more than 3 spaces, it should be a code block
-  if(((state.*.s_count.get_unchecked(usize(next_line)) - state.*.blk_indent) >= i32(4)), {
+  if(((state.*.s_count(usize(next_line)) - state.*.blk_indent) >= i32(4)), {
     return false;
   });
 
   // first character of the second line should be '|', '-', ':',
   // and no other characters are allowed but spaces;
   // basically, this is the equivalent of /^[-:|][-:|\s]*$/
-  (pos : i32) = (state.*.b_marks.get_unchecked(usize(next_line)) + state.*.t_shift.get_unchecked(usize(next_line)));
-  if((pos >= state.*.e_marks.get_unchecked(usize(next_line))), {
+  (pos : i32) = (state.*.b_marks(usize(next_line)) + state.*.t_shift(usize(next_line)));
+  if((pos >= state.*.e_marks(usize(next_line))), {
     return false;
   });
 
-  (first_ch : i32) = i32(state.*._src_bytes.get_unchecked(usize(pos)));
+  (first_ch : i32) = i32(state.*._src_bytes(usize(pos)));
   pos = (pos + i32(1));
   if((((first_ch != i32(0x7C)) && (first_ch != i32(0x2D))) && (first_ch != i32(0x3A))), {
     return false;
   });
 
-  if((pos >= state.*.e_marks.get_unchecked(usize(next_line))), {
+  if((pos >= state.*.e_marks(usize(next_line))), {
     return false;
   });
 
-  (second_ch : i32) = i32(state.*._src_bytes.get_unchecked(usize(pos)));
+  (second_ch : i32) = i32(state.*._src_bytes(usize(pos)));
   pos = (pos + i32(1));
   if(((((second_ch != i32(0x7C)) && (second_ch != i32(0x2D))) && (second_ch != i32(0x3A))) && !(is_space(second_ch))), {
     return false;
@@ -67,8 +67,8 @@ table :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: bool,
   // check remaining chars on separator line
   (check_pos : i32) = pos;
   (sep_valid : bool) = true;
-  while ((check_pos < state.*.e_marks.get_unchecked(usize(next_line))) && sep_valid), {
-    (ch : i32) = i32(state.*._src_bytes.get_unchecked(usize(check_pos)));
+  while ((check_pos < state.*.e_marks(usize(next_line))) && sep_valid), {
+    (ch : i32) = i32(state.*._src_bytes(usize(check_pos)));
     if(((((ch != i32(0x7C)) && (ch != i32(0x2D))) && (ch != i32(0x3A))) && !(is_space(ch))), {
       sep_valid = false;
     }, {
@@ -87,7 +87,7 @@ table :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: bool,
   (ci : i32) = i32(0);
   (col_valid : bool) = true;
   while ((ci < i32(columns.len())) && col_valid), {
-    (t : String) = columns.get_unchecked(usize(ci)).trim();
+    (t : String) = columns(usize(ci)).trim();
     if((t.len() == usize(0)), {
       // allow empty columns before and after table, but not in between
       if(((ci == i32(0)) || (ci == (i32(columns.len()) - i32(1)))), {
@@ -100,14 +100,14 @@ table :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: bool,
       (t_bytes : ArrayList(u8)) = t.as_bytes();
       (t_len : i32) = i32(t_bytes.len());
       (ti : i32) = i32(0);
-      (first_colon : bool) = (i32(t_bytes.get_unchecked(usize(0))) == i32(0x3A));
+      (first_colon : bool) = (i32(t_bytes(usize(0))) == i32(0x3A));
       if(first_colon, {
         ti = i32(1);
       });
       (has_dash : bool) = false;
       (pattern_ok : bool) = true;
       while ((ti < t_len) && pattern_ok), {
-        (tc : i32) = i32(t_bytes.get_unchecked(usize(ti)));
+        (tc : i32) = i32(t_bytes(usize(ti)));
         if((tc == i32(0x2D)), {
           has_dash = true;
           ti = (ti + i32(1));
@@ -122,7 +122,7 @@ table :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: bool,
       if((!(pattern_ok) || !(has_dash)), {
         col_valid = false;
       }, {
-        (last_colon : bool) = (i32(t_bytes.get_unchecked(usize((t_len - i32(1))))) == i32(0x3A));
+        (last_colon : bool) = (i32(t_bytes(usize((t_len - i32(1))))) == i32(0x3A));
         if(last_colon, {
           if(first_colon, {
             _ := aligns.push(`center`);
@@ -149,17 +149,17 @@ table :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: bool,
   if(header_text.index_of(`|`).is_none(), {
     return false;
   });
-  if(((state.*.s_count.get_unchecked(usize(start_line)) - state.*.blk_indent) >= i32(4)), {
+  if(((state.*.s_count(usize(start_line)) - state.*.blk_indent) >= i32(4)), {
     return false;
   });
 
   (header_columns : ArrayList(String)) = escaped_split(header_text);
   // trim leading empty
-  if(((header_columns.len() > usize(0)) && (header_columns.get_unchecked(usize(0)).len() == usize(0))), {
+  if(((header_columns.len() > usize(0)) && (header_columns(usize(0)).len() == usize(0))), {
     _ := header_columns.remove(usize(0));
   });
   // trim trailing empty
-  if(((header_columns.len() > usize(0)) && (header_columns.get_unchecked(usize((i32(header_columns.len()) - i32(1)))).len() == usize(0))), {
+  if(((header_columns.len() > usize(0)) && (header_columns(usize((i32(header_columns.len()) - i32(1)))).len() == usize(0))), {
     _ := header_columns.remove(usize((i32(header_columns.len()) - i32(1))));
   });
 
@@ -194,14 +194,14 @@ table :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: bool,
   (hi : i32) = i32(0);
   while (hi < i32(header_columns.len())), {
     (token_ho : Token) = Token.new(.TT_TH_OPEN, "th", i32(1));
-    (align_val : String) = aligns.get_unchecked(usize(hi));
+    (align_val : String) = aligns(usize(hi));
     if((align_val.len() > usize(0)), {
       token_ho.attr_push(StringPair(name: `style`, value: `text-align:${align_val}`));
     });
     block_push_token(state, token_ho);
 
     (token_il : Token) = Token.new(.TT_INLINE, "", i32(0));
-    token_il.content = header_columns.get_unchecked(usize(hi)).trim();
+    token_il.content = header_columns(usize(hi)).trim();
     token_il.children = .Some(ArrayList(Token).new());
     block_push_token(state, token_il);
 
@@ -220,7 +220,7 @@ table :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: bool,
   next_line = (start_line + i32(2));
   (body_done : bool) = false;
   while ((next_line < end_line) && !(body_done)), {
-    if((state.*.s_count.get_unchecked(usize(next_line)) < state.*.blk_indent), {
+    if((state.*.s_count(usize(next_line)) < state.*.blk_indent), {
       body_done = true;
     }, {
       // check terminator rules
@@ -228,7 +228,7 @@ table :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: bool,
       (ti : i32) = i32(0);
       while ((ti < i32(terminator_rules.*.len())) && !(terminate)), {
         // Workaround: separate .unwrap() from call to avoid evaluator chained-call bug
-        (rule_fn : BlockRuleFn) = terminator_rules.*.get_unchecked(usize(ti));
+        (rule_fn : BlockRuleFn) = terminator_rules.*(usize(ti));
         if(rule_fn((&state.*), next_line, end_line, true), {
           terminate = true;
         }, {
@@ -242,14 +242,14 @@ table :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: bool,
         if((row_text.len() == usize(0)), {
           body_done = true;
         }, {
-          if(((state.*.s_count.get_unchecked(usize(next_line)) - state.*.blk_indent) >= i32(4)), {
+          if(((state.*.s_count(usize(next_line)) - state.*.blk_indent) >= i32(4)), {
             body_done = true;
           }, {
             (row_columns : ArrayList(String)) = escaped_split(row_text);
-            if(((row_columns.len() > usize(0)) && (row_columns.get_unchecked(usize(0)).len() == usize(0))), {
+            if(((row_columns.len() > usize(0)) && (row_columns(usize(0)).len() == usize(0))), {
               _ := row_columns.remove(usize(0));
             });
-            if(((row_columns.len() > usize(0)) && (row_columns.get_unchecked(usize((i32(row_columns.len()) - i32(1)))).len() == usize(0))), {
+            if(((row_columns.len() > usize(0)) && (row_columns(usize((i32(row_columns.len()) - i32(1)))).len() == usize(0))), {
               _ := row_columns.remove(usize((i32(row_columns.len()) - i32(1))));
             });
 
@@ -271,7 +271,7 @@ table :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: bool,
               (ri : i32) = i32(0);
               while (ri < column_count), {
                 (token_tdo : Token) = Token.new(.TT_TD_OPEN, "td", i32(1));
-                (a_val : String) = aligns.get_unchecked(usize(ri));
+                (a_val : String) = aligns(usize(ri));
                 if((a_val.len() > usize(0)), {
                   token_tdo.attr_push(StringPair(name: `style`, value: `text-align:${a_val}`));
                 });
@@ -279,7 +279,7 @@ table :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: bool,
 
                 (token_il : Token) = Token.new(.TT_INLINE, "", i32(0));
                 if((ri < i32(row_columns.len())), {
-                  token_il.content = row_columns.get_unchecked(usize(ri)).trim();
+                  token_il.content = row_columns(usize(ri)).trim();
                 }, {
                   token_il.content = ``;
                 });

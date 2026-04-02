@@ -18,7 +18,7 @@ render_attrs :: (fn(result: *(String), token: Token) -> unit)(
     .Some(attrs) => {
       (i : i32) = i32(0);
       while (i < i32(attrs.len())), {
-        (pair : StringPair) = attrs.get_unchecked(usize(i));
+        (pair : StringPair) = attrs(usize(i));
         result.push_str(" ");
         escape_html_to(result, pair.name);
         result.push_str("=\"");
@@ -33,7 +33,7 @@ render_attrs :: (fn(result: *(String), token: Token) -> unit)(
 // Render a single token (open or close tag) as HTML, appending to result.
 // Handles self-closing tags (nesting == -1 with xhtml), and block-level newlines.
 render_token :: (fn(result: *(String), tokens: ArrayList(Token), idx: i32, options: *(Options)) -> unit)({
-  (token : *(Token)) = tokens.get_ptr(usize(idx));
+  (token : *(Token)) = &(tokens(usize(idx)));
 
   // Tight list paragraphs: hide open/close tags
   if(token.*.hidden, {
@@ -42,7 +42,7 @@ render_token :: (fn(result: *(String), tokens: ArrayList(Token), idx: i32, optio
 
   // Insert a newline before this tag if prev token was hidden
   if(((((token.*.block) && (token.*.nesting != i32(-1))) && (idx > i32(0)))), {
-    (prev : *(Token)) = tokens.get_ptr(usize((idx - i32(1))));
+    (prev : *(Token)) = &(tokens(usize((idx - i32(1)))));
     if(prev.*.hidden, {
       result.push_str("\n");
     });
@@ -73,7 +73,7 @@ render_token :: (fn(result: *(String), tokens: ArrayList(Token), idx: i32, optio
     // Suppress newline after opening tag if next token is inline or hidden
     if((token.*.nesting == i32(1)), {
       if(((idx + i32(1)) < i32(tokens.len())), {
-        (next_token : *(Token)) = tokens.get_ptr(usize((idx + i32(1))));
+        (next_token : *(Token)) = &(tokens(usize((idx + i32(1)))));
         if(((next_token.*.type_name == .TT_INLINE) || next_token.*.hidden), {
           need_lf = false;
         }, {
@@ -95,7 +95,7 @@ render_token :: (fn(result: *(String), tokens: ArrayList(Token), idx: i32, optio
 // ============================================================================
 
 _render_code_inline :: (fn(result: *(String), tokens: ArrayList(Token), idx: i32, options: *(Options)) -> unit)({
-  (token : *(Token)) = tokens.get_ptr(usize(idx));
+  (token : *(Token)) = &(tokens(usize(idx)));
   result.push_str("<code");
   render_attrs(result, token.*);
   result.push_str(">");
@@ -104,7 +104,7 @@ _render_code_inline :: (fn(result: *(String), tokens: ArrayList(Token), idx: i32
 });
 
 _render_code_block :: (fn(result: *(String), tokens: ArrayList(Token), idx: i32, options: *(Options)) -> unit)({
-  (token : *(Token)) = tokens.get_ptr(usize(idx));
+  (token : *(Token)) = &(tokens(usize(idx)));
   result.push_str("<pre");
   render_attrs(result, token.*);
   result.push_str("><code>");
@@ -113,7 +113,7 @@ _render_code_block :: (fn(result: *(String), tokens: ArrayList(Token), idx: i32,
 });
 
 _render_fence :: (fn(result: *(String), tokens: ArrayList(Token), idx: i32, options: *(Options)) -> unit)({
-  (token : *(Token)) = tokens.get_ptr(usize(idx));
+  (token : *(Token)) = &(tokens(usize(idx)));
   (info : String) = cond(
     (token.*.info.bytes_len() > usize(0)) => unescape_all(token.*.info).trim(),
     true => ``
@@ -127,7 +127,7 @@ _render_fence :: (fn(result: *(String), tokens: ArrayList(Token), idx: i32, opti
     (space_pos : i32) = i32(0);
     (found_space : bool) = false;
     while (((space_pos < i32(info_bytes.len())) && !(found_space))), {
-      (b : i32) = i32(info_bytes.get_unchecked(usize(space_pos)));
+      (b : i32) = i32(info_bytes(usize(space_pos)));
       if(((((b == i32(0x20)) || (b == i32(0x09))) || ((b == i32(0x0A)) || (b == i32(0x0B)))) || ((b == i32(0x0C)) || (b == i32(0x0D)))), {
         found_space = true;
       }, {
@@ -165,7 +165,7 @@ _render_fence :: (fn(result: *(String), tokens: ArrayList(Token), idx: i32, opti
 render_inline_as_text :: (fn(result: *(String), tokens: ArrayList(Token)) -> unit)({
   (i : i32) = i32(0);
   while (i < i32(tokens.len())), {
-    (tok : *(Token)) = tokens.get_ptr(usize(i));
+    (tok : *(Token)) = &(tokens(usize(i)));
     (tn : TokenType) = tok.*.type_name;
     cond(
       (tn == .TT_TEXT) => result.push_string(tok.*.content),
@@ -190,7 +190,7 @@ render_inline_as_text :: (fn(result: *(String), tokens: ArrayList(Token)) -> uni
 });
 
 _render_image :: (fn(result: *(String), tokens: ArrayList(Token), idx: i32, options: *(Options)) -> unit)({
-  (token : *(Token)) = tokens.get_ptr(usize(idx));
+  (token : *(Token)) = &(tokens(usize(idx)));
   // Alt text: strip markdown from children (render_inline_as_text)
   (alt_text : String) = match(token.*.children,
     .Some(children) => {
@@ -205,9 +205,9 @@ _render_image :: (fn(result: *(String), tokens: ArrayList(Token), idx: i32, opti
     .Some(attrs) => {
       (ai : i32) = i32(0);
       while (ai < i32(attrs.len())), {
-        (pair : StringPair) = attrs.get_unchecked(usize(ai));
+        (pair : StringPair) = attrs(usize(ai));
         if((pair.name == `alt`), {
-          attrs.set(usize(ai), StringPair(name: `alt`, value: alt_text));
+          &(attrs(usize(ai))).* = StringPair(name: `alt`, value: alt_text);
         });
         ai = (ai + i32(1));
       };
@@ -215,7 +215,7 @@ _render_image :: (fn(result: *(String), tokens: ArrayList(Token), idx: i32, opti
     .None => ()
   );
   // Update token in the list then render via render_token
-  tokens.set(usize(idx), token.*);
+  &(tokens(usize(idx))).* = token.*;
   render_token(result, tokens, idx, options);
 });
 
@@ -254,7 +254,7 @@ _render_html_inline :: (fn(result: *(String), token: Token) -> unit)(
 
 // Render a single token to HTML (dispatches by type), appending to result.
 _render_one_token :: (fn(result: *(String), tokens: ArrayList(Token), idx: i32, options: *(Options)) -> unit)({
-  (token : *(Token)) = tokens.get_ptr(usize(idx));
+  (token : *(Token)) = &(tokens(usize(idx)));
   (type_name : TokenType) = token.*.type_name;
 
   cond(
@@ -292,7 +292,7 @@ render :: (fn(tokens: ArrayList(Token), options: *(Options), src_byte_len: usize
   (i : i32) = i32(0);
 
   while (i < len), {
-    (token : *(Token)) = tokens.get_ptr(usize(i));
+    (token : *(Token)) = &(tokens(usize(i)));
     (type_name : TokenType) = token.*.type_name;
 
     if((type_name == .TT_INLINE), {

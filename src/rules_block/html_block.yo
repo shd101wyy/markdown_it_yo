@@ -114,11 +114,11 @@ _cached_html_seqs := _build_html_sequences();
 
 // HTML block rule
 html_block :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: bool) -> bool)({
-  (pos : i32) = (state.*.b_marks.get_unchecked(usize(start_line)) + state.*.t_shift.get_unchecked(usize(start_line)));
-  (max : i32) = state.*.e_marks.get_unchecked(usize(start_line));
+  (pos : i32) = (state.*.b_marks(usize(start_line)) + state.*.t_shift(usize(start_line)));
+  (max : i32) = state.*.e_marks(usize(start_line));
 
   // if it's indented more than 3 spaces, it should be a code block
-  if(((state.*.s_count.get_unchecked(usize(start_line)) - state.*.blk_indent) >= i32(4)), {
+  if(((state.*.s_count(usize(start_line)) - state.*.blk_indent) >= i32(4)), {
     return false;
   });
 
@@ -127,7 +127,7 @@ html_block :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: 
     return false;
   });
 
-  if((i32(state.*._src_bytes.get_unchecked(usize(pos))) != i32(0x3C)), {
+  if((i32(state.*._src_bytes(usize(pos))) != i32(0x3C)), {
     return false;
   });
 
@@ -142,7 +142,7 @@ html_block :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: 
   (seq_idx : i32) = i32(0);
   (found : bool) = false;
   while ((seq_idx < i32(seqs.*.len())) && (!(found))), {
-    (seq : HtmlSequence) = seqs.*.get_unchecked(usize(seq_idx));
+    (seq : HtmlSequence) = seqs.*(usize(seq_idx));
     if(seq.open_re.test(line_text), {
       found = true;
     }, {
@@ -156,7 +156,7 @@ html_block :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: 
 
   if(silent, {
     // true if this sequence can be a terminator, false otherwise
-    (seq : HtmlSequence) = seqs.*.get_unchecked(usize(seq_idx));
+    (seq : HtmlSequence) = seqs.*(usize(seq_idx));
     return seq.can_terminate;
   });
 
@@ -164,15 +164,15 @@ html_block :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: 
 
   // If we are here - we detected HTML block.
   // Let's roll down till block end.
-  (matched_seq : HtmlSequence) = seqs.*.get_unchecked(usize(seq_idx));
+  (matched_seq : HtmlSequence) = seqs.*(usize(seq_idx));
   if(!(matched_seq.close_re.test(line_text)), {
     (scanning : bool) = true;
     while ((next_line < end_line) && scanning), {
-      if((state.*.s_count.get_unchecked(usize(next_line)) < state.*.blk_indent), {
+      if((state.*.s_count(usize(next_line)) < state.*.blk_indent), {
         scanning = false;
       }, {
-        (p : i32) = (state.*.b_marks.get_unchecked(usize(next_line)) + state.*.t_shift.get_unchecked(usize(next_line)));
-        (m : i32) = state.*.e_marks.get_unchecked(usize(next_line));
+        (p : i32) = (state.*.b_marks(usize(next_line)) + state.*.t_shift(usize(next_line)));
+        (m : i32) = state.*.e_marks(usize(next_line));
         (lb : ArrayList(u8)) = state.*._src_bytes.slice(usize(p), usize(m)).unwrap();
         (lt : String) = String.from_bytes(lb);
 

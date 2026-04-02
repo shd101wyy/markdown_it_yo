@@ -54,7 +54,7 @@ escape_rule :: (fn(state: *(StateInline), silent: bool) -> bool)({
   (pos : i32) = state.*.pos;
   (max : i32) = state.*.pos_max;
 
-  if((i32(state.*._src_bytes.get_unchecked(usize(pos))) != i32(0x5C)), {
+  if((i32(state.*._src_bytes(usize(pos))) != i32(0x5C)), {
     return false;
   });
 
@@ -65,7 +65,7 @@ escape_rule :: (fn(state: *(StateInline), silent: bool) -> bool)({
     return false;
   });
 
-  (ch1 : i32) = i32(state.*._src_bytes.get_unchecked(usize(pos)));
+  (ch1 : i32) = i32(state.*._src_bytes(usize(pos)));
 
   if((ch1 == i32(0x0A)), {
     if(!(silent), {
@@ -74,7 +74,7 @@ escape_rule :: (fn(state: *(StateInline), silent: bool) -> bool)({
 
     pos = (pos + i32(1));
     // skip leading whitespaces from next line
-    while (((pos < max) && is_space(i32(state.*._src_bytes.get_unchecked(usize(pos)))))), {
+    while (((pos < max) && is_space(i32(state.*._src_bytes(usize(pos)))))), {
       pos = (pos + i32(1));
     };
 
@@ -93,7 +93,7 @@ escape_rule :: (fn(state: *(StateInline), silent: bool) -> bool)({
   if((ch1 >= i32(0x80)), {
     // Multi-byte UTF-8: collect all continuation bytes
     (end : i32) = (pos + i32(1));
-    while ((((end < max) && (i32(state.*._src_bytes.get_unchecked(usize(end))) >= i32(0x80))) && (i32(state.*._src_bytes.get_unchecked(usize(end))) < i32(0xC0)))), {
+    while ((((end < max) && (i32(state.*._src_bytes(usize(end))) >= i32(0x80))) && (i32(state.*._src_bytes(usize(end))) < i32(0xC0)))), {
       end = (end + i32(1));
     };
     (mb_bytes : ArrayList(u8)) = state.*._src_bytes.slice(usize(pos), usize(end)).unwrap();

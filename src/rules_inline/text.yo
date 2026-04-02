@@ -41,7 +41,7 @@ is_terminator_char :: (fn(ch: i32) -> bool)(
 text :: (fn(state: *(StateInline), silent: bool) -> bool)({
   (pos : i32) = state.*.pos;
 
-  while ((pos < state.*.pos_max) && !(is_terminator_char(i32(state.*._src_bytes.get_unchecked(usize(pos)))))), {
+  while ((pos < state.*.pos_max) && !(is_terminator_char(i32(state.*._src_bytes(usize(pos)))))), {
     pos = (pos + i32(1));
   };
 

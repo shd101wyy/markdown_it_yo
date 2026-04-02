@@ -12,7 +12,7 @@ open import "std/string";
 // Insert each marker as a separate text token, and add it to delimiter list
 emphasis_tokenize :: (fn(state: *(StateInline), silent: bool) -> bool)({
   (start : i32) = state.*.pos;
-  (marker : i32) = i32(state.*._src_bytes.get_unchecked(usize(start)));
+  (marker : i32) = i32(state.*._src_bytes(usize(start)));
 
   if(silent, {
     return false;
@@ -55,19 +55,19 @@ _post_process_emphasis :: (fn(tokens: ArrayList(Token), delimiters: ArrayList(De
 
   (i : i32) = (max - i32(1));
   while (i >= i32(0)), {
-    (start_delim : Delimiter) = delimiters.get_unchecked(usize(i));
+    (start_delim : Delimiter) = delimiters(usize(i));
 
     if((((start_delim.marker == i32(0x5F)) || (start_delim.marker == i32(0x2A)))
         && (start_delim.end != i32(-1))), {
-      (end_delim : Delimiter) = delimiters.get_unchecked(usize(start_delim.end));
+      (end_delim : Delimiter) = delimiters(usize(start_delim.end));
 
       // Check if previous delimiter is adjacent → strong emphasis
       (is_strong : bool) = false;
       if((i > i32(0)), {
-        (prev : Delimiter) = delimiters.get_unchecked(usize((i - i32(1))));
+        (prev : Delimiter) = delimiters(usize((i - i32(1))));
         if(((prev.end == (start_delim.end + i32(1))) && (prev.marker == start_delim.marker)), {
           if((prev.token_idx == (start_delim.token_idx - i32(1))), {
-            (next_end : Delimiter) = delimiters.get_unchecked(usize((start_delim.end + i32(1))));
+            (next_end : Delimiter) = delimiters(usize((start_delim.end + i32(1))));
             if((next_end.token_idx == (end_delim.token_idx + i32(1))), {
               is_strong = true;
             });
@@ -85,7 +85,7 @@ _post_process_emphasis :: (fn(tokens: ArrayList(Token), delimiters: ArrayList(De
       );
 
       // Opening token
-      (token_o : *(Token)) = tokens.get_ptr(usize(start_delim.token_idx));
+      (token_o : *(Token)) = &(tokens(usize(start_delim.token_idx)));
       token_o.*.type_name = cond(is_strong => .TT_STRONG_OPEN, true => .TT_EM_OPEN);
       (o_tag : str) = "em";
       if(is_strong, { o_tag = "strong"; });
@@ -95,7 +95,7 @@ _post_process_emphasis :: (fn(tokens: ArrayList(Token), delimiters: ArrayList(De
       token_o.*.content = ``;
 
       // Closing token
-      (token_c : *(Token)) = tokens.get_ptr(usize(end_delim.token_idx));
+      (token_c : *(Token)) = &(tokens(usize(end_delim.token_idx)));
       token_c.*.type_name = cond(is_strong => .TT_STRONG_CLOSE, true => .TT_EM_CLOSE);
       (c_tag : str) = "em";
       if(is_strong, { c_tag = "strong"; });
@@ -106,12 +106,12 @@ _post_process_emphasis :: (fn(tokens: ArrayList(Token), delimiters: ArrayList(De
 
       // If strong, clear inner delimiter tokens
       if(is_strong, {
-        (prev_delim : Delimiter) = delimiters.get_unchecked(usize((i - i32(1))));
-        (tok1 : *(Token)) = tokens.get_ptr(usize(prev_delim.token_idx));
+        (prev_delim : Delimiter) = delimiters(usize((i - i32(1))));
+        (tok1 : *(Token)) = &(tokens(usize(prev_delim.token_idx)));
         tok1.*.content = ``;
 
-        (next_end_delim : Delimiter) = delimiters.get_unchecked(usize((start_delim.end + i32(1))));
-        (tok2 : *(Token)) = tokens.get_ptr(usize(next_end_delim.token_idx));
+        (next_end_delim : Delimiter) = delimiters(usize((start_delim.end + i32(1))));
+        (tok2 : *(Token)) = &(tokens(usize(next_end_delim.token_idx)));
         tok2.*.content = ``;
 
         i = (i - i32(1));
@@ -130,7 +130,7 @@ emphasis_post_process :: (fn(state: *(StateInline)) -> unit)({
 
   (curr : i32) = i32(0);
   while (curr < max), {
-    match(tokens_meta.get_unchecked(usize(curr)),
+    match(tokens_meta(usize(curr)),
       .Some(tm) => _post_process_emphasis(state.*.tokens, tm.delimiters),
       .None => ()
     );

@@ -77,7 +77,7 @@ _core_inline :: (fn(state: *(StateCore), inline_parser: ParserInline, html_enabl
   (i : i32) = i32(0);
 
   while (i < len), {
-    (token : *(Token)) = state.*.tokens.get_ptr(usize(i));
+    (token : *(Token)) = &(state.*.tokens(usize(i)));
     if((token.*.type_name == .TT_INLINE), {
       (children : ArrayList(Token)) = ArrayList(Token).new();
       inline_parser.parse(token.*.content, state.*.env, children, html_enabled, enable_strikethrough);

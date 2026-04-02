@@ -272,21 +272,21 @@ array_replace_at :: (fn(forall(T : Type), src: ArrayList(T), pos: i32, new_eleme
 
     (i : i32) = i32(0);
     while (i < pos), {
-      result.push(src.get_unchecked(usize(i)));
+      result.push(src(usize(i)));
       i = (i + i32(1));
     };
 
     (j : i32) = i32(0);
     (new_len : i32) = i32(new_elements.len());
     while (j < new_len), {
-      result.push(new_elements.get_unchecked(usize(j)));
+      result.push(new_elements(usize(j)));
       j = (j + i32(1));
     };
 
     (k : i32) = (pos + i32(1));
     (src_len : i32) = i32(src.len());
     while (k < src_len), {
-      result.push(src.get_unchecked(usize(k)));
+      result.push(src(usize(k)));
       k = (k + i32(1));
     };
 

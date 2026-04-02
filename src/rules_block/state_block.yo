@@ -92,7 +92,7 @@ new_state_block :: (fn(src: String, env: *(Env), tokens: ArrayList(Token), html_
     (indent_found : bool) = false;
 
     while (pos < len), {
-      (ch : i32) = i32(bytes.get_unchecked(usize(pos)));
+      (ch : i32) = i32(bytes(usize(pos)));
 
       if(!(indent_found), {
         if(is_space(ch), {
@@ -213,14 +213,14 @@ impl(StateBlock,
 
   // Check if line is empty
   is_empty : (fn(self: Self, line_idx: i32) -> bool)(
-    ((self.b_marks.get_unchecked(usize(line_idx)) + self.t_shift.get_unchecked(usize(line_idx))) >= self.e_marks.get_unchecked(usize(line_idx)))
+    ((self.b_marks(usize(line_idx)) + self.t_shift(usize(line_idx))) >= self.e_marks(usize(line_idx)))
   ),
 
   // Skip empty lines from given line number, return first non-empty line
   skip_empty_lines : (fn(self: Self, from: i32) -> i32)({
     (line : i32) = from;
     while (line < self.line_max), {
-      if(((self.b_marks.get_unchecked(usize(line)) + self.t_shift.get_unchecked(usize(line))) < self.e_marks.get_unchecked(usize(line))), {
+      if(((self.b_marks(usize(line)) + self.t_shift(usize(line))) < self.e_marks(usize(line))), {
         return line;
       });
       line = (line + i32(1));
@@ -233,7 +233,7 @@ impl(StateBlock,
     (pos : i32) = pos_param;
     (max : i32) = i32(self._src_bytes.len());
     while (pos < max), {
-      if(!(is_space(i32(self._src_bytes.get_unchecked(usize(pos))))), {
+      if(!(is_space(i32(self._src_bytes(usize(pos))))), {
         return pos;
       });
       pos = (pos + i32(1));
@@ -249,7 +249,7 @@ impl(StateBlock,
     });
     while (pos > min), {
       pos = (pos - i32(1));
-      if(!(is_space(i32(self._src_bytes.get_unchecked(usize(pos))))), {
+      if(!(is_space(i32(self._src_bytes(usize(pos))))), {
         return (pos + i32(1));
       });
     };
@@ -261,7 +261,7 @@ impl(StateBlock,
     (pos : i32) = pos_param;
     (max : i32) = i32(self._src_bytes.len());
     while (pos < max), {
-      if((i32(self._src_bytes.get_unchecked(usize(pos))) != code), {
+      if((i32(self._src_bytes(usize(pos))) != code), {
         return pos;
       });
       pos = (pos + i32(1));
@@ -277,7 +277,7 @@ impl(StateBlock,
     });
     while (pos > min), {
       pos = (pos - i32(1));
-      if((code != i32(self._src_bytes.get_unchecked(usize(pos)))), {
+      if((code != i32(self._src_bytes(usize(pos)))), {
         return (pos + i32(1));
       });
     };
@@ -295,11 +295,11 @@ impl(StateBlock,
 
     while (line < end), {
       (line_indent : i32) = i32(0);
-      (line_start : i32) = self.b_marks.get_unchecked(usize(line));
+      (line_start : i32) = self.b_marks(usize(line));
       (first : i32) = line_start;
       (last_raw : i32) = cond(
-        (((line + i32(1)) < end) || keep_last_lf) => (self.e_marks.get_unchecked(usize(line)) + i32(1)),
-        true => self.e_marks.get_unchecked(usize(line))
+        (((line + i32(1)) < end) || keep_last_lf) => (self.e_marks(usize(line)) + i32(1)),
+        true => self.e_marks(usize(line))
       );
       // Clamp to source length (last line may not have trailing newline)
       (last : i32) = cond(
@@ -309,16 +309,16 @@ impl(StateBlock,
 
       (done : bool) = false;
       while ((first < last) && ((line_indent < indent) && !(done))), {
-        (ch : i32) = i32(self._src_bytes.get_unchecked(usize(first)));
+        (ch : i32) = i32(self._src_bytes(usize(first)));
         cond(
           is_space(ch) => {
             if((ch == i32(0x09)), {
-              line_indent = (line_indent + (i32(4) - ((line_indent + self.bs_count.get_unchecked(usize(line))) % i32(4))));
+              line_indent = (line_indent + (i32(4) - ((line_indent + self.bs_count(usize(line))) % i32(4))));
             }, {
               line_indent = (line_indent + i32(1));
             });
           },
-          ((first - line_start) < self.t_shift.get_unchecked(usize(line))) => {
+          ((first - line_start) < self.t_shift(usize(line))) => {
             line_indent = (line_indent + i32(1));
           },
           true => {
