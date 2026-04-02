@@ -1,196 +1,174 @@
 #!/usr/bin/env node
 // Benchmark: markdown-it (JS) vs markdown_it_yo (native)
 //
-// Runs both implementations on the same markdown input multiple times
-// and reports average throughput.
+// Runs both implementations on sample markdown files of various sizes
+// and reports median throughput.
+//
+// Usage:
+//   node benchmark/run.js              # Run all benchmarks
+//   node benchmark/run.js --size 1mb   # Run only 1MB benchmark
 
 const { execSync, execFileSync } = require("child_process");
 const fs = require("fs");
 const path = require("path");
 
-const ITERATIONS = 50;
-const WARMUP = 5;
+const args = process.argv.slice(2);
+const getArg = (name, defaultVal) => {
+  const idx = args.indexOf(name);
+  return idx >= 0 && args[idx + 1] ? args[idx + 1] : defaultVal;
+};
+
+const sizeFilter = getArg("--size", null);
+const ITERATIONS = parseInt(getArg("--iterations", "10"));
+const WARMUP = parseInt(getArg("--warmup", "3"));
 
 // ---------------------------------------------------------------------------
-// 1. Build sample markdown from fixture files
+// 1. Resolve paths and generate samples
 // ---------------------------------------------------------------------------
 
-function extractMarkdownFromFixtures() {
-  const fixtureDir = path.join(__dirname, "..", "tests", "fixtures");
-  const files = [
-    path.join(fixtureDir, "commonmark", "good.txt"),
-    path.join(fixtureDir, "markdown_it", "commonmark_extras.txt"),
-    path.join(fixtureDir, "markdown_it", "tables.txt"),
-    path.join(fixtureDir, "markdown_it", "strikethrough.txt"),
-    path.join(fixtureDir, "markdown_it", "typographer.txt"),
-  ];
+const samplesDir = path.join(__dirname, "samples");
 
-  const chunks = [];
-  for (const file of files) {
-    if (!fs.existsSync(file)) continue;
-    const content = fs.readFileSync(file, "utf-8");
-    // Extract markdown blocks (between first and second `.` lines)
-    const lines = content.split("\n");
-    let inMarkdown = false;
-    let dotCount = 0;
-    for (const line of lines) {
-      if (line.trim() === ".") {
-        dotCount++;
-        if (dotCount % 2 === 1) {
-          inMarkdown = true;
-          continue;
-        } else {
-          inMarkdown = false;
-          continue;
-        }
-      }
-      if (inMarkdown) {
-        chunks.push(line);
-      }
+// Generate samples if missing
+if (!fs.existsSync(samplesDir) || fs.readdirSync(samplesDir).filter(f => f.endsWith(".md")).length === 0) {
+  console.log("Generating benchmark samples...");
+  execSync(`node ${path.join(__dirname, "generate_samples.js")}`, { stdio: "inherit" });
+}
+
+// Resolve Yo binary — search yo-out/<target>/bin/
+const yoOutDir = path.join(__dirname, "..", "yo-out");
+let yoBinary = null;
+if (fs.existsSync(yoOutDir)) {
+  for (const target of fs.readdirSync(yoOutDir)) {
+    const candidate = path.join(yoOutDir, target, "bin", "markdown_it_yo");
+    if (fs.existsSync(candidate)) {
+      yoBinary = candidate;
+      break;
     }
   }
-  return chunks.join("\n");
+}
+if (!yoBinary) {
+  console.error("ERROR: Binary not found in yo-out/*/bin/markdown_it_yo\nRun `yo build` first.");
+  process.exit(1);
 }
 
 // ---------------------------------------------------------------------------
-// 2. Benchmark helpers
+// 2. Discover sample files
 // ---------------------------------------------------------------------------
 
-function benchmarkJS(markdown, iterations) {
+const sizeOrder = { "1mb": 0, "5mb": 1, "20mb": 2 };
+
+let samples = fs.readdirSync(samplesDir)
+  .filter(f => f.endsWith(".md"))
+  .sort((a, b) => {
+    const getSize = name => {
+      const m = name.match(/bench_(\w+)\.md/);
+      return m ? (sizeOrder[m[1]] ?? 99) : 99;
+    };
+    return getSize(a) - getSize(b);
+  });
+
+if (sizeFilter) {
+  samples = samples.filter(f => f.includes(sizeFilter));
+}
+
+if (samples.length === 0) {
+  console.error("No sample files found!");
+  process.exit(1);
+}
+
+// ---------------------------------------------------------------------------
+// 3. Benchmark helpers
+// ---------------------------------------------------------------------------
+
+function benchmarkJS(content, warmup, iterations) {
   const md = require("markdown-it")({ html: true, typographer: true });
-
-  // Warmup
-  for (let i = 0; i < WARMUP; i++) md.render(markdown);
-
+  for (let i = 0; i < warmup; i++) md.render(content);
   const times = [];
   for (let i = 0; i < iterations; i++) {
-    const start = performance.now();
-    md.render(markdown);
-    times.push(performance.now() - start);
+    const start = process.hrtime.bigint();
+    md.render(content);
+    const end = process.hrtime.bigint();
+    times.push(Number(end - start) / 1e6);
   }
   return times;
 }
 
-function benchmarkYo(markdown, iterations, binary) {
-  // Warmup
-  for (let i = 0; i < WARMUP; i++) {
-    try {
-      execFileSync(binary, { input: markdown, stdio: ["pipe", "pipe", "pipe"] });
-    } catch {
-      console.error("ERROR: Yo binary failed. Did you run `yo build`?");
-      process.exit(1);
-    }
+function benchmarkNative(filePath, warmup, iterations) {
+  for (let i = 0; i < warmup; i++) {
+    execFileSync(yoBinary, [filePath], { stdio: ["pipe", "pipe", "pipe"], maxBuffer: 200 * 1024 * 1024 });
   }
-
   const times = [];
   for (let i = 0; i < iterations; i++) {
-    const start = performance.now();
-    execFileSync(binary, {
-      input: markdown,
-      stdio: ["pipe", "pipe", "pipe"],
-    });
-    times.push(performance.now() - start);
+    const start = process.hrtime.bigint();
+    execFileSync(yoBinary, [filePath], { stdio: ["pipe", "pipe", "pipe"], maxBuffer: 200 * 1024 * 1024 });
+    const end = process.hrtime.bigint();
+    times.push(Number(end - start) / 1e6);
   }
   return times;
 }
-
-// ---------------------------------------------------------------------------
-// 3. Stats
-// ---------------------------------------------------------------------------
 
 function stats(times) {
   times.sort((a, b) => a - b);
-  const sum = times.reduce((a, b) => a + b, 0);
-  const avg = sum / times.length;
   const median = times[Math.floor(times.length / 2)];
+  const mean = times.reduce((a, b) => a + b, 0) / times.length;
   const min = times[0];
   const max = times[times.length - 1];
-  // stddev
-  const variance =
-    times.reduce((s, t) => s + (t - avg) ** 2, 0) / times.length;
-  const stddev = Math.sqrt(variance);
-  return { avg, median, min, max, stddev };
-}
-
-function fmt(ms) {
-  return ms.toFixed(2) + " ms";
+  return { median, mean, min, max };
 }
 
 // ---------------------------------------------------------------------------
-// 4. Main
+// 4. Run benchmarks
 // ---------------------------------------------------------------------------
 
-function main() {
-  console.log("═══════════════════════════════════════════════════════");
-  console.log("  markdown-it (JS) vs markdown_it_yo (native) benchmark");
-  console.log("═══════════════════════════════════════════════════════\n");
+console.log(`\n${"═".repeat(72)}`);
+console.log(`  markdown_it_yo Benchmark — ${WARMUP} warmup, ${ITERATIONS} iterations`);
+console.log(`${"═".repeat(72)}\n`);
 
-  // Resolve Yo binary — search yo-out/<target>/bin/
-  const yoOutDir = path.join(__dirname, "..", "yo-out");
-  let yoBinary = null;
-  if (fs.existsSync(yoOutDir)) {
-    for (const target of fs.readdirSync(yoOutDir)) {
-      const candidate = path.join(yoOutDir, target, "bin", "markdown_it_yo");
-      if (fs.existsSync(candidate)) {
-        yoBinary = candidate;
-        break;
-      }
-    }
-  }
-  if (!yoBinary) {
-    console.error(
-      `ERROR: Binary not found in yo-out/*/bin/markdown_it_yo\nRun \`yo build\` first.`
-    );
-    process.exit(1);
-  }
+const results = [];
 
-  // Generate input
-  const markdown = extractMarkdownFromFixtures();
-  const inputKB = (Buffer.byteLength(markdown, "utf-8") / 1024).toFixed(1);
-  console.log(`Input size: ${inputKB} KB`);
-  console.log(`Iterations: ${ITERATIONS}  (warmup: ${WARMUP})\n`);
+for (const sample of samples) {
+  const filePath = path.join(samplesDir, sample);
+  const content = fs.readFileSync(filePath, "utf8");
+  const sizeMB = (content.length / 1024 / 1024).toFixed(0);
+  const sizeName = sample.replace("bench_", "").replace(".md", "").toUpperCase();
 
-  // Benchmark JS
-  process.stdout.write("Running markdown-it (JS)...");
-  const jsTimes = benchmarkJS(markdown, ITERATIONS);
+  process.stdout.write(`  ${sizeName.padEnd(6)} (${sizeMB} MB):\n`);
+
+  // JS benchmark
+  const jsTimes = benchmarkJS(content, WARMUP, ITERATIONS);
   const jsStats = stats(jsTimes);
-  console.log(" done");
+  process.stdout.write(`    JS       ${jsStats.median.toFixed(1).padStart(8)} ms  (baseline)\n`);
 
-  // Benchmark Yo (native)
-  process.stdout.write("Running markdown_it_yo (native)...");
-  const yoTimes = benchmarkYo(markdown, ITERATIONS, yoBinary);
-  const yoStats = stats(yoTimes);
-  console.log(" done\n");
+  // Native benchmark
+  const nativeTimes = benchmarkNative(filePath, WARMUP, ITERATIONS);
+  const nativeStats = stats(nativeTimes);
+  const speedup = (jsStats.median / nativeStats.median).toFixed(1);
+  process.stdout.write(`    Native   ${nativeStats.median.toFixed(1).padStart(8)} ms  ${speedup}×\n`);
 
-  // Report
-  const speedup = jsStats.avg / yoStats.avg;
-
-  console.log("Results");
-  console.log("─────────────────────────────────────────────────────");
-  console.log(
-    `  markdown-it (JS):     avg ${fmt(jsStats.avg)}  median ${fmt(jsStats.median)}  min ${fmt(jsStats.min)}  max ${fmt(jsStats.max)}  stddev ${fmt(jsStats.stddev)}`
-  );
-  console.log(
-    `  markdown_it_yo:       avg ${fmt(yoStats.avg)}  median ${fmt(yoStats.median)}  min ${fmt(yoStats.min)}  max ${fmt(yoStats.max)}  stddev ${fmt(yoStats.stddev)}`
-  );
-  console.log("─────────────────────────────────────────────────────");
-
-  if (speedup >= 1) {
-    console.log(
-      `  Yo is ${speedup.toFixed(2)}x faster than JS (avg)\n`
-    );
-  } else {
-    console.log(
-      `  JS is ${(1 / speedup).toFixed(2)}x faster than Yo (avg)\n`
-    );
-  }
-
-  // Throughput
-  const inputMB = Buffer.byteLength(markdown, "utf-8") / (1024 * 1024);
-  const jsMBs = (inputMB / (jsStats.avg / 1000)).toFixed(2);
-  const yoMBs = (inputMB / (yoStats.avg / 1000)).toFixed(2);
-  console.log(`  Throughput (JS):  ${jsMBs} MB/s`);
-  console.log(`  Throughput (Yo):  ${yoMBs} MB/s`);
+  results.push({ sizeName, sizeMB, jsStats, nativeStats, speedup });
 }
 
-main();
+// Summary table
+console.log(`\n${"─".repeat(72)}`);
+console.log("  Summary (median times):");
+console.log(`${"─".repeat(72)}`);
+console.log(
+  "  " +
+  "Size".padEnd(8) +
+  "markdown-it (JS)".padEnd(20) +
+  "markdown_it_yo".padEnd(20) +
+  "Speedup"
+);
+console.log(`  ${"─".repeat(56)}`);
+
+for (const r of results) {
+  console.log(
+    "  " +
+    r.sizeName.padEnd(8) +
+    `${r.jsStats.median.toFixed(1)} ms`.padEnd(20) +
+    `${r.nativeStats.median.toFixed(1)} ms`.padEnd(20) +
+    `${r.speedup}×`
+  );
+}
+
+console.log(`${"═".repeat(72)}\n`);

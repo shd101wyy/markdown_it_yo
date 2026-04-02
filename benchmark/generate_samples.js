@@ -8,6 +8,7 @@ const path = require("path");
 const SIZES = {
   "1mb": 1 * 1024 * 1024,
   "5mb": 5 * 1024 * 1024,
+  "20mb": 20 * 1024 * 1024,
 };
 
 function extractMarkdownFromFixtures() {

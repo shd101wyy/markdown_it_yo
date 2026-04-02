@@ -29,3 +29,6 @@ bench_*.md
 .devenv*
 Thumbs.db
 *.c
+# Benchmark samples (generated)
+benchmark/samples/
+bench_*.md

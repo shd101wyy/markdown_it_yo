@@ -1,6 +1,8 @@
 # markdown_it_yo
 
-A high-performance Markdown parser written in [Yo](https://github.com/shd101wyy/yo) programming language — a direct port of the popular [markdown-it](https://github.com/markdown-it/markdown-it) JavaScript library.
+A high-performance Markdown parser written in [Yo](https://github.com/shd101wyy/yo) programming language — a direct 1:1 port of the popular [markdown-it](https://github.com/markdown-it/markdown-it) JavaScript library.
+
+> **See also:** [markdown_yo](https://github.com/nicolo-ribaudo/markdown_yo) — a custom implementation inspired by markdown-it, [md4c](https://github.com/mity/md4c), and [markdown-wasm](https://github.com/nicolo-ribaudo/markdown-wasm), optimized for speed. markdown_it_yo faithfully mirrors the original JS architecture for easier maintenance, while markdown_yo is a **ground-up rewrite** for maximum performance.
 
 ## Features
 
