@@ -145,15 +145,15 @@ The port achieves competitive performance through several key optimizations:
 1. **Enum token types** — Token `type_name` uses an `enum` instead of `String`, eliminating millions of string allocations and comparisons (2× speedup)
 2. **Value-type token tags** — Token `tag` uses `str` (16-byte value type, pointer+length) instead of `String` (RC heap object), eliminating heap allocations for every token creation
 3. **Buffer-pattern renderer** — Renderer appends to a pre-allocated `String` buffer via `push_str`/`push_string` instead of string concatenation
-3. **Zero-allocation HTML escaping** — `escape_html_to()` appends escaped content directly to the output buffer using run-batching and `extend_from_ptr`, avoiding intermediate String objects
-4. **`push_str` for literals** — All string literal appends use `push_str("...")` (str type) instead of `push_string(\`...\`)` (String type), avoiding RC object creation
-5. **libc allocator** — macOS system malloc outperforms mimalloc by 3.3× for this allocation pattern (many small RC objects). Set via `build.Allocator.Libc` in `build.yo`
-6. **Pre-allocated buffers** — Render buffer pre-allocated to 1.5× source size; `escape_html` pre-allocates with headroom
-7. **O(1) length checks** — `bytes_len()` for byte count instead of `len()` which counts Unicode characters
-8. **Bulk memory operations** — `String.substring` and `String.trim` use `memcpy`/`extend_from_ptr` instead of byte-by-byte copying
-9. **Pointer-based access** — `ArrayList.get_ptr` returns pointers to elements without copying, avoiding RC overhead in hot loops
-10. **Regex caching** — Compiled regex patterns cached as module-level variables instead of recompiled per call
-11. **Pre-allocated arrays** — Parser state arrays pre-allocated to expected capacity
+4. **Zero-allocation HTML escaping** — `escape_html_to()` appends escaped content directly to the output buffer using run-batching and `extend_from_ptr`, avoiding intermediate String objects
+5. **`push_str` for literals** — All string literal appends use `push_str("...")` (str type) instead of `push_string(\`...\`)` (String type), avoiding RC object creation
+6. **libc allocator** — macOS system malloc outperforms mimalloc by 3.3× for this allocation pattern (many small RC objects). Set via `build.Allocator.Libc` in `build.yo`
+7. **Pre-allocated buffers** — Render buffer pre-allocated to 1.5× source size; `escape_html` pre-allocates with headroom
+8. **O(1) length checks** — `bytes_len()` for byte count instead of `len()` which counts Unicode characters
+9. **Bulk memory operations** — `String.substring` and `String.trim` use `memcpy`/`extend_from_ptr` instead of byte-by-byte copying
+10. **Pointer-based access** — `ArrayList.get_ptr` returns pointers to elements without copying, avoiding RC overhead in hot loops
+11. **Regex caching** — Compiled regex patterns cached as module-level variables instead of recompiled per call
+12. **Pre-allocated arrays** — Parser state arrays pre-allocated to expected capacity
 
 ### Verifying Correctness
 
