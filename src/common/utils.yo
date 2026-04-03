@@ -535,6 +535,14 @@ byte_substring :: (fn(bytes: str, start: i32, end: i32) -> String)({
   String.from_bytes(out)
 });
 
+// Zero-copy byte slice: returns a str view into the source bytes.
+// The returned str borrows from the source — caller must ensure `bytes` outlives the result.
+byte_str_slice :: (fn(bytes: str, start: i32, end: i32) -> str)({
+  (count : usize) = usize((end - start));
+  if((count == usize(0)), { return ""; });
+  str.from_raw_parts(&(bytes.bytes(usize(start))), count)
+});
+
 export is_valid_entity_code, from_code_point, escape_html, escape_html_to, is_space, is_white_space,
        is_md_ascii_punct, is_punct_char, unescape_md, unescape_all, normalize_reference,
-       array_replace_at, byte_substring;
+       array_replace_at, byte_substring, byte_str_slice;

@@ -83,14 +83,14 @@ _post_process_emphasis :: (fn(tokens: ArrayList(Token), delimiters: ArrayList(De
         });
       });
 
-      (markup_str : String) = cond(
+      (markup_str : str) = cond(
         is_strong => cond(
-          (start_delim.marker == i32(0x2A)) => _DOUBLE_STAR,
-          true => _DOUBLE_UNDERSCORE
+          (start_delim.marker == i32(0x2A)) => "**",
+          true => "__"
         ),
         true => cond(
-          (start_delim.marker == i32(0x2A)) => _STAR,
-          true => _UNDERSCORE
+          (start_delim.marker == i32(0x2A)) => "*",
+          true => "_"
         )
       );
 

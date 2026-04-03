@@ -115,7 +115,7 @@ _render_code_block :: (fn(result: *(String), tokens: ArrayList(Token), idx: i32,
 _render_fence :: (fn(result: *(String), tokens: ArrayList(Token), idx: i32, options: *(Options)) -> unit)({
   (token : *(Token)) = &(tokens(usize(idx)));
   (info : String) = cond(
-    (token.*.info.bytes_len() > usize(0)) => unescape_all(token.*.info).trim(),
+    (token.*.info.len() > usize(0)) => unescape_all(String.from(token.*.info)).trim(),
     true => String.new()
   );
 

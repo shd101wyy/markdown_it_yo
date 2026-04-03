@@ -135,7 +135,7 @@ link_rule :: (fn(state: *(StateInline), silent: bool) -> bool)({
       _ := attrs.push(StringPair(name: `title`, value: title));
     });
     token_o.attrs = .Some(attrs);
-    token_o.markup = `[`;
+    token_o.markup = "[";
     &(state.*.tokens(usize((i32(state.*.tokens.len()) - i32(1))))).* = token_o;
 
     state.*.link_level = (state.*.link_level + i32(1));

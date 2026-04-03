@@ -7,7 +7,7 @@ open import "std/string";
 { Token, TokenType } :: import "../token.yo";
 { is_valid_entity_code, from_code_point } :: import "../common/char_utils.yo";
 { decode_html } :: import "../common/entities.yo";
-{ byte_substring } :: import "../common/utils.yo";
+{ byte_substring, byte_str_slice } :: import "../common/utils.yo";
 { StateInline } :: import "./state_inline.yo";
 { flush_pending, inline_push_token } :: import "./inline_helpers.yo";
 
@@ -104,7 +104,7 @@ entity :: (fn(state: *(StateInline), silent: bool) -> bool)({
             is_valid_entity_code(code) => from_code_point(code),
             true => from_code_point(i32(0xFFFD))
           );
-          (markup : String) = byte_substring(state.*._src_bytes, pos, match_end);
+          (markup : str) = byte_str_slice(state.*._src_bytes, pos, match_end);
           (token : Token) = Token(
             type_name: .TT_TEXT_SPECIAL,
             tag: "",
@@ -114,7 +114,7 @@ entity :: (fn(state: *(StateInline), silent: bool) -> bool)({
             children: .None,
             content: content,
             markup: markup,
-            info: `entity`,
+            info: "entity",
             block: false,
             hidden: false,
             level: i32(0)
@@ -141,7 +141,7 @@ entity :: (fn(state: *(StateInline), silent: bool) -> bool)({
             is_valid_entity_code(code) => from_code_point(code),
             true => from_code_point(i32(0xFFFD))
           );
-          (markup : String) = byte_substring(state.*._src_bytes, pos, match_end);
+          (markup : str) = byte_str_slice(state.*._src_bytes, pos, match_end);
           (token : Token) = Token(
             type_name: .TT_TEXT_SPECIAL,
             tag: "",
@@ -151,7 +151,7 @@ entity :: (fn(state: *(StateInline), silent: bool) -> bool)({
             children: .None,
             content: content,
             markup: markup,
-            info: `entity`,
+            info: "entity",
             block: false,
             hidden: false,
             level: i32(0)
@@ -180,6 +180,7 @@ entity :: (fn(state: *(StateInline), silent: bool) -> bool)({
       // Potential match: &name;
       (match_end : i32) = (scan + i32(1));
       (matched : String) = byte_substring(state.*._src_bytes, pos, match_end);
+      (matched_markup : str) = byte_str_slice(state.*._src_bytes, pos, match_end);
       (decoded : String) = decode_html(matched);
       if(!(decoded == matched), {
         if(!(silent), {
@@ -191,8 +192,8 @@ entity :: (fn(state: *(StateInline), silent: bool) -> bool)({
             map: .None,
             children: .None,
             content: decoded,
-            markup: matched,
-            info: `entity`,
+            markup: matched_markup,
+            info: "entity",
             block: false,
             hidden: false,
             level: i32(0)

@@ -8,14 +8,6 @@ open import "std/string";
 { StateBlock, block_push_token } :: import "./state_block.yo";
 { is_space, byte_substring } :: import "../common/utils.yo";
 
-// Cached heading markup strings
-_H1_MARKUP := String.from("#");
-_H2_MARKUP := String.from("##");
-_H3_MARKUP := String.from("###");
-_H4_MARKUP := String.from("####");
-_H5_MARKUP := String.from("#####");
-_H6_MARKUP := String.from("######");
-
 // ATX heading rule
 heading :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: bool) -> bool)({
   (pos : i32) = (state.*.b_marks(usize(start_line)) + state.*.t_shift(usize(start_line)));
@@ -69,13 +61,13 @@ heading :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: boo
   if((level == i32(4)), { h_tag = "h4"; });
   if((level == i32(5)), { h_tag = "h5"; });
   if((level == i32(6)), { h_tag = "h6"; });
-  (markup_str : String) = cond(
-    (level == i32(1)) => _H1_MARKUP,
-    (level == i32(2)) => _H2_MARKUP,
-    (level == i32(3)) => _H3_MARKUP,
-    (level == i32(4)) => _H4_MARKUP,
-    (level == i32(5)) => _H5_MARKUP,
-    true => _H6_MARKUP
+  (markup_str : str) = cond(
+    (level == i32(1)) => "#",
+    (level == i32(2)) => "##",
+    (level == i32(3)) => "###",
+    (level == i32(4)) => "####",
+    (level == i32(5)) => "#####",
+    true => "######"
   );
 
   // heading_open

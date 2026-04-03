@@ -8,7 +8,7 @@ open import "std/string";
 { Token, TokenType } :: import "../token.yo";
 { StateInline } :: import "./state_inline.yo";
 { flush_pending, inline_push_token } :: import "./inline_helpers.yo";
-{ byte_substring } :: import "../common/utils.yo";
+{ byte_substring, byte_str_slice } :: import "../common/utils.yo";
 
 backtick :: (fn(state: *(StateInline), silent: bool) -> bool)({
   (pos : i32) = state.*.pos;
@@ -28,6 +28,7 @@ backtick :: (fn(state: *(StateInline), silent: bool) -> bool)({
   };
 
   (marker : String) = byte_substring(state.*._src_bytes, start, pos);
+  (marker_str : str) = byte_str_slice(state.*._src_bytes, start, pos);
   (opener_length : i32) = (pos - start);
 
   // Check cache: if we already scanned and found no closer at this length,
@@ -107,8 +108,8 @@ backtick :: (fn(state: *(StateInline), silent: bool) -> bool)({
             map: .None,
             children: .None,
             content: content,
-            markup: marker,
-            info: String.new(),
+            markup: marker_str,
+            info: "",
             block: false,
             hidden: false,
             level: i32(0)

@@ -203,7 +203,7 @@ blockquote :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: 
 
   // Create blockquote_open token
   (token_o : Token) = Token.new(.TT_BLOCKQUOTE_OPEN, "blockquote", i32(1));
-  token_o.markup = `>`;
+  token_o.markup = ">";
   token_o.block = true;
   token_o.map = .Some(MapRange(begin: start_line, end: i32(0)));
   (open_token_idx : usize) = state.*.tokens.len();
@@ -215,7 +215,7 @@ blockquote :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: 
 
   // Create blockquote_close token
   (token_c : Token) = Token.new(.TT_BLOCKQUOTE_CLOSE, "blockquote", i32(-1));
-  token_c.markup = `>`;
+  token_c.markup = ">";
   token_c.block = true;
   block_push_token(state, token_c);
 

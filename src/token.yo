@@ -103,13 +103,15 @@ Token :: struct(
   content : String,
 
   // '*' or '_' for emphasis, fence string for fence, etc.
-  markup : String,
+  // Non-owning str slice — typically points into source text or static memory.
+  markup : str,
 
   // Additional information:
   //  - Info string for "fence" tokens
   //  - The value "auto" for autolink "link_open" and "link_close" tokens
   //  - The string value of the item marker for ordered-list "list_item_open" tokens
-  info : String,
+  // Non-owning str slice — typically points into source text or static memory.
+  info : str,
 
   // True for block-level tokens, false for inline tokens.
   // Used in renderer to calculate line breaks
@@ -132,8 +134,8 @@ impl(Token,
       level: i32(0),
       children: .None,
       content: String.new(),
-      markup: String.new(),
-      info: String.new(),
+      markup: "",
+      info: "",
       block: false,
       hidden: false
     )

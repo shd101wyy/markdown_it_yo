@@ -21,8 +21,8 @@ flush_pending :: (fn(state: *(StateInline)) -> unit)({
       map: .None,
       children: .None,
       content: state.*.pending.clone(),
-      markup: String.new(),
-      info: String.new(),
+      markup: "",
+      info: "",
       block: false,
       hidden: false,
       level: state.*.pending_level
@@ -57,8 +57,8 @@ state_push :: (fn(state: *(StateInline), type_name: TokenType, tag: str, nesting
     map: .None,
     children: .None,
     content: String.new(),
-    markup: String.new(),
-    info: String.new(),
+    markup: "",
+    info: "",
     block: false,
     hidden: false,
     level: i32(0)

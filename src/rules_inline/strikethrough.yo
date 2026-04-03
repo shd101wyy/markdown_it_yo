@@ -84,7 +84,7 @@ _post_process_strikethrough :: (fn(tokens: ArrayList(Token), delimiters: ArrayLi
       (s_tag : str) = "s";
       token_o.*.tag = s_tag;
       token_o.*.nesting = i32(1);
-      token_o.*.markup = _DOUBLE_TILDE;
+      token_o.*.markup = "~~";
       token_o.*.content = String.new();
 
       // Closing token
@@ -92,7 +92,7 @@ _post_process_strikethrough :: (fn(tokens: ArrayList(Token), delimiters: ArrayLi
       token_c.*.type_name = .TT_S_CLOSE;
       token_c.*.tag = s_tag;
       token_c.*.nesting = i32(-1);
-      token_c.*.markup = _DOUBLE_TILDE;
+      token_c.*.markup = "~~";
       token_c.*.content = String.new();
 
       // Check for lone marker before closing token

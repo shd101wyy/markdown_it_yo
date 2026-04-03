@@ -7,10 +7,6 @@ open import "std/string";
 { Token, TokenType, MapRange } :: import "../token.yo";
 {StateBlock, block_push_token, PARENT_PARAGRAPH} :: import "./state_block.yo";
 
-// Cached lheading markers
-_EQUALS_MARKUP := String.from("=");
-_DASH_MARKUP := String.from("-");
-
 // Block rule function type: (state, start_line, end_line, silent) -> bool
 BlockRuleFn :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: bool) -> bool);
 
@@ -106,9 +102,9 @@ lheading :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: bo
   if((level == i32(4)), { h_tag = "h4"; });
   if((level == i32(5)), { h_tag = "h5"; });
   if((level == i32(6)), { h_tag = "h6"; });
-  (marker_str : String) = cond(
-    (marker == i32(0x3D)) => _EQUALS_MARKUP,
-    true => _DASH_MARKUP
+  (marker_str : str) = cond(
+    (marker == i32(0x3D)) => "=",
+    true => "-"
   );
 
   // heading_open

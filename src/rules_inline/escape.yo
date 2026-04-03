@@ -5,7 +5,7 @@
 open import "std/string";
 { ArrayList } :: import "std/collections/array_list";
 { Token, TokenType } :: import "../token.yo";
-{ is_space, byte_substring } :: import "../common/utils.yo";
+{ is_space, byte_substring, byte_str_slice } :: import "../common/utils.yo";
 { from_code_point } :: import "../common/char_utils.yo";
 { StateInline } :: import "./state_inline.yo";
 { flush_pending, inline_push_token } :: import "./inline_helpers.yo";
@@ -115,8 +115,8 @@ escape_rule :: (fn(state: *(StateInline), silent: bool) -> bool)({
         ((ch1 < i32(256)) && _is_escaped(ch1)) => escaped_str,
         true => orig_str
       ),
-      markup: orig_str,
-      info: `escape`,
+      markup: byte_str_slice(state.*._src_bytes, state.*.pos, (pos + i32(1))),
+      info: "escape",
       block: false,
       hidden: false,
       level: i32(0)
