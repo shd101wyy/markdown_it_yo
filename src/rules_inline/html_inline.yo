@@ -64,7 +64,9 @@ html_inline :: (fn(state: *(StateInline), silent: bool) -> bool)({
     .Some(m) => {
       if(!(silent), {
         (tok : Token) = state_push(state, .TT_HTML_INLINE, "", i32(0));
-        tok.content = m.value();
+        (match_val : String) = m.value();
+        tok.content = match_val.as_str();
+        tok._content_owned = .Some(match_val);
         &(state.*.tokens(usize((i32(state.*.tokens.len()) - i32(1))))).* = tok;
 
         if(_is_link_open(m.value()), {

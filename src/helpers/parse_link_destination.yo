@@ -4,7 +4,7 @@
 
 open import "std/string";
 { ArrayList } :: import "std/collections/array_list";
-{ unescape_all } :: import "../common/utils.yo";
+{ unescape_all, byte_substring } :: import "../common/utils.yo";
 
 // Result of parsing a link destination
 LinkDestResult :: struct(
@@ -18,9 +18,8 @@ LinkDestResult :: struct(
 //
 // - `<url>` form: angles are required, no spaces/newlines inside
 // - bare form: balanced parentheses, no spaces/control chars
-parse_link_destination :: (fn(input: String, start: i32, max: i32) -> LinkDestResult)(
+parse_link_destination :: (fn(input: str, start: i32, max: i32) -> LinkDestResult)(
   {
-    (bytes : ArrayList(u8)) = input.as_bytes();
     (pos : i32) = start;
     (result : LinkDestResult) = LinkDestResult(ok: false, pos: i32(0), str: String.new());
 
@@ -28,13 +27,13 @@ parse_link_destination :: (fn(input: String, start: i32, max: i32) -> LinkDestRe
       return result;
     });
 
-    (code : u8) = bytes(usize(pos));
+    (code : u8) = input.bytes(usize(pos));
 
     // Parse <url> form
     if((code == u8(0x3C)), {
       pos = (pos + i32(1));
       while (pos < max), {
-        code = bytes(usize(pos));
+        code = input.bytes(usize(pos));
         cond(
           // \n - not allowed inside <...>
           (code == u8(0x0A)) => {
@@ -46,11 +45,10 @@ parse_link_destination :: (fn(input: String, start: i32, max: i32) -> LinkDestRe
           },
           // > - closing angle bracket
           (code == u8(0x3E)) => {
-            (slice_bytes : ArrayList(u8)) = bytes.slice(usize((start + i32(1))), usize(pos)).unwrap();
             result = LinkDestResult(
               ok: true,
               pos: (pos + i32(1)),
-              str: unescape_all(String.from_bytes(slice_bytes))
+              str: unescape_all(byte_substring(input, (start + i32(1)), pos))
             );
             return result;
           },
@@ -72,7 +70,7 @@ parse_link_destination :: (fn(input: String, start: i32, max: i32) -> LinkDestRe
     (level : i32) = i32(0);
     (done : bool) = false;
     while ((pos < max) && !(done)), {
-      code = bytes(usize(pos));
+      code = input.bytes(usize(pos));
 
       cond(
         // space - end of url
@@ -85,7 +83,7 @@ parse_link_destination :: (fn(input: String, start: i32, max: i32) -> LinkDestRe
         },
         // backslash escape
         ((code == u8(0x5C)) && ((pos + i32(1)) < max)) => {
-          if((bytes(usize((pos + i32(1)))) == u8(0x20)), {
+          if((input.bytes(usize((pos + i32(1)))) == u8(0x20)), {
             done = true;
           }, {
             pos = (pos + i32(2));
@@ -121,11 +119,10 @@ parse_link_destination :: (fn(input: String, start: i32, max: i32) -> LinkDestRe
       return result;
     });
 
-    (slice_bytes : ArrayList(u8)) = bytes.slice(usize(start), usize(pos)).unwrap();
     result = LinkDestResult(
       ok: true,
       pos: pos,
-      str: unescape_all(String.from_bytes(slice_bytes))
+      str: unescape_all(byte_substring(input, start, pos))
     );
     result
   }

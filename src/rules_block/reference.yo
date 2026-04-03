@@ -132,7 +132,7 @@ reference :: (fn(state: *(StateBlock), start_line: i32, _end_line: i32, silent: 
   };
 
   // Parse link destination
-  (dest_result : LinkDestResult) = parse_link_destination(buf, scan, str_max);
+  (dest_result : LinkDestResult) = parse_link_destination(buf.as_str(), scan, str_max);
   if(!(dest_result.ok), { return false; });
 
   (href : String) = normalize_link(dest_result.str);
@@ -161,7 +161,7 @@ reference :: (fn(state: *(StateBlock), start_line: i32, _end_line: i32, silent: 
   };
 
   // Parse link title (with multi-line continuation)
-  (title_result : LinkTitleResult) = parse_link_title(buf, pos, str_max, .None);
+  (title_result : LinkTitleResult) = parse_link_title(buf.as_str(), pos, str_max, .None);
   while (title_result.can_continue), {
     // Save pos before appending — new content starts here
     (old_str_max : i32) = str_max;
@@ -169,7 +169,7 @@ reference :: (fn(state: *(StateBlock), start_line: i32, _end_line: i32, silent: 
       title_result.can_continue = false;
     }, {
       pos = old_str_max;
-      title_result = parse_link_title(buf, pos, str_max, .Some(title_result));
+      title_result = parse_link_title(buf.as_str(), pos, str_max, .Some(title_result));
     });
   };
 

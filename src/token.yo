@@ -100,7 +100,12 @@ Token :: struct(
 
   // In a case of self-closing tag (code, html, fence, etc.),
   // it has contents of this tag.
-  content : String,
+  // Non-owning str slice — typically points into source text or _content_owned.
+  content : str,
+
+  // Backing storage for computed content that doesn't come from source text.
+  // When set, `content` is a str view into this String.
+  _content_owned : Option(String),
 
   // '*' or '_' for emphasis, fence string for fence, etc.
   // Non-owning str slice — typically points into source text or static memory.
@@ -133,7 +138,8 @@ impl(Token,
       nesting: nesting,
       level: i32(0),
       children: .None,
-      content: String.new(),
+      content: "",
+      _content_owned: .None,
       markup: "",
       info: "",
       block: false,

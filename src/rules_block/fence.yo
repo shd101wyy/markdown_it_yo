@@ -114,7 +114,9 @@ fence :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: bool)
 
   (token : Token) = Token.new(.TT_FENCE, "code", i32(0));
   token.info = params;
-  token.content = state.*.get_lines((start_line + i32(1)), next_line, fence_indent, true);
+  (lines : String) = state.*.get_lines((start_line + i32(1)), next_line, fence_indent, true);
+  token.content = lines.as_str();
+  token._content_owned = .Some(lines);
   token.markup = markup;
   token.block = true;
   token.map = .Some(MapRange(begin: start_line, end: state.*.line));

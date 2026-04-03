@@ -104,6 +104,10 @@ escape_rule :: (fn(state: *(StateInline), silent: bool) -> bool)({
   (orig_str : String) = `${backslash}${escaped_str}`;
 
   if(!(silent), {
+    (content_str : String) = cond(
+      ((ch1 < i32(256)) && _is_escaped(ch1)) => escaped_str,
+      true => orig_str
+    );
     (token : Token) = Token(
       type_name: .TT_TEXT_SPECIAL,
       tag: "",
@@ -111,10 +115,8 @@ escape_rule :: (fn(state: *(StateInline), silent: bool) -> bool)({
       attrs: .None,
       map: .None,
       children: .None,
-      content: cond(
-        ((ch1 < i32(256)) && _is_escaped(ch1)) => escaped_str,
-        true => orig_str
-      ),
+      content: content_str.as_str(),
+      _content_owned: .Some(content_str),
       markup: byte_str_slice(state.*._src_bytes, state.*.pos, (pos + i32(1))),
       info: "escape",
       block: false,

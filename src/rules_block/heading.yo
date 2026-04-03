@@ -6,7 +6,7 @@ open import "std/string";
 { ArrayList } :: import "std/collections/array_list";
 { Token, TokenType, MapRange } :: import "../token.yo";
 { StateBlock, block_push_token } :: import "./state_block.yo";
-{ is_space, byte_substring } :: import "../common/utils.yo";
+{ is_space, byte_str_slice } :: import "../common/utils.yo";
 
 // ATX heading rule
 heading :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: bool) -> bool)({
@@ -84,7 +84,7 @@ heading :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: boo
   while (((max > pos) && is_space(i32(state.*._src_bytes.bytes(usize((max - i32(1)))))))), {
     max = (max - i32(1));
   };
-  (content_str : String) = byte_substring(state.*._src_bytes, pos, max);
+  (content_str : str) = byte_str_slice(state.*._src_bytes, pos, max);
 
   (token_i : Token) = Token.new(.TT_INLINE, "", i32(0));
   token_i.content = content_str;

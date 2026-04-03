@@ -130,7 +130,7 @@ image_rule :: (fn(state: *(StateInline), silent: bool) -> bool)({
 
     // Parse alt text content through the full inline parser to get child tokens
     (children_tokens : ArrayList(Token)) = ArrayList(Token).new();
-    (sub_state : StateInline) = new_state_inline(content, state.*.env, children_tokens, state.*.html_enabled, state.*.enable_strikethrough, state.*._tokenize_fn, state.*._parse_fn);
+    (sub_state : StateInline) = new_state_inline(content.as_str(), state.*.env, children_tokens, state.*.html_enabled, state.*.enable_strikethrough, state.*._tokenize_fn, state.*._parse_fn);
     state.*._parse_fn((&sub_state));
 
     (token : Token) = state_push(state, .TT_IMAGE, "img", i32(0));
@@ -142,7 +142,8 @@ image_rule :: (fn(state: *(StateInline), silent: bool) -> bool)({
     });
     token.attrs = .Some(attrs);
     token.children = .Some(children_tokens);
-    token.content = content;
+    token.content = content.as_str();
+    token._content_owned = .Some(content);
     &(state.*.tokens(usize((i32(state.*.tokens.len()) - i32(1))))).* = token;
   });
 

@@ -182,7 +182,8 @@ _emit_autolink :: (fn(state: *(StateInline), full_url: String, display_text: Str
   &(state.*.tokens(usize((i32(state.*.tokens.len()) - i32(1))))).* = token_o;
 
   (token_t : Token) = state_push(state, .TT_TEXT, "", i32(0));
-  token_t.content = display_text;
+  token_t.content = display_text.as_str();
+  token_t._content_owned = .Some(display_text);
   &(state.*.tokens(usize((i32(state.*.tokens.len()) - i32(1))))).* = token_t;
 
   (token_c : Token) = state_push(state, .TT_LINK_CLOSE, "a", i32(-1));

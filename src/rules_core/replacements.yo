@@ -9,6 +9,7 @@ open import "std/string";
 { ArrayList } :: import "std/collections/array_list";
 { Token, TokenType } :: import "../token.yo";
 { from_code_point } :: import "../common/char_utils.yo";
+{ byte_substring } :: import "../common/utils.yo";
 { StateCore } :: import "./state_core.yo";
 
 // Check if a rune is ASCII whitespace (space, tab, LF, CR)
@@ -17,26 +18,28 @@ _is_whitespace :: (fn(ch: rune) -> bool)(
 );
 
 // Check if content contains scoped abbreviation patterns: (c), (r), (tm) case-insensitive
-_has_scoped_abbr :: (fn(content: String) -> bool)({
-  (has_c : bool) = content.contains(`(c)`);
-  (has_C : bool) = content.contains(`(C)`);
-  (has_r : bool) = content.contains(`(r)`);
-  (has_R : bool) = content.contains(`(R)`);
-  (has_tm : bool) = content.contains(`(tm)`);
-  (has_TM : bool) = content.contains(`(TM)`);
-  (has_Tm : bool) = content.contains(`(Tm)`);
-  (has_tM : bool) = content.contains(`(tM)`);
+_has_scoped_abbr :: (fn(content: str) -> bool)({
+  (content_s : String) = byte_substring(content, i32(0), i32(content.len()));
+  (has_c : bool) = content_s.contains(`(c)`);
+  (has_C : bool) = content_s.contains(`(C)`);
+  (has_r : bool) = content_s.contains(`(r)`);
+  (has_R : bool) = content_s.contains(`(R)`);
+  (has_tm : bool) = content_s.contains(`(tm)`);
+  (has_TM : bool) = content_s.contains(`(TM)`);
+  (has_Tm : bool) = content_s.contains(`(Tm)`);
+  (has_tM : bool) = content_s.contains(`(tM)`);
   (((((((has_c || has_C) || has_r) || has_R) || has_tm) || has_TM) || has_Tm) || has_tM)
 });
 
 // Check if content contains rare typographic sequences
-_has_rare_chars :: (fn(content: String) -> bool)({
-  (has_pm : bool) = content.contains(`+-`);
-  (has_dots : bool) = content.contains(`..`);
-  (has_qmarks : bool) = content.contains(`????`);
-  (has_emarks : bool) = content.contains(`!!!!`);
-  (has_commas : bool) = content.contains(`,,`);
-  (has_dashes : bool) = content.contains(`--`);
+_has_rare_chars :: (fn(content: str) -> bool)({
+  (content_s : String) = byte_substring(content, i32(0), i32(content.len()));
+  (has_pm : bool) = content_s.contains(`+-`);
+  (has_dots : bool) = content_s.contains(`..`);
+  (has_qmarks : bool) = content_s.contains(`????`);
+  (has_emarks : bool) = content_s.contains(`!!!!`);
+  (has_commas : bool) = content_s.contains(`,,`);
+  (has_dashes : bool) = content_s.contains(`--`);
   (((((has_pm || has_dots) || has_qmarks) || has_emarks) || has_commas) || has_dashes)
 });
 
@@ -305,7 +308,10 @@ _replace_scoped :: (fn(inline_tokens: ArrayList(Token)) -> unit)({
   while (i >= i32(0)), {
     (token : *(Token)) = &(inline_tokens(usize(i)));
     if(((token.*.type_name == .TT_TEXT) && (inside_autolink == i32(0))), {
-      token.*.content = _replace_scoped_abbrs(token.*.content);
+      (content_s : String) = byte_substring(token.*.content, i32(0), i32(token.*.content.len()));
+      (replaced : String) = _replace_scoped_abbrs(content_s);
+      token.*.content = replaced.as_str();
+      token.*._content_owned = .Some(replaced);
     });
     if(((token.*.type_name == .TT_LINK_OPEN) && (token.*.info == "auto")), {
       inside_autolink = (inside_autolink - i32(1));
@@ -326,7 +332,10 @@ _replace_rare_tokens :: (fn(inline_tokens: ArrayList(Token)) -> unit)({
     (token : *(Token)) = &(inline_tokens(usize(i)));
     if(((token.*.type_name == .TT_TEXT) && (inside_autolink == i32(0))), {
       if(_has_rare_chars(token.*.content), {
-        token.*.content = _replace_rare(token.*.content);
+        (content_s : String) = byte_substring(token.*.content, i32(0), i32(token.*.content.len()));
+        (replaced : String) = _replace_rare(content_s);
+        token.*.content = replaced.as_str();
+        token.*._content_owned = .Some(replaced);
       });
     });
     if(((token.*.type_name == .TT_LINK_OPEN) && (token.*.info == "auto")), {

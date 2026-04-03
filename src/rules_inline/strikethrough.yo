@@ -35,7 +35,8 @@ strikethrough_tokenize :: (fn(state: *(StateInline), silent: bool) -> bool)({
   // If odd count, push one single marker text token and reduce len
   if(((len % i32(2)) != i32(0)), {
     (token : Token) = Token.new(.TT_TEXT, "", i32(0));
-    token.content = _TILDE;
+    token.content = _TILDE.as_str();
+    token._content_owned = .Some(_TILDE);
     token.level = state.*.level;
     inline_push_token(state, token);
     len = (len - i32(1));
@@ -45,7 +46,8 @@ strikethrough_tokenize :: (fn(state: *(StateInline), silent: bool) -> bool)({
   (i : i32) = i32(0);
   while (i < len), {
     (token : Token) = Token.new(.TT_TEXT, "", i32(0));
-    token.content = _DOUBLE_TILDE;
+    token.content = _DOUBLE_TILDE.as_str();
+    token._content_owned = .Some(_DOUBLE_TILDE);
     token.level = state.*.level;
     inline_push_token(state, token);
 
@@ -85,7 +87,7 @@ _post_process_strikethrough :: (fn(tokens: ArrayList(Token), delimiters: ArrayLi
       token_o.*.tag = s_tag;
       token_o.*.nesting = i32(1);
       token_o.*.markup = "~~";
-      token_o.*.content = String.new();
+      token_o.*.content = "";
 
       // Closing token
       (token_c : *(Token)) = &(tokens(usize(end_delim.token_idx)));
@@ -93,12 +95,12 @@ _post_process_strikethrough :: (fn(tokens: ArrayList(Token), delimiters: ArrayLi
       token_c.*.tag = s_tag;
       token_c.*.nesting = i32(-1);
       token_c.*.markup = "~~";
-      token_c.*.content = String.new();
+      token_c.*.content = "";
 
       // Check for lone marker before closing token
       if(((end_delim.token_idx - i32(1)) >= i32(0)), {
         (prev_tok : *(Token)) = &(tokens(usize((end_delim.token_idx - i32(1)))));
-        if(((prev_tok.*.type_name == .TT_TEXT) && (prev_tok.*.content == _TILDE)), {
+        if(((prev_tok.*.type_name == .TT_TEXT) && (prev_tok.*.content == "~")), {
           _ := lone_markers.push((end_delim.token_idx - i32(1)));
         });
       });

@@ -55,14 +55,15 @@ _inline_tokenize :: (fn(state: *(StateInline)) -> unit)({
     if(!(ok), { ok = text(state, false); });
     if(!(ok), {
       // No rule matched — consume character as pending text
-      (ch_byte : u8) = state.*._src_bytes.bytes(usize(state.*.pos));
-      (&(state.*.pending)).push_byte(ch_byte);
+      if((state.*.pending_start < i32(0)), {
+        state.*.pending_start = state.*.pos;
+      });
       state.*.pos = (state.*.pos + i32(1));
     });
   };
 
   // Flush remaining pending text
-  if((state.*.pending.len() > usize(0)), {
+  if((state.*.pending_start >= i32(0)), {
     flush_pending(state);
   });
 });
@@ -88,7 +89,7 @@ new_parser_inline :: (fn() -> ParserInline)(
 
 impl(ParserInline,
   // Parse inline content: tokenize then run post-processing rules.
-  parse : (fn(self: Self, src: String, env: *(Env), out_tokens: ArrayList(Token), html_enabled: bool, enable_strikethrough: bool) -> unit)({
+  parse : (fn(self: Self, src: str, env: *(Env), out_tokens: ArrayList(Token), html_enabled: bool, enable_strikethrough: bool) -> unit)({
     (state : StateInline) = new_state_inline(src, env, out_tokens, html_enabled, enable_strikethrough, _inline_tokenize, _inline_parse_state);
     _inline_parse_state((&state));
   })

@@ -62,7 +62,8 @@ _core_block :: (fn(state: *(StateCore), block_parser: ParserBlock, html_enabled:
   if((state.*.inline_mode), {
     // In inline mode, wrap entire source as a single inline token
     (token : Token) = Token.new(.TT_INLINE, "", i32(0));
-    token.content = state.*.src;
+    token.content = state.*.src.as_str();
+    token._content_owned = .Some(state.*.src);
     token.children = .Some(ArrayList(Token).new());
     _ := state.*.tokens.push(token);
   }, {
@@ -80,7 +81,7 @@ _core_inline :: (fn(state: *(StateCore), inline_parser: ParserInline, html_enabl
     (token : *(Token)) = &(state.*.tokens(usize(i)));
     if((token.*.type_name == .TT_INLINE), {
       // Estimate ~1 inline token per 5 bytes of content
-      (content_len : usize) = token.*.content.bytes_len();
+      (content_len : usize) = token.*.content.len();
       (est_children : usize) = ((content_len / usize(5)) + usize(4));
       (children : ArrayList(Token)) = ArrayList(Token).with_capacity(est_children);
       inline_parser.parse(token.*.content, state.*.env, children, html_enabled, enable_strikethrough);

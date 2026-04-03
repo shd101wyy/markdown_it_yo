@@ -6,7 +6,7 @@ open import "std/string";
 { ArrayList } :: import "std/collections/array_list";
 { HashMap } :: import "std/collections/hash_map";
 { Token, TokenType } :: import "../token.yo";
-{ is_white_space, is_punct_char, is_md_ascii_punct } :: import "../common/utils.yo";
+{ is_white_space, is_punct_char, is_md_ascii_punct, byte_str_slice } :: import "../common/utils.yo";
 { is_valid_entity_code, from_code_point } :: import "../common/char_utils.yo";
 { Env } :: import "../env.yo";
 
@@ -34,7 +34,7 @@ ScanDelimsResult :: struct(
 
 // Inline parser state
 StateInline :: struct(
-  src : String,
+  src : str,
   env : *(Env),
   tokens : ArrayList(Token),
   tokens_meta : ArrayList(Option(TokenMeta)),
@@ -42,7 +42,7 @@ StateInline :: struct(
   pos : i32,
   pos_max : i32,
   level : i32,
-  pending : String,
+  pending_start : i32,
   pending_level : i32,
 
   // List of emphasis-like delimiters for current tag
@@ -74,10 +74,9 @@ StateInline :: struct(
 );
 
 // Create a new StateInline
-new_state_inline :: (fn(src: String, env: *(Env), out_tokens: ArrayList(Token), html_enabled: bool, enable_strikethrough: bool, tokenize_fn: (fn(state: *(StateInline)) -> unit), parse_fn: (fn(state: *(StateInline)) -> unit)) -> StateInline)(
+new_state_inline :: (fn(src: str, env: *(Env), out_tokens: ArrayList(Token), html_enabled: bool, enable_strikethrough: bool, tokenize_fn: (fn(state: *(StateInline)) -> unit), parse_fn: (fn(state: *(StateInline)) -> unit)) -> StateInline)(
   {
-    (bytes : str) = src.as_str();
-    (pos_max : i32) = i32(bytes.len());
+    (pos_max : i32) = i32(src.len());
 
     StateInline(
       src: src,
@@ -87,7 +86,7 @@ new_state_inline :: (fn(src: String, env: *(Env), out_tokens: ArrayList(Token), 
       pos: i32(0),
       pos_max: pos_max,
       level: i32(0),
-      pending: String.new(),
+      pending_start: i32(-1),
       pending_level: i32(0),
       delimiters: ArrayList(Delimiter).new(),
       _prev_delimiters: ArrayList(ArrayList(Delimiter)).new(),
@@ -96,7 +95,7 @@ new_state_inline :: (fn(src: String, env: *(Env), out_tokens: ArrayList(Token), 
       link_level: i32(0),
       html_enabled: html_enabled,
       enable_strikethrough: enable_strikethrough,
-      _src_bytes: bytes,
+      _src_bytes: src,
       _tokenize_fn: tokenize_fn,
       _parse_fn: parse_fn
     )
@@ -106,6 +105,7 @@ new_state_inline :: (fn(src: String, env: *(Env), out_tokens: ArrayList(Token), 
 impl(StateInline,
   // Flush pending text as a text token
   push_pending : (fn(self: Self) -> Token)({
+    (content_str : str) = byte_str_slice(self._src_bytes, self.pending_start, self.pos);
     (token : Token) = Token(
       type_name: .TT_TEXT,
       tag: "",
@@ -113,7 +113,8 @@ impl(StateInline,
       attrs: .None,
       map: .None,
       children: .None,
-      content: self.pending.clone(),
+      content: content_str,
+      _content_owned: .None,
       markup: "",
       info: "",
       block: false,
@@ -121,13 +122,13 @@ impl(StateInline,
       level: self.pending_level
     );
     _ := self.tokens.push(token);
-    self.pending.clear();
+    self.pending_start = i32(-1);
     token
   }),
 
   // Push a new token to the stream. Flushes pending text first.
   push : (fn(self: Self, type_name: TokenType, tag: str, nesting: i32) -> Token)({
-    if((self.pending.len() > usize(0)), {
+    if((self.pending_start >= i32(0)), {
       _ := self.push_pending();
     });
 
@@ -138,7 +139,8 @@ impl(StateInline,
       attrs: .None,
       map: .None,
       children: .None,
-      content: String.new(),
+      content: "",
+      _content_owned: .None,
       markup: "",
       info: "",
       block: false,

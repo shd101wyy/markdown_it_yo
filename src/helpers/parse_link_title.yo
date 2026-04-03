@@ -5,7 +5,7 @@
 
 open import "std/string";
 { ArrayList } :: import "std/collections/array_list";
-{ unescape_all } :: import "../common/utils.yo";
+{ unescape_all, byte_substring } :: import "../common/utils.yo";
 
 // Result of parsing a link title
 LinkTitleResult :: struct(
@@ -24,9 +24,8 @@ _default_title_result :: (fn() -> LinkTitleResult)(
 // Parse link title within `input` in [start, max] range.
 // If `prev_state` is .Some(state), this is a continuation from a previous call
 // (used in reference links that span multiple lines).
-parse_link_title :: (fn(input: String, start_param: i32, max: i32, prev_state: Option(LinkTitleResult)) -> LinkTitleResult)(
+parse_link_title :: (fn(input: str, start_param: i32, max: i32, prev_state: Option(LinkTitleResult)) -> LinkTitleResult)(
   {
-    (bytes : ArrayList(u8)) = input.as_bytes();
     (start : i32) = start_param;
     (pos : i32) = start;
     (state : LinkTitleResult) = _default_title_result();
@@ -46,7 +45,7 @@ parse_link_title :: (fn(input: String, start_param: i32, max: i32, prev_state: O
           return state;
         });
 
-        (marker_byte : u8) = bytes(usize(pos));
+        (marker_byte : u8) = input.bytes(usize(pos));
         (marker : i32) = i32(marker_byte);
 
         // Must start with ", ', or (
@@ -73,17 +72,17 @@ parse_link_title :: (fn(input: String, start_param: i32, max: i32, prev_state: O
     );
 
     while (pos < max), {
-      (code : u8) = bytes(usize(pos));
+      (code : u8) = input.bytes(usize(pos));
 
       cond(
         // Found closing marker
         (i32(code) == state.marker) => {
-          (slice_bytes : ArrayList(u8)) = bytes.slice(usize(start), usize(pos)).unwrap();
+          (slice_str : String) = byte_substring(input, start, pos);
           state = LinkTitleResult(
             ok: true,
             can_continue: false,
             pos: (pos + i32(1)),
-            str: `${state.str}${unescape_all(String.from_bytes(slice_bytes))}`,
+            str: `${state.str}${unescape_all(slice_str)}`,
             marker: state.marker
           );
           return state;
@@ -103,12 +102,12 @@ parse_link_title :: (fn(input: String, start_param: i32, max: i32, prev_state: O
     };
 
     // No closing marker found, but this title may continue on next line (for references)
-    (slice_bytes : ArrayList(u8)) = bytes.slice(usize(start), usize(pos)).unwrap();
+    (slice_str : String) = byte_substring(input, start, pos);
     state = LinkTitleResult(
       ok: false,
       can_continue: true,
       pos: i32(0),
-      str: `${state.str}${unescape_all(String.from_bytes(slice_bytes))}`,
+      str: `${state.str}${unescape_all(slice_str)}`,
       marker: state.marker
     );
     state

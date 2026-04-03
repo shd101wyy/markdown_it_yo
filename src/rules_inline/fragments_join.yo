@@ -6,6 +6,7 @@
 open import "std/string";
 { ArrayList } :: import "std/collections/array_list";
 { Token, TokenType } :: import "../token.yo";
+{ byte_substring } :: import "../common/utils.yo";
 { StateInline } :: import "./state_inline.yo";
 
 fragments_join :: (fn(state: *(StateInline)) -> unit)({
@@ -32,18 +33,10 @@ fragments_join :: (fn(state: *(StateInline)) -> unit)({
       (next_tok : *(Token)) = &(tokens(usize((curr + i32(1)))));
       if((next_tok.*.type_name == .TT_TEXT), {
         // collapse two adjacent text nodes: next.content = tok.content + next.content
-        (tok_bytes : ArrayList(u8)) = tok.*.content.as_bytes();
-        (next_bytes : ArrayList(u8)) = next_tok.*.content.as_bytes();
-        (combined : ArrayList(u8)) = ArrayList(u8).with_capacity((tok_bytes.len() + next_bytes.len()));
-        match(tok_bytes.ptr(),
-          .Some(p) => combined.extend_from_ptr(p, tok_bytes.len()),
-          .None => ()
-        );
-        match(next_bytes.ptr(),
-          .Some(p) => combined.extend_from_ptr(p, next_bytes.len()),
-          .None => ()
-        );
-        next_tok.*.content = String.from_bytes(combined);
+        (combined : String) = byte_substring(tok.*.content, i32(0), i32(tok.*.content.len()));
+        (&combined).push_str(next_tok.*.content);
+        next_tok.*.content = combined.as_str();
+        next_tok.*._content_owned = .Some(combined);
       }, {
         if((curr != last), {
           &(tokens(usize(last))).* = tok.*;

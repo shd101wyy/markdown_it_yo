@@ -7,6 +7,7 @@
 open import "std/string";
 { ArrayList } :: import "std/collections/array_list";
 { Token, TokenType } :: import "../token.yo";
+{ byte_substring } :: import "../common/utils.yo";
 { StateCore } :: import "./state_core.yo";
 
 text_join :: (fn(state: *(StateCore)) -> unit)({
@@ -41,9 +42,10 @@ text_join :: (fn(state: *(StateCore)) -> unit)({
                 && (&(tokens(usize((curr + i32(1))))).*.type_name == .TT_TEXT)), {
               // Collapse two adjacent text nodes
               (next_tok : *(Token)) = &(tokens(usize((curr + i32(1)))));
-              (merged : String) = tok.*.content;
-              (&merged).push_string(next_tok.*.content);
-              next_tok.*.content = merged;
+              (merged : String) = byte_substring(tok.*.content, i32(0), i32(tok.*.content.len()));
+              (&merged).push_str(next_tok.*.content);
+              next_tok.*.content = merged.as_str();
+              next_tok.*._content_owned = .Some(merged);
             }, {
               if((curr != last), {
                 &(tokens(usize(last))).* = tok.*;

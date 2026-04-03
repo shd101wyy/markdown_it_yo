@@ -2,11 +2,9 @@
 //
 // Process '\n'
 
-open import "std/string";
-{ ArrayList } :: import "std/collections/array_list";
 { Token, TokenType } :: import "../token.yo";
-{ is_space } :: import "../common/utils.yo";
-{ StateInline } :: import "./state_inline.yo";
+{ is_space, byte_str_slice } :: import "../common/utils.yo";
+{ StateInline, TokenMeta } :: import "./state_inline.yo";
 { flush_pending, inline_push_token } :: import "./inline_helpers.yo";
 
 newline :: (fn(state: *(StateInline), silent: bool) -> bool)({
@@ -19,22 +17,66 @@ newline :: (fn(state: *(StateInline), silent: bool) -> bool)({
   (max : i32) = state.*.pos_max;
 
   if(!(silent), {
-    (pending_bytes : ArrayList(u8)) = state.*.pending.as_bytes();
-    (pmax : i32) = (i32(pending_bytes.len()) - i32(1));
+    // Scan pending text (source bytes from pending_start to pos) for trailing spaces
+    (pending_end : i32) = pos;
+    (pmax : i32) = (pending_end - i32(1));
 
-    // '  \n' -> hardbreak
-    if(((pmax >= i32(0)) && (i32(pending_bytes(usize(pmax))) == i32(0x20))), {
-      if(((pmax >= i32(1)) && (i32(pending_bytes(usize((pmax - i32(1))))) == i32(0x20))), {
-        // Find whitespace tail of pending chars.
-        (ws : i32) = (pmax - i32(1));
-        while (((ws >= i32(1)) && (i32(pending_bytes(usize((ws - i32(1))))) == i32(0x20)))), {
+    if((((state.*.pending_start >= i32(0)) && (pmax >= state.*.pending_start)) && (i32(state.*._src_bytes.bytes(usize(pmax))) == i32(0x20))), {
+      (pmax2 : i32) = (pmax - i32(1));
+      if((((pmax2 >= state.*.pending_start) && (i32(state.*._src_bytes.bytes(usize(pmax2))) == i32(0x20)))), {
+        // Find whitespace tail
+        (ws : i32) = pmax2;
+        while (((ws > state.*.pending_start) && (i32(state.*._src_bytes.bytes(usize((ws - i32(1))))) == i32(0x20)))), {
           ws = (ws - i32(1));
         };
-        state.*.pending = String.from_bytes(pending_bytes.slice(usize(0), usize(ws)).unwrap());
+        // Flush trimmed pending
+        if((ws > state.*.pending_start), {
+          (content_str : str) = byte_str_slice(state.*._src_bytes, state.*.pending_start, ws);
+          (token : Token) = Token(
+            type_name: .TT_TEXT,
+            tag: "",
+            nesting: i32(0),
+            attrs: .None,
+            map: .None,
+            children: .None,
+            content: content_str,
+            _content_owned: .None,
+            markup: "",
+            info: "",
+            block: false,
+            hidden: false,
+            level: state.*.pending_level
+          );
+          _ := state.*.tokens.push(token);
+          (none_meta : Option(TokenMeta)) = .None;
+          _ := state.*.tokens_meta.push(none_meta);
+        });
+        state.*.pending_start = i32(-1);
         inline_push_token(state, Token.new(.TT_HARDBREAK, "br", i32(0)));
       }, {
-        // Single trailing space
-        state.*.pending = String.from_bytes(pending_bytes.slice(usize(0), usize(pmax)).unwrap());
+        // Single trailing space → softbreak
+        if((pmax > state.*.pending_start), {
+          (content_str : str) = byte_str_slice(state.*._src_bytes, state.*.pending_start, pmax);
+          (token : Token) = Token(
+            type_name: .TT_TEXT,
+            tag: "",
+            nesting: i32(0),
+            attrs: .None,
+            map: .None,
+            children: .None,
+            content: content_str,
+            _content_owned: .None,
+            markup: "",
+            info: "",
+            block: false,
+            hidden: false,
+            level: state.*.pending_level
+          );
+          _ := state.*.tokens.push(token);
+          (none_meta : Option(TokenMeta)) = .None;
+          _ := state.*.tokens_meta.push(none_meta);
+        });
+        state.*.pending_start = i32(-1);
         inline_push_token(state, Token.new(.TT_SOFTBREAK, "br", i32(0)));
       });
     }, {

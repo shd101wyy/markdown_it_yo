@@ -36,7 +36,8 @@ emphasis_tokenize :: (fn(state: *(StateInline), silent: bool) -> bool)({
   (i : i32) = i32(0);
   while (i < scanned.length), {
     (token : Token) = Token.new(.TT_TEXT, "", i32(0));
-    token.content = marker_str;
+    token.content = marker_str.as_str();
+    token._content_owned = .Some(marker_str);
     token.level = state.*.level;
     inline_push_token(state, token);
 
@@ -102,7 +103,7 @@ _post_process_emphasis :: (fn(tokens: ArrayList(Token), delimiters: ArrayList(De
       token_o.*.tag = o_tag;
       token_o.*.nesting = i32(1);
       token_o.*.markup = markup_str;
-      token_o.*.content = String.new();
+      token_o.*.content = "";
 
       // Closing token
       (token_c : *(Token)) = &(tokens(usize(end_delim.token_idx)));
@@ -112,17 +113,17 @@ _post_process_emphasis :: (fn(tokens: ArrayList(Token), delimiters: ArrayList(De
       token_c.*.tag = c_tag;
       token_c.*.nesting = i32(-1);
       token_c.*.markup = markup_str;
-      token_c.*.content = String.new();
+      token_c.*.content = "";
 
       // If strong, clear inner delimiter tokens
       if(is_strong, {
         (prev_delim : Delimiter) = delimiters(usize((i - i32(1))));
         (tok1 : *(Token)) = &(tokens(usize(prev_delim.token_idx)));
-        tok1.*.content = String.new();
+        tok1.*.content = "";
 
         (next_end_delim : Delimiter) = delimiters(usize((start_delim.end + i32(1))));
         (tok2 : *(Token)) = &(tokens(usize(next_end_delim.token_idx)));
-        tok2.*.content = String.new();
+        tok2.*.content = "";
 
         i = (i - i32(1));
       });

@@ -27,8 +27,7 @@ backtick :: (fn(state: *(StateInline), silent: bool) -> bool)({
     pos = (pos + i32(1));
   };
 
-  (marker : String) = byte_substring(state.*._src_bytes, start, pos);
-  (marker_str : str) = byte_str_slice(state.*._src_bytes, start, pos);
+  (marker : str) = byte_str_slice(state.*._src_bytes, start, pos);
   (opener_length : i32) = (pos - start);
 
   // Check cache: if we already scanned and found no closer at this length,
@@ -42,7 +41,9 @@ backtick :: (fn(state: *(StateInline), silent: bool) -> bool)({
       .Some(cached_pos) => {
         if((cached_pos <= start), {
           if(!(silent), {
-            (&(state.*.pending)).push_string(marker);
+            if((state.*.pending_start < i32(0)), {
+              state.*.pending_start = state.*.pos;
+            });
           });
           state.*.pos = (state.*.pos + opener_length);
           return true;
@@ -107,8 +108,9 @@ backtick :: (fn(state: *(StateInline), silent: bool) -> bool)({
             attrs: .None,
             map: .None,
             children: .None,
-            content: content,
-            markup: marker_str,
+            content: content.as_str(),
+            _content_owned: .Some(content),
+            markup: marker,
             info: "",
             block: false,
             hidden: false,
@@ -138,7 +140,9 @@ backtick :: (fn(state: *(StateInline), silent: bool) -> bool)({
   state.*.backticks_scanned = true;
 
   if(!(silent), {
-    (&(state.*.pending)).push_string(marker);
+    if((state.*.pending_start < i32(0)), {
+      state.*.pending_start = state.*.pos;
+    });
   });
   state.*.pos = (state.*.pos + opener_length);
   true

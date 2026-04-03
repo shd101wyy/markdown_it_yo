@@ -5,14 +5,15 @@ open import "std/string";
 { ArrayList } :: import "std/collections/array_list";
 { Token, TokenType } :: import "../token.yo";
 { StateInline, TokenMeta, Delimiter } :: import "./state_inline.yo";
+{ byte_str_slice } :: import "../common/utils.yo";
 
 // Inline rule function signature
 InlineRuleFn :: (fn(state: *(StateInline), silent: bool) -> bool);
 
 // Flush pending text into a text token.
-// Uses clone+clear to reuse the pending buffer allocation.
 flush_pending :: (fn(state: *(StateInline)) -> unit)({
-  if((state.*.pending.len() > usize(0)), {
+  if((state.*.pending_start >= i32(0)), {
+    (content_str : str) = byte_str_slice(state.*._src_bytes, state.*.pending_start, state.*.pos);
     (token : Token) = Token(
       type_name: .TT_TEXT,
       tag: "",
@@ -20,7 +21,8 @@ flush_pending :: (fn(state: *(StateInline)) -> unit)({
       attrs: .None,
       map: .None,
       children: .None,
-      content: state.*.pending.clone(),
+      content: content_str,
+      _content_owned: .None,
       markup: "",
       info: "",
       block: false,
@@ -30,7 +32,7 @@ flush_pending :: (fn(state: *(StateInline)) -> unit)({
     _ := state.*.tokens.push(token);
     (none_meta : Option(TokenMeta)) = .None;
     _ := state.*.tokens_meta.push(none_meta);
-    state.*.pending.clear();
+    state.*.pending_start = i32(-1);
   });
 });
 
@@ -56,7 +58,8 @@ state_push :: (fn(state: *(StateInline), type_name: TokenType, tag: str, nesting
     attrs: .None,
     map: .None,
     children: .None,
-    content: String.new(),
+    content: "",
+    _content_owned: .None,
     markup: "",
     info: "",
     block: false,

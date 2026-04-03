@@ -95,11 +95,9 @@ escape_html :: (fn(input: String) -> String)(
 );
 
 // Append HTML-escaped version of input directly to result buffer (no intermediate String)
-escape_html_to :: (fn(result: *(String), input: *(String)) -> unit)(
+escape_html_to :: (fn(result: *(String), input: str) -> unit)(
   {
-    (bytes : ArrayList(u8)) = input.*.as_bytes();
-    (i : usize) = usize(0);
-    (len : usize) = bytes.len();
+    (len : usize) = input.len();
 
     if((len == usize(0)), {
       return ();
@@ -107,21 +105,18 @@ escape_html_to :: (fn(result: *(String), input: *(String)) -> unit)(
 
     // Quick test — if no special chars, append as-is
     (has_special : bool) = false;
-    match(bytes.ptr(),
-      .Some(p) => {
-        while ((i < len) && (!(has_special))), {
-          (ch : u8) = (p &+ i).*;
-          if(((ch == u8(0x26)) || ((ch == u8(0x3C)) || ((ch == u8(0x3E)) || (ch == u8(0x22))))), {
-            has_special = true;
-          });
-          i = (i + usize(1));
-        };
-      },
-      .None => ()
-    );
+    (i : usize) = usize(0);
+    (src_ptr : *(u8)) = &(input.bytes(usize(0)));
+    while ((i < len) && (!(has_special))), {
+      (ch : u8) = (src_ptr &+ i).*;
+      if(((ch == u8(0x26)) || ((ch == u8(0x3C)) || ((ch == u8(0x3E)) || (ch == u8(0x22))))), {
+        has_special = true;
+      });
+      i = (i + usize(1));
+    };
 
     if(!(has_special), {
-      result.push_string(input.*);
+      result.push_str(input);
       return ();
     });
 
@@ -129,49 +124,44 @@ escape_html_to :: (fn(result: *(String), input: *(String)) -> unit)(
     i = usize(0);
     (run_start : usize) = usize(0);
     (result_al : ArrayList(u8)) = result.*._bytes.unwrap();
-    match(bytes.ptr(),
-      .Some(src_ptr) => {
-        while (i < len), {
-          (ch : u8) = (src_ptr &+ i).*;
-          cond(
-            (ch == u8(0x26)) => {
-              if((i > run_start), {
-                result_al.extend_from_ptr((src_ptr &+ run_start), (i - run_start));
-              });
-              result.push_str("&amp;");
-              run_start = (i + usize(1));
-            },
-            (ch == u8(0x3C)) => {
-              if((i > run_start), {
-                result_al.extend_from_ptr((src_ptr &+ run_start), (i - run_start));
-              });
-              result.push_str("&lt;");
-              run_start = (i + usize(1));
-            },
-            (ch == u8(0x3E)) => {
-              if((i > run_start), {
-                result_al.extend_from_ptr((src_ptr &+ run_start), (i - run_start));
-              });
-              result.push_str("&gt;");
-              run_start = (i + usize(1));
-            },
-            (ch == u8(0x22)) => {
-              if((i > run_start), {
-                result_al.extend_from_ptr((src_ptr &+ run_start), (i - run_start));
-              });
-              result.push_str("&quot;");
-              run_start = (i + usize(1));
-            },
-            true => ()
-          );
-          i = (i + usize(1));
-        };
-        if((len > run_start), {
-          result_al.extend_from_ptr((src_ptr &+ run_start), (len - run_start));
-        });
-      },
-      .None => ()
-    );
+    while (i < len), {
+      (ch : u8) = (src_ptr &+ i).*;
+      cond(
+        (ch == u8(0x26)) => {
+          if((i > run_start), {
+            result_al.extend_from_ptr((src_ptr &+ run_start), (i - run_start));
+          });
+          result.push_str("&amp;");
+          run_start = (i + usize(1));
+        },
+        (ch == u8(0x3C)) => {
+          if((i > run_start), {
+            result_al.extend_from_ptr((src_ptr &+ run_start), (i - run_start));
+          });
+          result.push_str("&lt;");
+          run_start = (i + usize(1));
+        },
+        (ch == u8(0x3E)) => {
+          if((i > run_start), {
+            result_al.extend_from_ptr((src_ptr &+ run_start), (i - run_start));
+          });
+          result.push_str("&gt;");
+          run_start = (i + usize(1));
+        },
+        (ch == u8(0x22)) => {
+          if((i > run_start), {
+            result_al.extend_from_ptr((src_ptr &+ run_start), (i - run_start));
+          });
+          result.push_str("&quot;");
+          run_start = (i + usize(1));
+        },
+        true => ()
+      );
+      i = (i + usize(1));
+    };
+    if((len > run_start), {
+      result_al.extend_from_ptr((src_ptr &+ run_start), (len - run_start));
+    });
   }
 );
 

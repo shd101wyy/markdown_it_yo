@@ -6,7 +6,7 @@ open import "std/string";
 { ArrayList } :: import "std/collections/array_list";
 { Token, TokenType } :: import "../token.yo";
 { StateCore } :: import "./state_core.yo";
-{ is_white_space, is_punct_char, is_md_ascii_punct } :: import "../common/utils.yo";
+{ is_white_space, is_punct_char, is_md_ascii_punct, byte_substring } :: import "../common/utils.yo";
 { from_code_point } :: import "../common/char_utils.yo";
 
 APOSTROPHE := from_code_point(i32(0x2019));
@@ -51,7 +51,7 @@ _process_inlines :: (fn(tokens: ArrayList(Token), quotes: ArrayList(String)) -> 
     if((token.*.type_name != .TT_TEXT), {
       i = (i + i32(1));
     }, {
-      (text : String) = token.*.content;
+      (text : String) = byte_substring(token.*.content, i32(0), i32(token.*.content.len()));
       (pos : usize) = usize(0);
       (max : usize) = text.len();
       (done : bool) = false;
@@ -93,7 +93,7 @@ _process_inlines :: (fn(tokens: ArrayList(Token), quotes: ArrayList(String)) -> 
                 found_prev = true;
               }, {
                 if((prev_tok.*.content.len() > usize(0)), {
-                  last_char = i32(prev_tok.*.content.at((prev_tok.*.content.len() - usize(1))).unwrap().to_u32());
+                  last_char = i32(prev_tok.*.content.bytes((prev_tok.*.content.len() - usize(1))));
                   found_prev = true;
                 }, {
                   pj = (pj - i32(1));
@@ -116,7 +116,7 @@ _process_inlines :: (fn(tokens: ArrayList(Token), quotes: ArrayList(String)) -> 
                 found_next = true;
               }, {
                 if((next_tok.*.content.len() > usize(0)), {
-                  next_char = i32(next_tok.*.content.at(usize(0)).unwrap().to_u32());
+                  next_char = i32(next_tok.*.content.bytes(usize(0)));
                   found_next = true;
                 }, {
                   nj = (nj + i32(1));
@@ -167,10 +167,8 @@ _process_inlines :: (fn(tokens: ArrayList(Token), quotes: ArrayList(String)) -> 
             // Middle of word — replace single quote with apostrophe
             if(is_single, {
               text = _replace_at(text, quote_pos, APOSTROPHE);
-              token.*.content = text;
-            });
-          }, {
-            if(can_close, {
+              token.*.content = text.as_str();
+              token.*._content_owned = .Some(text);
               // Try to find matching opening quote on stack
               (sj : i32) = (i32(stack.len()) - i32(1));
               (matched : bool) = false;
@@ -191,11 +189,15 @@ _process_inlines :: (fn(tokens: ArrayList(Token), quotes: ArrayList(String)) -> 
 
                     // Replace closing quote first (before opening, in case same token)
                     text = _replace_at(text, quote_pos, close_quote);
-                    token.*.content = text;
+                    token.*.content = text.as_str();
+                    token.*._content_owned = .Some(text);
 
                     // Replace opening quote
                     (open_tok : *(Token)) = &(tokens(usize(item.token_idx)));
-                    open_tok.*.content = _replace_at(open_tok.*.content, item.pos, open_quote);
+                    (open_content : String) = byte_substring(open_tok.*.content, i32(0), i32(open_tok.*.content.len()));
+                    (replaced_open : String) = _replace_at(open_content, item.pos, open_quote);
+                    open_tok.*.content = replaced_open.as_str();
+                    open_tok.*._content_owned = .Some(replaced_open);
 
                     // Adjust position if same token
                     pos = (pos + (close_quote.len() - usize(1)));
@@ -204,7 +206,7 @@ _process_inlines :: (fn(tokens: ArrayList(Token), quotes: ArrayList(String)) -> 
                     });
 
                     // Re-read text after modification
-                    text = &(tokens(usize(i))).*.content;
+                    text = byte_substring(&(tokens(usize(i))).*.content, i32(0), i32(&(tokens(usize(i))).*.content.len()));
                     max = text.len();
 
                     // Truncate stack
@@ -223,7 +225,8 @@ _process_inlines :: (fn(tokens: ArrayList(Token), quotes: ArrayList(String)) -> 
                 }, {
                   if(is_single, {
                     text = _replace_at(text, quote_pos, APOSTROPHE);
-                    token.*.content = text;
+                    token.*.content = text.as_str();
+                    token.*._content_owned = .Some(text);
                   });
                 });
               });
@@ -250,8 +253,8 @@ smartquotes :: (fn(state: *(StateCore), quotes: ArrayList(String)) -> unit)({
       (has_quotes : bool) = false;
       (qi : usize) = usize(0);
       while ((qi < block_tok.*.content.len()) && !(has_quotes)), {
-        (qc : rune) = block_tok.*.content.at(qi).unwrap();
-        if(((qc == rune(u32(0x27))) || (qc == rune(u32(0x22)))), {
+        (qb : u8) = block_tok.*.content.bytes(qi);
+        if(((qb == u8(0x27)) || (qb == u8(0x22))), {
           has_quotes = true;
         });
         qi = (qi + usize(1));

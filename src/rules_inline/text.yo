@@ -3,7 +3,6 @@
 // Skip text characters for text token, place those to pending buffer
 // and increment current pos.
 
-open import "std/string";
 { ArrayList } :: import "std/collections/array_list";
 { StateInline } :: import "./state_inline.yo";
 
@@ -60,16 +59,9 @@ text :: (fn(state: *(StateInline), silent: bool) -> bool)({
   });
 
   if(!(silent), {
-    (count : usize) = usize((pos - state.*.pos));
-    (p : *(u8)) = &(state.*._src_bytes.bytes(usize(state.*.pos)));
-    match(state.*.pending._bytes,
-      .None => {
-        al := ArrayList(u8).with_capacity(count);
-        al.extend_from_ptr(p, count);
-        state.*.pending = String.from_bytes(al);
-      },
-      .Some(al) => al.extend_from_ptr(p, count)
-    );
+    if((state.*.pending_start < i32(0)), {
+      state.*.pending_start = state.*.pos;
+    });
   });
 
   state.*.pos = pos;
