@@ -103,65 +103,75 @@ escape_html_to :: (fn(result: *(String), input: str) -> unit)(
       return ();
     });
 
-    // Quick test — if no special chars, append as-is
-    (has_special : bool) = false;
-    (i : usize) = usize(0);
     (src_ptr : *(u8)) = &(input.bytes(usize(0)));
-    while ((i < len) && (!(has_special))), {
-      (ch : u8) = (src_ptr &+ i).*;
+
+    // Single-pass: find first special char position
+    (first : usize) = usize(0);
+    while (first < len), {
+      (ch : u8) = (src_ptr &+ first).*;
       if(((ch == u8(0x26)) || ((ch == u8(0x3C)) || ((ch == u8(0x3E)) || (ch == u8(0x22))))), {
-        has_special = true;
+        // Found special char — break to escape loop
+        result.reserve((len + (len / usize(8))));
+        (result_al : ArrayList(u8)) = result.*._bytes.unwrap();
+        // Append text before first special char
+        if((first > usize(0)), {
+          result_al.extend_from_ptr(src_ptr, first);
+        });
+        // Escape the current special char
+        cond(
+          (ch == u8(0x26)) => result_al.extend_from_ptr(*(u8)("&amp;"), usize(5)),
+          (ch == u8(0x3C)) => result_al.extend_from_ptr(*(u8)("&lt;"), usize(4)),
+          (ch == u8(0x3E)) => result_al.extend_from_ptr(*(u8)("&gt;"), usize(4)),
+          true => result_al.extend_from_ptr(*(u8)("&quot;"), usize(6))
+        );
+        // Continue escaping remaining bytes
+        (i : usize) = (first + usize(1));
+        (run_start : usize) = i;
+        while (i < len), {
+          (ch2 : u8) = (src_ptr &+ i).*;
+          cond(
+            (ch2 == u8(0x26)) => {
+              if((i > run_start), {
+                result_al.extend_from_ptr((src_ptr &+ run_start), (i - run_start));
+              });
+              result_al.extend_from_ptr(*(u8)("&amp;"), usize(5));
+              run_start = (i + usize(1));
+            },
+            (ch2 == u8(0x3C)) => {
+              if((i > run_start), {
+                result_al.extend_from_ptr((src_ptr &+ run_start), (i - run_start));
+              });
+              result_al.extend_from_ptr(*(u8)("&lt;"), usize(4));
+              run_start = (i + usize(1));
+            },
+            (ch2 == u8(0x3E)) => {
+              if((i > run_start), {
+                result_al.extend_from_ptr((src_ptr &+ run_start), (i - run_start));
+              });
+              result_al.extend_from_ptr(*(u8)("&gt;"), usize(4));
+              run_start = (i + usize(1));
+            },
+            (ch2 == u8(0x22)) => {
+              if((i > run_start), {
+                result_al.extend_from_ptr((src_ptr &+ run_start), (i - run_start));
+              });
+              result_al.extend_from_ptr(*(u8)("&quot;"), usize(6));
+              run_start = (i + usize(1));
+            },
+            true => ()
+          );
+          i = (i + usize(1));
+        };
+        if((len > run_start), {
+          result_al.extend_from_ptr((src_ptr &+ run_start), (len - run_start));
+        });
+        return ();
       });
-      i = (i + usize(1));
+      first = (first + usize(1));
     };
 
-    if(!(has_special), {
-      result.push_str(input);
-      return ();
-    });
-
-    result.reserve((len + (len / usize(8))));
-    i = usize(0);
-    (run_start : usize) = usize(0);
-    (result_al : ArrayList(u8)) = result.*._bytes.unwrap();
-    while (i < len), {
-      (ch : u8) = (src_ptr &+ i).*;
-      cond(
-        (ch == u8(0x26)) => {
-          if((i > run_start), {
-            result_al.extend_from_ptr((src_ptr &+ run_start), (i - run_start));
-          });
-          result.push_str("&amp;");
-          run_start = (i + usize(1));
-        },
-        (ch == u8(0x3C)) => {
-          if((i > run_start), {
-            result_al.extend_from_ptr((src_ptr &+ run_start), (i - run_start));
-          });
-          result.push_str("&lt;");
-          run_start = (i + usize(1));
-        },
-        (ch == u8(0x3E)) => {
-          if((i > run_start), {
-            result_al.extend_from_ptr((src_ptr &+ run_start), (i - run_start));
-          });
-          result.push_str("&gt;");
-          run_start = (i + usize(1));
-        },
-        (ch == u8(0x22)) => {
-          if((i > run_start), {
-            result_al.extend_from_ptr((src_ptr &+ run_start), (i - run_start));
-          });
-          result.push_str("&quot;");
-          run_start = (i + usize(1));
-        },
-        true => ()
-      );
-      i = (i + usize(1));
-    };
-    if((len > run_start), {
-      result_al.extend_from_ptr((src_ptr &+ run_start), (len - run_start));
-    });
+    // No special chars found — append as-is
+    result.push_str(input);
   }
 );
 
