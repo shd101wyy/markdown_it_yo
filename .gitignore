@@ -32,3 +32,5 @@ Thumbs.db
 # Benchmark samples (generated)
 benchmark/samples/
 bench_*.md
+profile_bin
+profile_gprof

@@ -19,8 +19,9 @@ A high-performance Markdown parser written in [Yo](https://github.com/shd101wyy/
 ## Build
 
 ```bash
-yo build          # Build executable + static library
+yo build          # Build native executable + static library
 yo build run      # Build and run (reads from stdin)
+yo build wasm     # Build WASM target (requires emscripten)
 ```
 
 ## Usage
@@ -82,44 +83,46 @@ node benchmark/run.js
 
 **Parse time only** — median of 10 runs, 3 warmup, `--repeat` to amortize process startup:
 
-| Input | markdown-it (JS) | markdown_it_yo (Native) | Ratio |
-| ----- | ----------------- | ----------------------- | ----- |
-| 1 MB  | 13.8 ms           | 115.3 ms                | 0.12× |
-| 5 MB  | 69.4 ms           | 594.9 ms                | 0.12× |
-| 20 MB | 334.0 ms          | 2444.2 ms               | 0.14× |
+| Input | markdown-it (JS) | Native | WASM | Native× | WASM× |
+| ----- | ----------------- | ------ | ---- | ------- | ----- |
+| 1 MB  | 14.8 ms           | 14.0 ms | 32.4 ms | 1.1× | 0.5× |
+| 5 MB  | 72.5 ms           | 75.1 ms | 160.5 ms | 1.0× | 0.5× |
+| 20 MB | 341.6 ms          | 333.1 ms | 684.3 ms | 1.0× | 0.5× |
 
-The 1:1 port is currently ~8× slower than the JS original, primarily due to reference counting overhead in the regex engine (~96% of heap allocations come from NfaThread objects during regex matching). See [markdown_yo](https://github.com/shd101wyy/markdown_yo) for a custom implementation that is **2-2.5× faster** than JS through a SAX architecture with value-type tokens.
+The native build matches or slightly beats the JS original. WASM runs at ~0.5× JS speed (compiled with emcc `-Os`; `-O2`/`-O3` are impractical due to 20+ minute compile times on the 70K-line generated C file).
 
 > **Note on wall-clock benchmarks:** Single-run wall-clock timings (e.g., `/usr/bin/time`) can be misleading — Node.js startup adds ~60-150ms of overhead (VM init, JIT compilation, module loading) that amortizes away on repeated runs. The numbers above measure **parse time only** after JIT warmup using `--repeat` and `process.hrtime.bigint()` per iteration.
 
 ### Optimizations Applied
 
-Despite being a faithful 1:1 port, several optimizations have been applied to reduce overhead:
+Despite being a faithful 1:1 port, several optimizations bring performance to JS parity:
 
-1. **Enum token types** — Token `type_name` uses an `enum` instead of `String`, eliminating millions of string allocations and comparisons
-2. **Value-type token tags** — Token `tag` uses `str` (16-byte value type, pointer+length) instead of `String` (RC heap object)
-3. **Buffer-pattern renderer** — Renderer appends to a pre-allocated `String` buffer via `push_str`/`push_string` instead of string concatenation
-4. **Zero-allocation HTML escaping** — `escape_html_to()` appends escaped content directly to the output buffer
-5. **`push_str` for literals** — String literal appends use `push_str("...")` (str type) instead of `push_string(\`...\`)` (String type)
-6. **libc allocator** — System malloc outperforms mimalloc for this allocation pattern (many small RC objects). Set via `build.Allocator.Libc` in `build.yo`
-7. **Pre-allocated buffers** — Render buffer pre-allocated to 1.5× source size
-8. **Bulk memory operations** — `String.substring` and `String.trim` use `memcpy`/`extend_from_ptr` instead of byte-by-byte copying
-9. **Pointer-based access** — `ArrayList.get_ptr` returns pointers to elements without copying, avoiding RC overhead in hot loops
-10. **Regex caching** — Compiled regex patterns cached as module-level variables
-11. **Regex VM buffer reuse** — NfaVm hoisted outside search loops, seen/next_seen arrays pre-allocated as VM fields, swap+clear pattern for current/next thread lists (reduced NfaVm allocations by 81%)
+1. **Enum token types** — Token `type_name` uses an `enum` instead of `String`, eliminating millions of string allocations
+2. **Value-type token tags** — Token `tag` uses `str` (value type) instead of `String` (RC heap object)
+3. **Buffer-pattern renderer** — Pre-allocated `String` buffer via `push_str`/`push_string`
+4. **Zero-allocation HTML escaping** — `escape_html_to()` appends directly to output buffer
+5. **libc allocator** — System malloc outperforms mimalloc for this allocation pattern
+6. **Pre-allocated buffers** — Render buffer (1.5× source), token arrays, inline children
+7. **Bulk memory operations** — `String.substring`/`String.trim` use `memcpy`
+8. **Pointer-based access** — `ArrayList.get_ptr` avoids RC copies in hot loops
+9. **Regex caching** — Compiled regex patterns cached as module-level variables
+10. **Regex VM buffer reuse** — Swap+clear pattern for thread lists (81% fewer allocations)
+11. **Lazy HashMap** — StateInline backticks HashMap only allocated when backticks are present
+12. **HashMap-free delimiter processing** — `process_delimiters` uses parallel ArrayLists instead of HashMap
+13. **String buffer reuse** — `push_pending` uses `clone()`+`clear()` to reuse the pending buffer
+14. **Inline RC functions** — `__yo_incr_rc`/`__yo_decr_rc` marked `static inline`
+15. **Manual autolink/entity matching** — Hot inline rules use hand-coded char matching instead of regex
+16. **RC borrow chain optimization** — Linked-list traversal patterns avoid redundant dup/drop pairs
 
 ### Performance Analysis
 
-Profiling with instrumented C code reveals that **~96% of heap allocations** come from the regex engine, not the parser itself:
+The main performance bottleneck is **reference counting overhead** (~47% of CPU time in `__yo_decr_rc`/`__yo_incr_rc` operations). Each Token has 5 RC-able fields (content, markup, info, children, attrs), and the parser creates ~50K tokens per 1MB of input.
 
-| Allocator         | Count (1 MB parse) | Notes                                  |
-| ----------------- | ------------------- | -------------------------------------- |
-| NfaThread         | 2,060,663           | **Dominant bottleneck** — fork creates new RC object + slots |
-| ArrayList(usize)  | 2,004,328           | NfaThread capture slots (one per fork) |
-| ArrayList(NfaThread) | 394,168          | Thread lists for NFA simulation        |
-| Token-related     | ~50,000             | Actual parser allocations              |
+V8's generational GC handles short-lived objects nearly for free (young generation bump allocation ~2-3ns), while RC incurs per-operation overhead on every increment/decrement (~5-10ns each). Despite this structural disadvantage, the optimizations above bring the Yo port to JS parity on native.
 
-V8's generational GC handles these short-lived objects nearly for free (young generation collection), while reference counting incurs per-operation overhead on every increment/decrement. This is the fundamental cost of RC vs tracing GC for allocation-heavy workloads.
+For the WASM target, additional overhead comes from bounds checking and the WASM calling convention. The `-Os` optimization level provides the best tradeoff between compile time (<30s) and runtime performance.
+
+See [markdown_yo](https://github.com/shd101wyy/markdown_yo) for a **ground-up rewrite** using a SAX architecture with value-type tokens, targeting 2-5× faster than JS.
 
 ### Verifying Correctness
 
