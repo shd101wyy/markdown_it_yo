@@ -57,9 +57,37 @@ _is_safe_char :: (fn(code: u8, exclude: str) -> bool)({
 // - keep_escaped: don't encode '%' in a correct escape sequence (default: true)
 encode :: (fn(input: String, exclude: str, keep_escaped: bool) -> String)({
   (bytes : ArrayList(u8)) = input.as_bytes();
-  (result : ArrayList(u8)) = ArrayList(u8).with_capacity(bytes.len());
-  (i : usize) = usize(0);
   (len : usize) = bytes.len();
+
+  // Fast path: if all bytes are safe ASCII, return input unchanged
+  (needs_encoding : bool) = false;
+  (scan : usize) = usize(0);
+  while ((scan < len) && (!(needs_encoding))), {
+    (b : u8) = bytes(scan);
+    if((b >= u8(128)), {
+      needs_encoding = true;
+    }, if(((b == u8(0x25)) && keep_escaped), {
+      // '%' followed by hex is kept, otherwise needs encoding
+      if(((scan + usize(2)) < len), {
+        if((_is_hex_digit(bytes((scan + usize(1)))) && _is_hex_digit(bytes((scan + usize(2))))), {
+          scan = (scan + usize(3));
+        }, {
+          needs_encoding = true;
+        });
+      }, {
+        needs_encoding = true;
+      });
+    }, if(!(_is_safe_char(b, exclude)), {
+      needs_encoding = true;
+    }, {
+      scan = (scan + usize(1));
+    })));
+  };
+
+  if(!(needs_encoding), { return input; });
+
+  (result : ArrayList(u8)) = ArrayList(u8).with_capacity(len);
+  (i : usize) = usize(0);
 
   while (i < len), {
     (b : u8) = bytes(i);
