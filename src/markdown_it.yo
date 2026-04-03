@@ -64,7 +64,6 @@ _core_block :: (fn(state: *(StateCore), block_parser: ParserBlock, html_enabled:
     (token : Token) = Token.new(.TT_INLINE, "", i32(0));
     token.content = state.*.src.as_str();
     token._content_owned = .Some(state.*.src);
-    token.children = .Some(ArrayList(Token).new());
     _ := state.*.tokens.push(token);
   }, {
     // Run block parser

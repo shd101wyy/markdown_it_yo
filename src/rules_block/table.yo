@@ -204,7 +204,6 @@ table :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: bool,
     (hdr_content : String) = header_columns(usize(hi)).trim();
     token_il.content = hdr_content.as_str();
     token_il._content_owned = .Some(hdr_content);
-    token_il.children = .Some(ArrayList(Token).new());
     block_push_token(state, token_il);
 
     block_push_token(state, Token.new(.TT_TH_CLOSE, "th", i32(-1)));
@@ -287,7 +286,6 @@ table :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: bool,
                 }, {
                   token_il.content = "";
                 });
-                token_il.children = .Some(ArrayList(Token).new());
                 block_push_token(state, token_il);
 
                 block_push_token(state, Token.new(.TT_TD_CLOSE, "td", i32(-1)));

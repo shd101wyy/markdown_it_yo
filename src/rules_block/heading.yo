@@ -90,7 +90,6 @@ heading :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: boo
   token_i.content = content_str;
   token_i.block = true;
   token_i.map = .Some(MapRange(begin: start_line, end: state.*.line));
-  token_i.children = .Some(ArrayList(Token).new());
   block_push_token(state, token_i);
 
   // heading_close

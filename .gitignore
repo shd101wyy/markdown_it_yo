@@ -34,3 +34,4 @@ benchmark/samples/
 bench_*.md
 profile_bin
 profile_gprof
+isolate-*.log
