@@ -77,12 +77,14 @@ StateInline :: struct(
 new_state_inline :: (fn(src: str, env: *(Env), out_tokens: ArrayList(Token), html_enabled: bool, enable_strikethrough: bool, tokenize_fn: (fn(state: *(StateInline)) -> unit), parse_fn: (fn(state: *(StateInline)) -> unit)) -> StateInline)(
   {
     (pos_max : i32) = i32(src.len());
+    // Pre-allocate tokens_meta to match token array capacity
+    (meta_cap : usize) = out_tokens.capacity();
 
     StateInline(
       src: src,
       env: env,
       tokens: out_tokens,
-      tokens_meta: ArrayList(Option(TokenMeta)).new(),
+      tokens_meta: ArrayList(Option(TokenMeta)).with_capacity(meta_cap),
       pos: i32(0),
       pos_max: pos_max,
       level: i32(0),
