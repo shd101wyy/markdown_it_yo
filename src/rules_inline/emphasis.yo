@@ -17,7 +17,7 @@ _DOUBLE_UNDERSCORE := String.from("__");
 // Insert each marker as a separate text token, and add it to delimiter list
 emphasis_tokenize :: (fn(state: *(StateInline), silent: bool) -> bool)({
   (start : i32) = state.*.pos;
-  (marker : i32) = i32(state.*._src_bytes(usize(start)));
+  (marker : i32) = i32(state.*._src_bytes.bytes(usize(start)));
 
   if(silent, {
     return false;

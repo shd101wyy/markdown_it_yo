@@ -33,11 +33,11 @@ _is_alnum :: (fn(b: u8) -> bool)(
 );
 
 // Parse hex digits from bytes, returns i32
-_parse_hex_bytes :: (fn(bytes: ArrayList(u8), start: i32, end: i32) -> i32)({
+_parse_hex_bytes :: (fn(bytes: str, start: i32, end: i32) -> i32)({
   (result : i32) = i32(0);
   (i : i32) = start;
   while (i < end), {
-    (ch : u8) = bytes(usize(i));
+    (ch : u8) = bytes.bytes(usize(i));
     (digit : i32) = cond(
       ((ch >= u8(0x30)) && (ch <= u8(0x39))) => (i32(ch) - i32(0x30)),
       ((ch >= u8(0x61)) && (ch <= u8(0x66))) => ((i32(ch) - i32(0x61)) + i32(10)),
@@ -51,11 +51,11 @@ _parse_hex_bytes :: (fn(bytes: ArrayList(u8), start: i32, end: i32) -> i32)({
 });
 
 // Parse decimal digits from bytes, returns i32
-_parse_dec_bytes :: (fn(bytes: ArrayList(u8), start: i32, end: i32) -> i32)({
+_parse_dec_bytes :: (fn(bytes: str, start: i32, end: i32) -> i32)({
   (result : i32) = i32(0);
   (i : i32) = start;
   while (i < end), {
-    (ch : u8) = bytes(usize(i));
+    (ch : u8) = bytes.bytes(usize(i));
     result = ((result * i32(10)) + (i32(ch) - i32(0x30)));
     i = (i + i32(1));
   };
@@ -66,7 +66,7 @@ entity :: (fn(state: *(StateInline), silent: bool) -> bool)({
   (pos : i32) = state.*.pos;
   (max : i32) = state.*.pos_max;
 
-  if((i32(state.*._src_bytes(usize(pos))) != i32(0x26)), {
+  if((i32(state.*._src_bytes.bytes(usize(pos))) != i32(0x26)), {
     return false;
   });
 
@@ -74,12 +74,12 @@ entity :: (fn(state: *(StateInline), silent: bool) -> bool)({
     return false;
   });
 
-  (ch : i32) = i32(state.*._src_bytes(usize((pos + i32(1)))));
+  (ch : i32) = i32(state.*._src_bytes.bytes(usize((pos + i32(1)))));
 
   if((ch == i32(0x23)), {
     // Numeric entity: &#...;
     if(((pos + i32(2)) >= max), { return false; });
-    (ch2 : u8) = state.*._src_bytes(usize((pos + i32(2))));
+    (ch2 : u8) = state.*._src_bytes.bytes(usize((pos + i32(2))));
     (is_hex : bool) = ((ch2 == u8(0x78)) || (ch2 == u8(0x58)));
     (is_digit : bool) = ((ch2 >= u8(0x30)) && (ch2 <= u8(0x39)));
     if((!(is_hex) && !(is_digit)), {
@@ -91,11 +91,11 @@ entity :: (fn(state: *(StateInline), silent: bool) -> bool)({
       // Hex: scan pos+3.. for hex digits, then ';'
       (scan : i32) = (pos + i32(3));
       (scan_max : i32) = cond((max < (pos + i32(10))) => max, true => (pos + i32(10)));
-      while ((scan < scan_max) && _is_hex_digit(state.*._src_bytes(usize(scan)))), {
+      while ((scan < scan_max) && _is_hex_digit(state.*._src_bytes.bytes(usize(scan)))), {
         scan = (scan + i32(1));
       };
       (digit_count : i32) = (scan - (pos + i32(3)));
-      if(((((digit_count >= i32(1)) && (digit_count <= i32(6))) && (scan < max)) && (state.*._src_bytes(usize(scan)) == u8(0x3B))), {
+      if(((((digit_count >= i32(1)) && (digit_count <= i32(6))) && (scan < max)) && (state.*._src_bytes.bytes(usize(scan)) == u8(0x3B))), {
         // Match: &#xHHHH;
         (match_end : i32) = (scan + i32(1));
         if(!(silent), {
@@ -128,11 +128,11 @@ entity :: (fn(state: *(StateInline), silent: bool) -> bool)({
       // Decimal: scan pos+2.. for digits, then ';'
       (scan : i32) = (pos + i32(2));
       (scan_max : i32) = cond((max < (pos + i32(11))) => max, true => (pos + i32(11)));
-      while ((scan < scan_max) && ((state.*._src_bytes(usize(scan)) >= u8(0x30)) && (state.*._src_bytes(usize(scan)) <= u8(0x39)))), {
+      while ((scan < scan_max) && ((state.*._src_bytes.bytes(usize(scan)) >= u8(0x30)) && (state.*._src_bytes.bytes(usize(scan)) <= u8(0x39)))), {
         scan = (scan + i32(1));
       };
       (digit_count : i32) = (scan - (pos + i32(2)));
-      if(((((digit_count >= i32(1)) && (digit_count <= i32(7))) && (scan < max)) && (state.*._src_bytes(usize(scan)) == u8(0x3B))), {
+      if(((((digit_count >= i32(1)) && (digit_count <= i32(7))) && (scan < max)) && (state.*._src_bytes.bytes(usize(scan)) == u8(0x3B))), {
         // Match: &#NNNNNNN;
         (match_end : i32) = (scan + i32(1));
         if(!(silent), {
@@ -172,11 +172,11 @@ entity :: (fn(state: *(StateInline), silent: bool) -> bool)({
     // Scan for alphanumeric chars then ';'
     (scan : i32) = (pos + i32(2));
     (scan_max : i32) = cond((max < (pos + i32(34))) => max, true => (pos + i32(34)));
-    while ((scan < scan_max) && _is_alnum(state.*._src_bytes(usize(scan)))), {
+    while ((scan < scan_max) && _is_alnum(state.*._src_bytes.bytes(usize(scan)))), {
       scan = (scan + i32(1));
     };
     (name_len : i32) = (scan - (pos + i32(1)));
-    if(((((name_len >= i32(2)) && (name_len <= i32(32))) && (scan < max)) && (state.*._src_bytes(usize(scan)) == u8(0x3B))), {
+    if(((((name_len >= i32(2)) && (name_len <= i32(32))) && (scan < max)) && (state.*._src_bytes.bytes(usize(scan)) == u8(0x3B))), {
       // Potential match: &name;
       (match_end : i32) = (scan + i32(1));
       (matched : String) = byte_substring(state.*._src_bytes, pos, match_end);

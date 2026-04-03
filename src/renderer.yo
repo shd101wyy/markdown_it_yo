@@ -123,11 +123,11 @@ _render_fence :: (fn(result: *(String), tokens: ArrayList(Token), idx: i32, opti
   (lang_name : String) = String.new();
   if((info.bytes_len() > usize(0)), {
     // Split on first space
-    (info_bytes : ArrayList(u8)) = info.as_bytes();
+    (info_str : str) = info.as_str();
     (space_pos : i32) = i32(0);
     (found_space : bool) = false;
-    while (((space_pos < i32(info_bytes.len())) && !(found_space))), {
-      (b : i32) = i32(info_bytes(usize(space_pos)));
+    while (((space_pos < i32(info_str.len())) && !(found_space))), {
+      (b : i32) = i32(info_str.bytes(usize(space_pos)));
       if(((((b == i32(0x20)) || (b == i32(0x09))) || ((b == i32(0x0A)) || (b == i32(0x0B)))) || ((b == i32(0x0C)) || (b == i32(0x0D)))), {
         found_space = true;
       }, {
@@ -135,7 +135,7 @@ _render_fence :: (fn(result: *(String), tokens: ArrayList(Token), idx: i32, opti
       });
     };
     if(found_space, {
-      lang_name = byte_substring(info_bytes, i32(0), space_pos);
+      lang_name = byte_substring(info_str, i32(0), space_pos);
     }, {
       lang_name = info;
     });

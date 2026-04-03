@@ -45,7 +45,7 @@ lheading :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: bo
         (max : i32) = state.*.e_marks(usize(next_line));
 
         if((pos < max), {
-          marker = i32(state.*._src_bytes(usize(pos)));
+          marker = i32(state.*._src_bytes.bytes(usize(pos)));
 
           if(((marker == i32(0x2D)) || (marker == i32(0x3D))), {
             pos = state.*.skip_chars(pos, marker);

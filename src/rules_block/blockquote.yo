@@ -24,11 +24,11 @@ _is_list_start :: (fn(state: *(StateBlock), line: i32) -> bool)({
   (max : i32) = state.*.e_marks(usize(line));
   (pos : i32) = (state.*.b_marks(usize(line)) + state.*.t_shift(usize(line)));
   if((pos >= max), { return false; });
-  (ch : i32) = i32(state.*._src_bytes(usize(pos)));
+  (ch : i32) = i32(state.*._src_bytes.bytes(usize(pos)));
   // Bullet: -, +, *
   if((((ch == i32(0x2A)) || (ch == i32(0x2D))) || (ch == i32(0x2B))), {
     if(((pos + i32(1)) < max), {
-      if(!(is_space(i32(state.*._src_bytes(usize((pos + i32(1))))))), {
+      if(!(is_space(i32(state.*._src_bytes.bytes(usize((pos + i32(1))))))), {
         return false;
       });
     });
@@ -40,7 +40,7 @@ _is_list_start :: (fn(state: *(StateBlock), line: i32) -> bool)({
   (found : bool) = false;
   while !(found), {
     if((opos >= max), { return false; });
-    ch = i32(state.*._src_bytes(usize(opos)));
+    ch = i32(state.*._src_bytes.bytes(usize(opos)));
     opos = (opos + i32(1));
     if(((ch >= i32(0x30)) && (ch <= i32(0x39))), {
       if(((opos - pos) >= i32(10)), { return false; });
@@ -51,7 +51,7 @@ _is_list_start :: (fn(state: *(StateBlock), line: i32) -> bool)({
     }));
   };
   if((opos < max), {
-    if(!(is_space(i32(state.*._src_bytes(usize(opos))))), { return false; });
+    if(!(is_space(i32(state.*._src_bytes.bytes(usize(opos))))), { return false; });
   });
   true
 });
@@ -67,7 +67,7 @@ blockquote :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: 
   });
 
   // Check the block quote marker
-  if((i32(state.*._src_bytes(usize(pos))) != i32(0x3E)), {
+  if((i32(state.*._src_bytes.bytes(usize(pos))) != i32(0x3E)), {
     return false;
   });
 
@@ -96,7 +96,7 @@ blockquote :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: 
     // Case 1: empty line — break
     if((pos >= max), {
       bq_done = true;
-    }, if(((i32(state.*._src_bytes(usize(pos))) == i32(0x3E)) && !(is_outdented)), {
+    }, if(((i32(state.*._src_bytes.bytes(usize(pos))) == i32(0x3E)) && !(is_outdented)), {
       // This line is inside the blockquote
       pos = (pos + i32(1));
 
@@ -107,7 +107,7 @@ blockquote :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: 
 
       // Skip one optional space/tab after '>'
       if((pos < max), {
-        (after_ch : i32) = i32(state.*._src_bytes(usize(pos)));
+        (after_ch : i32) = i32(state.*._src_bytes.bytes(usize(pos)));
         if((after_ch == i32(0x20)), {
           pos = (pos + i32(1));
           initial = (initial + i32(1));
@@ -134,7 +134,7 @@ blockquote :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: 
       // Calculate remaining indentation
       (ws_done : bool) = false;
       while ((pos < max) && !(ws_done)), {
-        (ch : i32) = i32(state.*._src_bytes(usize(pos)));
+        (ch : i32) = i32(state.*._src_bytes.bytes(usize(pos)));
         if(is_space(ch), {
           if((ch == i32(0x09)), {
             offset = (offset + (i32(4) - (((offset + state.*.bs_count(usize(next_line))) + cond(adjust_tab => i32(1), true => i32(0))) % i32(4))));

@@ -527,13 +527,11 @@ unescape_all :: (fn(input: String) -> String)(
 // Extract a substring from byte positions [start, end) of a byte array
 // and return it as a String. This is needed because String.substring uses
 // character positions, but our parser works with byte positions.
-byte_substring :: (fn(bytes: ArrayList(u8), start: i32, end: i32) -> String)({
+byte_substring :: (fn(bytes: str, start: i32, end: i32) -> String)({
   (count : usize) = usize((end - start));
+  if((count == usize(0)), { return String.new(); });
   (out : ArrayList(u8)) = ArrayList(u8).with_capacity(count);
-  match(bytes.ptr(),
-    .Some(p) => out.extend_from_ptr((p &+ usize(start)), count),
-    .None => ()
-  );
+  out.extend_from_ptr(&(bytes.bytes(usize(start))), count);
   String.from_bytes(out)
 });
 

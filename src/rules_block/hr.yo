@@ -19,7 +19,7 @@ hr :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: bool) ->
 
   (pos : i32) = (state.*.b_marks(usize(start_line)) + state.*.t_shift(usize(start_line)));
 
-  (marker : i32) = i32(state.*._src_bytes(usize(pos)));
+  (marker : i32) = i32(state.*._src_bytes.bytes(usize(pos)));
   pos = (pos + i32(1));
 
   // Check hr marker: * - _
@@ -30,7 +30,7 @@ hr :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: bool) ->
   // markers can be mixed with spaces, but there should be at least 3 of them
   (cnt : i32) = i32(1);
   while (pos < max), {
-    (ch : i32) = i32(state.*._src_bytes(usize(pos)));
+    (ch : i32) = i32(state.*._src_bytes.bytes(usize(pos)));
     pos = (pos + i32(1));
     if(((ch != marker) && (!(is_space(ch)))), {
       return false;

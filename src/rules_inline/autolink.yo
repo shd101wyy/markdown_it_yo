@@ -12,12 +12,12 @@ open import "std/string";
 
 // Manual URI autolink check: [a-zA-Z][a-zA-Z0-9+.\-]{1,31}:[^\s<>]*
 // Works directly on byte range to avoid String allocation for non-matches
-_is_autolink_uri_bytes :: (fn(bytes: ArrayList(u8), start: i32, end: i32) -> bool)({
+_is_autolink_uri_bytes :: (fn(bytes: str, start: i32, end: i32) -> bool)({
   (len : i32) = (end - start);
   if((len < i32(2)), { return false; }); // minimum: "a:"
 
   // First char must be [a-zA-Z]
-  (first : u8) = bytes(usize(start));
+  (first : u8) = bytes.bytes(usize(start));
   (is_alpha : bool) = (((first >= u8(0x61)) && (first <= u8(0x7A))) || ((first >= u8(0x41)) && (first <= u8(0x5A))));
   if(!(is_alpha), { return false; });
 
@@ -25,7 +25,7 @@ _is_autolink_uri_bytes :: (fn(bytes: ArrayList(u8), start: i32, end: i32) -> boo
   (i : i32) = (start + i32(1));
   (scheme_end : i32) = cond(((start + i32(33)) < end) => (start + i32(33)), true => end);
   while (i < scheme_end), {
-    (ch : u8) = bytes(usize(i));
+    (ch : u8) = bytes.bytes(usize(i));
     if((ch == u8(0x3A)), {
       // Found ':' — scheme must be at least 2 chars (first + 1..31)
       (scheme_len : i32) = (i - start);
@@ -33,7 +33,7 @@ _is_autolink_uri_bytes :: (fn(bytes: ArrayList(u8), start: i32, end: i32) -> boo
         // Check rest is [^\s<>]
         (j : i32) = (i + i32(1));
         while (j < end), {
-          (rc : u8) = bytes(usize(j));
+          (rc : u8) = bytes.bytes(usize(j));
           // Reject whitespace (\x00-\x20), '<', '>'
           if((((rc <= u8(0x20)) || (rc == u8(0x3C))) || (rc == u8(0x3E))), {
             return false;
@@ -61,7 +61,7 @@ _is_autolink_uri_bytes :: (fn(bytes: ArrayList(u8), start: i32, end: i32) -> boo
 });
 
 // Manual email check: [a-zA-Z0-9.!#$%&'*+/=?^_`{|}~\-]+@domain
-_is_email_bytes :: (fn(bytes: ArrayList(u8), start: i32, end: i32) -> bool)({
+_is_email_bytes :: (fn(bytes: str, start: i32, end: i32) -> bool)({
   (len : i32) = (end - start);
   if((len < i32(3)), { return false; }); // minimum: "a@b"
 
@@ -69,7 +69,7 @@ _is_email_bytes :: (fn(bytes: ArrayList(u8), start: i32, end: i32) -> bool)({
   (at_pos : i32) = i32(-1);
   (i : i32) = start;
   while (i < end), {
-    if((bytes(usize(i)) == u8(0x40)), {
+    if((bytes.bytes(usize(i)) == u8(0x40)), {
       at_pos = i;
       i = end; // break
     }, {
@@ -82,7 +82,7 @@ _is_email_bytes :: (fn(bytes: ArrayList(u8), start: i32, end: i32) -> bool)({
   // Check local part: [a-zA-Z0-9.!#$%&'*+/=?^_`{|}~\-]+
   (j : i32) = start;
   while (j < at_pos), {
-    (ch : u8) = bytes(usize(j));
+    (ch : u8) = bytes.bytes(usize(j));
     (ok : bool) = cond(
       ((ch >= u8(0x61)) && (ch <= u8(0x7A))) => true,
       ((ch >= u8(0x41)) && (ch <= u8(0x5A))) => true,
@@ -118,7 +118,7 @@ _is_email_bytes :: (fn(bytes: ArrayList(u8), start: i32, end: i32) -> bool)({
   if((dpos >= end), { return false; });
 
   // First domain label
-  (first_ch : u8) = bytes(usize(dpos));
+  (first_ch : u8) = bytes.bytes(usize(dpos));
   (is_alnum : bool) = ((((first_ch >= u8(0x61)) && (first_ch <= u8(0x7A))) || ((first_ch >= u8(0x41)) && (first_ch <= u8(0x5A)))) || ((first_ch >= u8(0x30)) && (first_ch <= u8(0x39))));
   if(!(is_alnum), { return false; });
   dpos = (dpos + i32(1));
@@ -126,7 +126,7 @@ _is_email_bytes :: (fn(bytes: ArrayList(u8), start: i32, end: i32) -> bool)({
   // Consume label chars [a-zA-Z0-9-], max 62 more (total 63)
   (label_start : i32) = (dpos - i32(1));
   while ((dpos < end) && (dpos < (label_start + i32(63)))), {
-    (dch : u8) = bytes(usize(dpos));
+    (dch : u8) = bytes.bytes(usize(dpos));
     (is_label : bool) = ((((dch >= u8(0x61)) && (dch <= u8(0x7A))) || ((dch >= u8(0x41)) && (dch <= u8(0x5A)))) || (((dch >= u8(0x30)) && (dch <= u8(0x39))) || (dch == u8(0x2D))));
     if(!(is_label), {
       // Not a label char — must be '.' for next label or end
@@ -138,21 +138,21 @@ _is_email_bytes :: (fn(bytes: ArrayList(u8), start: i32, end: i32) -> bool)({
   };
 
   // Last char of label must not be '-'
-  if(((dpos > (at_pos + i32(2))) && (bytes(usize((dpos - i32(1)))) == u8(0x2D))), {
+  if(((dpos > (at_pos + i32(2))) && (bytes.bytes(usize((dpos - i32(1)))) == u8(0x2D))), {
     return false;
   });
 
   // Consume additional labels: \.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?
-  while ((dpos < end) && (bytes(usize(dpos)) == u8(0x2E))), {
+  while ((dpos < end) && (bytes.bytes(usize(dpos)) == u8(0x2E))), {
     dpos = (dpos + i32(1)); // skip '.'
     if((dpos >= end), { return false; });
-    (lch : u8) = bytes(usize(dpos));
+    (lch : u8) = bytes.bytes(usize(dpos));
     (is_la : bool) = ((((lch >= u8(0x61)) && (lch <= u8(0x7A))) || ((lch >= u8(0x41)) && (lch <= u8(0x5A)))) || ((lch >= u8(0x30)) && (lch <= u8(0x39))));
     if(!(is_la), { return false; });
     dpos = (dpos + i32(1));
     (ls : i32) = (dpos - i32(1));
     while ((dpos < end) && (dpos < (ls + i32(63)))), {
-      (lch2 : u8) = bytes(usize(dpos));
+      (lch2 : u8) = bytes.bytes(usize(dpos));
       (is_l2 : bool) = ((((lch2 >= u8(0x61)) && (lch2 <= u8(0x7A))) || ((lch2 >= u8(0x41)) && (lch2 <= u8(0x5A)))) || (((lch2 >= u8(0x30)) && (lch2 <= u8(0x39))) || (lch2 == u8(0x2D))));
       if(!(is_l2), {
         dpos = dpos;
@@ -162,7 +162,7 @@ _is_email_bytes :: (fn(bytes: ArrayList(u8), start: i32, end: i32) -> bool)({
       });
     };
     // Last char of label must not be '-'
-    if((bytes(usize((dpos - i32(1)))) == u8(0x2D)), {
+    if((bytes.bytes(usize((dpos - i32(1)))) == u8(0x2D)), {
       return false;
     });
   };
@@ -195,7 +195,7 @@ autolink :: (fn(state: *(StateInline), silent: bool) -> bool)({
   (max : i32) = state.*.pos_max;
 
   // Must start with '<'
-  if((i32(state.*._src_bytes(usize(pos))) != i32(0x3C)), {
+  if((i32(state.*._src_bytes.bytes(usize(pos))) != i32(0x3C)), {
     return false;
   });
 
@@ -205,7 +205,7 @@ autolink :: (fn(state: *(StateInline), silent: bool) -> bool)({
   (has_colon : bool) = false;
   (has_at : bool) = false;
   while (((scan < max) && !(found_close))), {
-    (ch : i32) = i32(state.*._src_bytes(usize(scan)));
+    (ch : i32) = i32(state.*._src_bytes.bytes(usize(scan)));
     if((ch == i32(0x3C)), { return false; });
     if((ch == i32(0x3E)), {
       found_close = true;

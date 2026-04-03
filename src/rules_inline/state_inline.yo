@@ -63,7 +63,7 @@ StateInline :: struct(
   enable_strikethrough : bool,
 
   // Cached bytes for fast access
-  _src_bytes : ArrayList(u8),
+  _src_bytes : str,
 
   // Function pointer for recursive inline tokenization (avoids circular imports)
   _tokenize_fn : (fn(state: *(Self)) -> unit),
@@ -76,7 +76,7 @@ StateInline :: struct(
 // Create a new StateInline
 new_state_inline :: (fn(src: String, env: *(Env), out_tokens: ArrayList(Token), html_enabled: bool, enable_strikethrough: bool, tokenize_fn: (fn(state: *(StateInline)) -> unit), parse_fn: (fn(state: *(StateInline)) -> unit)) -> StateInline)(
   {
-    (bytes : ArrayList(u8)) = src.as_bytes();
+    (bytes : str) = src.as_str();
     (pos_max : i32) = i32(bytes.len());
 
     StateInline(
@@ -174,23 +174,23 @@ impl(StateInline,
   // start or end an emphasis sequence.
   scan_delims : (fn(self: Self, start: i32, can_split_word: bool) -> ScanDelimsResult)({
     (max : i32) = self.pos_max;
-    (marker : i32) = i32(self._src_bytes(usize(start)));
+    (marker : i32) = i32(self._src_bytes.bytes(usize(start)));
 
     // Treat beginning of line as whitespace
     (last_char : i32) = cond(
-      (start > i32(0)) => i32(self._src_bytes(usize((start - i32(1))))),
+      (start > i32(0)) => i32(self._src_bytes.bytes(usize((start - i32(1))))),
       true => i32(0x20)
     );
 
     (pos : i32) = start;
-    while ((pos < max) && (i32(self._src_bytes(usize(pos))) == marker)), {
+    while ((pos < max) && (i32(self._src_bytes.bytes(usize(pos))) == marker)), {
       pos = (pos + i32(1));
     };
     (count : i32) = (pos - start);
 
     // Treat end of line as whitespace
     (next_char : i32) = cond(
-      (pos < max) => i32(self._src_bytes(usize(pos))),
+      (pos < max) => i32(self._src_bytes.bytes(usize(pos))),
       true => i32(0x20)
     );
 

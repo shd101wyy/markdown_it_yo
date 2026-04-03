@@ -51,7 +51,7 @@ is_terminator_char :: (fn(ch: i32) -> bool)(
 text :: (fn(state: *(StateInline), silent: bool) -> bool)({
   (pos : i32) = state.*.pos;
 
-  while ((pos < state.*.pos_max) && !(is_terminator_char(i32(state.*._src_bytes(usize(pos)))))), {
+  while ((pos < state.*.pos_max) && !(is_terminator_char(i32(state.*._src_bytes.bytes(usize(pos)))))), {
     pos = (pos + i32(1));
   };
 
@@ -61,18 +61,14 @@ text :: (fn(state: *(StateInline), silent: bool) -> bool)({
 
   if(!(silent), {
     (count : usize) = usize((pos - state.*.pos));
-    match(state.*._src_bytes.ptr(),
-      .Some(p) => {
-        match(state.*.pending._bytes,
-          .None => {
-            al := ArrayList(u8).with_capacity(count);
-            al.extend_from_ptr((p &+ usize(state.*.pos)), count);
-            state.*.pending = String.from_bytes(al);
-          },
-          .Some(al) => al.extend_from_ptr((p &+ usize(state.*.pos)), count)
-        );
+    (p : *(u8)) = &(state.*._src_bytes.bytes(usize(state.*.pos)));
+    match(state.*.pending._bytes,
+      .None => {
+        al := ArrayList(u8).with_capacity(count);
+        al.extend_from_ptr(p, count);
+        state.*.pending = String.from_bytes(al);
       },
-      .None => ()
+      .Some(al) => al.extend_from_ptr(p, count)
     );
   });
 

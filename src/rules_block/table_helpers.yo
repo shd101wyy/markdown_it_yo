@@ -3,13 +3,13 @@
 open import "std/string";
 { ArrayList } :: import "std/collections/array_list";
 { StateBlock } :: import "./state_block.yo";
+{ byte_substring } :: import "../common/utils.yo";
 
 // Get line text (not trimmed)
 table_get_line :: (fn(state: *(StateBlock), line: i32) -> String)({
   (pos : i32) = (state.*.b_marks(usize(line)) + state.*.t_shift(usize(line)));
   (max : i32) = state.*.e_marks(usize(line));
-  (line_bytes : ArrayList(u8)) = state.*._src_bytes.slice(usize(pos), usize(max)).unwrap();
-  String.from_bytes(line_bytes)
+  byte_substring(state.*._src_bytes, pos, max)
 });
 
 // Split string by unescaped pipe characters

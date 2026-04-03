@@ -12,7 +12,7 @@ open import "std/string";
 newline :: (fn(state: *(StateInline), silent: bool) -> bool)({
   (pos : i32) = state.*.pos;
 
-  if((i32(state.*._src_bytes(usize(pos))) != i32(0x0A)), {
+  if((i32(state.*._src_bytes.bytes(usize(pos))) != i32(0x0A)), {
     return false;
   });
 
@@ -45,7 +45,7 @@ newline :: (fn(state: *(StateInline), silent: bool) -> bool)({
   pos = (pos + i32(1));
 
   // skip heading spaces for next line
-  while (((pos < max) && is_space(i32(state.*._src_bytes(usize(pos)))))), {
+  while (((pos < max) && is_space(i32(state.*._src_bytes.bytes(usize(pos)))))), {
     pos = (pos + i32(1));
   };
 

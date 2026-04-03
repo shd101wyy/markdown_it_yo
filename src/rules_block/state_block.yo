@@ -44,7 +44,7 @@ StateBlock :: struct(
   enable_table : bool,
 
   // Cached bytes for fast access
-  _src_bytes : ArrayList(u8),
+  _src_bytes : str,
 
   // Function pointer for recursive block tokenization (set by parser_block).
   _tokenize_fn : (fn(state: *(Self), start: i32, end: i32) -> unit)
@@ -73,7 +73,7 @@ block_push_token :: (fn(state: *(StateBlock), tok: Token) -> unit)({
 // Create a new StateBlock and precompute line markers
 new_state_block :: (fn(src: String, env: *(Env), tokens: ArrayList(Token), html_enabled: bool, enable_table: bool, tokenize_fn: BlockTokenizeFn) -> StateBlock)(
   {
-    (bytes : ArrayList(u8)) = src.as_bytes();
+    (bytes : str) = src.as_str();
     (len : i32) = i32(bytes.len());
 
     // Estimate line count: ~60 bytes per line average, +1 for sentinel
@@ -92,7 +92,7 @@ new_state_block :: (fn(src: String, env: *(Env), tokens: ArrayList(Token), html_
     (indent_found : bool) = false;
 
     while (pos < len), {
-      (ch : i32) = i32(bytes(usize(pos)));
+      (ch : i32) = i32(bytes.bytes(usize(pos)));
 
       if(!(indent_found), {
         if(is_space(ch), {
@@ -233,7 +233,7 @@ impl(StateBlock,
     (pos : i32) = pos_param;
     (max : i32) = i32(self._src_bytes.len());
     while (pos < max), {
-      if(!(is_space(i32(self._src_bytes(usize(pos))))), {
+      if(!(is_space(i32(self._src_bytes.bytes(usize(pos))))), {
         return pos;
       });
       pos = (pos + i32(1));
@@ -249,7 +249,7 @@ impl(StateBlock,
     });
     while (pos > min), {
       pos = (pos - i32(1));
-      if(!(is_space(i32(self._src_bytes(usize(pos))))), {
+      if(!(is_space(i32(self._src_bytes.bytes(usize(pos))))), {
         return (pos + i32(1));
       });
     };
@@ -261,7 +261,7 @@ impl(StateBlock,
     (pos : i32) = pos_param;
     (max : i32) = i32(self._src_bytes.len());
     while (pos < max), {
-      if((i32(self._src_bytes(usize(pos))) != code), {
+      if((i32(self._src_bytes.bytes(usize(pos))) != code), {
         return pos;
       });
       pos = (pos + i32(1));
@@ -277,7 +277,7 @@ impl(StateBlock,
     });
     while (pos > min), {
       pos = (pos - i32(1));
-      if((code != i32(self._src_bytes(usize(pos)))), {
+      if((code != i32(self._src_bytes.bytes(usize(pos)))), {
         return (pos + i32(1));
       });
     };
@@ -309,7 +309,7 @@ impl(StateBlock,
 
       (done : bool) = false;
       while ((first < last) && ((line_indent < indent) && !(done))), {
-        (ch : i32) = i32(self._src_bytes(usize(first)));
+        (ch : i32) = i32(self._src_bytes.bytes(usize(first)));
         cond(
           is_space(ch) => {
             if((ch == i32(0x09)), {
@@ -342,10 +342,7 @@ impl(StateBlock,
 
       // Copy the line bytes directly via pointer
       if((last > first), {
-        match(self._src_bytes.ptr(),
-          .Some(p) => out.extend_from_ptr((p &+ usize(first)), usize((last - first))),
-          .None => ()
-        );
+        out.extend_from_ptr(&(self._src_bytes.bytes(usize(first))), usize((last - first)));
       });
 
       line = (line + i32(1));

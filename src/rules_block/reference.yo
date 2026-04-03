@@ -75,7 +75,7 @@ reference :: (fn(state: *(StateBlock), start_line: i32, _end_line: i32, silent: 
     return false;
   });
 
-  if((i32(state.*._src_bytes(usize(pos))) != i32(0x5B)), {
+  if((i32(state.*._src_bytes.bytes(usize(pos))) != i32(0x5B)), {
     return false;
   });
 
@@ -206,7 +206,7 @@ reference :: (fn(state: *(StateBlock), start_line: i32, _end_line: i32, silent: 
     return false;
   });
 
-  (label : String) = normalize_reference(byte_substring(buf.as_bytes(), i32(1), label_end));
+  (label : String) = normalize_reference(byte_substring(buf.as_str(), i32(1), label_end));
   if((label.len() == usize(0)), {
     return false;
   });

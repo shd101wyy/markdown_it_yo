@@ -8,10 +8,11 @@ open import "std/string";
 { Token, TokenType } :: import "../token.yo";
 { StateInline } :: import "./state_inline.yo";
 { flush_pending, inline_push_token } :: import "./inline_helpers.yo";
+{ byte_substring } :: import "../common/utils.yo";
 
 backtick :: (fn(state: *(StateInline), silent: bool) -> bool)({
   (pos : i32) = state.*.pos;
-  (ch : i32) = i32(state.*._src_bytes(usize(pos)));
+  (ch : i32) = i32(state.*._src_bytes.bytes(usize(pos)));
 
   if((ch != i32(0x60)), {
     return false;
@@ -22,11 +23,11 @@ backtick :: (fn(state: *(StateInline), silent: bool) -> bool)({
   (max : i32) = state.*.pos_max;
 
   // scan marker length
-  while (((pos < max) && (i32(state.*._src_bytes(usize(pos))) == i32(0x60)))), {
+  while (((pos < max) && (i32(state.*._src_bytes.bytes(usize(pos))) == i32(0x60)))), {
     pos = (pos + i32(1));
   };
 
-  (marker : String) = String.from_bytes(state.*._src_bytes.slice(usize(start), usize(pos)).unwrap());
+  (marker : String) = byte_substring(state.*._src_bytes, start, pos);
   (opener_length : i32) = (pos - start);
 
   // Check cache: if we already scanned and found no closer at this length,
@@ -61,7 +62,7 @@ backtick :: (fn(state: *(StateInline), silent: bool) -> bool)({
     (match_start : i32) = i32(-1);
     (scan : i32) = match_end;
     while (((scan < max) && (match_start == i32(-1)))), {
-      if((i32(state.*._src_bytes(usize(scan))) == i32(0x60)), {
+      if((i32(state.*._src_bytes.bytes(usize(scan))) == i32(0x60)), {
         match_start = scan;
       }, {
         scan = (scan + i32(1));
@@ -75,7 +76,7 @@ backtick :: (fn(state: *(StateInline), silent: bool) -> bool)({
       match_end = (match_start + i32(1));
 
       // scan closer length
-      while (((match_end < max) && (i32(state.*._src_bytes(usize(match_end))) == i32(0x60)))), {
+      while (((match_end < max) && (i32(state.*._src_bytes.bytes(usize(match_end))) == i32(0x60)))), {
         match_end = (match_end + i32(1));
       };
 
@@ -85,8 +86,7 @@ backtick :: (fn(state: *(StateInline), silent: bool) -> bool)({
         // Found matching closer length.
         if(!(silent), {
           // Extract content between opener and closer
-          (content_bytes : ArrayList(u8)) = state.*._src_bytes.slice(usize(pos), usize(match_start)).unwrap();
-          (raw_content : String) = String.from_bytes(content_bytes);
+          (raw_content : String) = byte_substring(state.*._src_bytes, pos, match_start);
           // Replace newlines with spaces and strip leading/trailing single space
           (content : String) = raw_content.replace_all(`\n`, ` `);
           // Apply the regex-like rule: /^ (.+) $/ → strip one leading + trailing space

@@ -6,6 +6,7 @@ open import "std/string";
 { ArrayList } :: import "std/collections/array_list";
 { Token, TokenType, MapRange } :: import "../token.yo";
 { StateBlock, block_push_token } :: import "./state_block.yo";
+{ byte_substring } :: import "../common/utils.yo";
 
 // Fenced code block rule
 fence :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: bool) -> bool)({
@@ -21,7 +22,7 @@ fence :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: bool)
     return false;
   });
 
-  (marker : i32) = i32(state.*._src_bytes(usize(pos)));
+  (marker : i32) = i32(state.*._src_bytes.bytes(usize(pos)));
 
   if(((marker != i32(0x7E)) && (marker != i32(0x60))), {
     return false;
@@ -38,10 +39,8 @@ fence :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: bool)
   });
 
   // Extract markup and params from source bytes
-  (markup_bytes : ArrayList(u8)) = state.*._src_bytes.slice(usize(mem), usize(pos)).unwrap();
-  (markup : String) = String.from_bytes(markup_bytes);
-  (params_bytes : ArrayList(u8)) = state.*._src_bytes.slice(usize(pos), usize(max)).unwrap();
-  (params : String) = String.from_bytes(params_bytes);
+  (markup : String) = byte_substring(state.*._src_bytes, mem, pos);
+  (params : String) = byte_substring(state.*._src_bytes, pos, max);
 
   // if backtick fence, check that params don't contain backticks
   if((marker == i32(0x60)), {
@@ -83,7 +82,7 @@ fence :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: bool)
         // non-empty line with negative indent should stop the list
         searching = false;
       }, {
-        if((i32(state.*._src_bytes(usize(pos))) != marker), {
+        if((i32(state.*._src_bytes.bytes(usize(pos))) != marker), {
           // not our marker, continue searching
           ();
         }, {

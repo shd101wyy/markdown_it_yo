@@ -19,7 +19,7 @@ _is_blockquote_start :: (fn(state: *(StateBlock), line: i32) -> bool)({
   (pos : i32) = (state.*.b_marks(usize(line)) + state.*.t_shift(usize(line)));
   (max : i32) = state.*.e_marks(usize(line));
   if((pos >= max), { return false; });
-  (i32(state.*._src_bytes(usize(pos))) == i32(0x3E))
+  (i32(state.*._src_bytes.bytes(usize(pos))) == i32(0x3E))
 });
 
 // Search [-+*][\n ], returns next pos after marker on success, or -1 on fail.
@@ -29,7 +29,7 @@ skip_bullet_list_marker :: (fn(state: *(StateBlock), start_line: i32) -> i32)({
 
   if((pos >= max), { return i32(-1); });
 
-  (marker : i32) = i32(state.*._src_bytes(usize(pos)));
+  (marker : i32) = i32(state.*._src_bytes.bytes(usize(pos)));
   pos = (pos + i32(1));
 
   // Check bullet: *, -, +
@@ -38,7 +38,7 @@ skip_bullet_list_marker :: (fn(state: *(StateBlock), start_line: i32) -> i32)({
   });
 
   if((pos < max), {
-    (ch : i32) = i32(state.*._src_bytes(usize(pos)));
+    (ch : i32) = i32(state.*._src_bytes.bytes(usize(pos)));
     if(!(is_space(ch)), {
       return i32(-1);
     });
@@ -56,7 +56,7 @@ skip_ordered_list_marker :: (fn(state: *(StateBlock), start_line: i32) -> i32)({
   // List marker should have at least 2 chars (digit + dot)
   if(((pos + i32(1)) >= max), { return i32(-1); });
 
-  (ch : i32) = i32(state.*._src_bytes(usize(pos)));
+  (ch : i32) = i32(state.*._src_bytes.bytes(usize(pos)));
   pos = (pos + i32(1));
 
   if(((ch < i32(0x30)) || (ch > i32(0x39))), { return i32(-1); });
@@ -65,7 +65,7 @@ skip_ordered_list_marker :: (fn(state: *(StateBlock), start_line: i32) -> i32)({
   while !(found_end), {
     if((pos >= max), { return i32(-1); });
 
-    ch = i32(state.*._src_bytes(usize(pos)));
+    ch = i32(state.*._src_bytes.bytes(usize(pos)));
     pos = (pos + i32(1));
 
     if(((ch >= i32(0x30)) && (ch <= i32(0x39))), {
@@ -79,7 +79,7 @@ skip_ordered_list_marker :: (fn(state: *(StateBlock), start_line: i32) -> i32)({
   };
 
   if((pos < max), {
-    ch = i32(state.*._src_bytes(usize(pos)));
+    ch = i32(state.*._src_bytes.bytes(usize(pos)));
     if(!(is_space(ch)), { return i32(-1); });
   });
 
@@ -111,7 +111,7 @@ parse_ordered_value :: (fn(state: *(StateBlock), start: i32, end: i32) -> i32)({
   (marker_value : i32) = i32(0);
   (parse_pos : i32) = start;
   while (parse_pos < end), {
-    (digit : i32) = (i32(state.*._src_bytes(usize(parse_pos))) - i32(0x30));
+    (digit : i32) = (i32(state.*._src_bytes.bytes(usize(parse_pos))) - i32(0x30));
     marker_value = ((marker_value * i32(10)) + digit);
     parse_pos = (parse_pos + i32(1));
   };
@@ -178,7 +178,7 @@ list :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: bool) 
   if(silent, { return true; });
 
   // We should terminate list on style change. Remember first one to compare.
-  (marker_char_code : i32) = i32(state.*._src_bytes(usize((pos_after_marker - i32(1)))));
+  (marker_char_code : i32) = i32(state.*._src_bytes.bytes(usize((pos_after_marker - i32(1)))));
 
   // Build markup string from marker char
   (markup_str : String) = cond(
@@ -230,7 +230,7 @@ list :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: bool) 
     // Skip whitespace after marker to find content start
     (ws_done : bool) = false;
     while ((pos < max) && !(ws_done)), {
-      (ch : i32) = i32(state.*._src_bytes(usize(pos)));
+      (ch : i32) = i32(state.*._src_bytes.bytes(usize(pos)));
       cond(
         (ch == i32(0x09)) => {
           offset = (offset + (i32(4) - ((offset + state.*.bs_count(usize(next_line))) % i32(4))));
@@ -370,7 +370,7 @@ list :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: bool) 
 
     if(!(list_done), {
       // Check marker style hasn't changed
-      if((marker_char_code != i32(state.*._src_bytes(usize((pos_after_marker - i32(1)))))), {
+      if((marker_char_code != i32(state.*._src_bytes.bytes(usize((pos_after_marker - i32(1)))))), {
         list_done = true;
       });
     });
