@@ -157,7 +157,7 @@ main :: (fn() -> unit)({
   );
   if(html_enabled, { opts.html = true; });
   opts.typographer = typographer_enabled;
-  if(no_lang_prefix, { opts.lang_prefix = ``; });
+  if(no_lang_prefix, { opts.lang_prefix = String.new(); });
   md := new_markdown_it_with_options(opts);
 
   match(file_path,

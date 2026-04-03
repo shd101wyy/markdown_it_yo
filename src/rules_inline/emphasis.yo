@@ -5,9 +5,14 @@
 open import "std/string";
 { ArrayList } :: import "std/collections/array_list";
 { Token, TokenType } :: import "../token.yo";
-{ from_code_point } :: import "../common/char_utils.yo";
 { StateInline, Delimiter, TokenMeta, ScanDelimsResult } :: import "./state_inline.yo";
 { flush_pending, inline_push_token } :: import "./inline_helpers.yo";
+
+// Cached marker strings to avoid per-call allocation
+_STAR := String.from("*");
+_UNDERSCORE := String.from("_");
+_DOUBLE_STAR := String.from("**");
+_DOUBLE_UNDERSCORE := String.from("__");
 
 // Insert each marker as a separate text token, and add it to delimiter list
 emphasis_tokenize :: (fn(state: *(StateInline), silent: bool) -> bool)({
@@ -23,7 +28,10 @@ emphasis_tokenize :: (fn(state: *(StateInline), silent: bool) -> bool)({
   });
 
   (scanned : ScanDelimsResult) = state.*.scan_delims(state.*.pos, (marker == i32(0x2A)));
-  (marker_str : String) = from_code_point(marker);
+  (marker_str : String) = cond(
+    (marker == i32(0x2A)) => _STAR,
+    true => _UNDERSCORE
+  );
 
   (i : i32) = i32(0);
   while (i < scanned.length), {
@@ -75,13 +83,15 @@ _post_process_emphasis :: (fn(tokens: ArrayList(Token), delimiters: ArrayList(De
         });
       });
 
-      (ch : String) = from_code_point(start_delim.marker);
       (markup_str : String) = cond(
         is_strong => cond(
-          (start_delim.marker == i32(0x2A)) => `**`,
-          true => `__`
+          (start_delim.marker == i32(0x2A)) => _DOUBLE_STAR,
+          true => _DOUBLE_UNDERSCORE
         ),
-        true => ch
+        true => cond(
+          (start_delim.marker == i32(0x2A)) => _STAR,
+          true => _UNDERSCORE
+        )
       );
 
       // Opening token
@@ -92,7 +102,7 @@ _post_process_emphasis :: (fn(tokens: ArrayList(Token), delimiters: ArrayList(De
       token_o.*.tag = o_tag;
       token_o.*.nesting = i32(1);
       token_o.*.markup = markup_str;
-      token_o.*.content = ``;
+      token_o.*.content = String.new();
 
       // Closing token
       (token_c : *(Token)) = &(tokens(usize(end_delim.token_idx)));
@@ -102,17 +112,17 @@ _post_process_emphasis :: (fn(tokens: ArrayList(Token), delimiters: ArrayList(De
       token_c.*.tag = c_tag;
       token_c.*.nesting = i32(-1);
       token_c.*.markup = markup_str;
-      token_c.*.content = ``;
+      token_c.*.content = String.new();
 
       // If strong, clear inner delimiter tokens
       if(is_strong, {
         (prev_delim : Delimiter) = delimiters(usize((i - i32(1))));
         (tok1 : *(Token)) = &(tokens(usize(prev_delim.token_idx)));
-        tok1.*.content = ``;
+        tok1.*.content = String.new();
 
         (next_end_delim : Delimiter) = delimiters(usize((start_delim.end + i32(1))));
         (tok2 : *(Token)) = &(tokens(usize(next_end_delim.token_idx)));
-        tok2.*.content = ``;
+        tok2.*.content = String.new();
 
         i = (i - i32(1));
       });

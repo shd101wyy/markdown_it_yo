@@ -4,7 +4,6 @@
 
 open import "std/string";
 { ArrayList } :: import "std/collections/array_list";
-{ Regex, RegexMatch } :: import "std/regex";
 { Token, TokenType } :: import "../token.yo";
 { is_valid_entity_code, from_code_point } :: import "../common/char_utils.yo";
 { decode_html } :: import "../common/entities.yo";
@@ -12,20 +11,33 @@ open import "std/string";
 { StateInline } :: import "./state_inline.yo";
 { flush_pending, inline_push_token } :: import "./inline_helpers.yo";
 
-// Numeric entity: &#123; or &#xAF;
-_DIGITAL_RE := Regex.new(`^&#((?:x[a-f0-9]{1,6}|[0-9]{1,7}));`, `i`).unwrap();
+// Manual matching replaces regex for performance.
+// Numeric: &#(x[a-fA-F0-9]{1,6}|[0-9]{1,7});
+// Named:   &([a-zA-Z][a-zA-Z0-9]{1,31});
 
-// Named entity: &quot;
-_NAMED_RE := Regex.new(`^&([a-z][a-z0-9]{1,31});`, `i`).unwrap();
+_is_hex_digit :: (fn(b: u8) -> bool)(
+  cond(
+    ((b >= u8(0x30)) && (b <= u8(0x39))) => true,
+    ((b >= u8(0x61)) && (b <= u8(0x66))) => true,
+    ((b >= u8(0x41)) && (b <= u8(0x46))) => true,
+    true => false
+  )
+);
 
-// Parse a hex string to i32
-_parse_hex :: (fn(s: String) -> i32)({
-  (bytes : ArrayList(u8)) = s.as_bytes();
+_is_alpha :: (fn(b: u8) -> bool)(
+  (((b >= u8(0x61)) && (b <= u8(0x7A))) || ((b >= u8(0x41)) && (b <= u8(0x5A))))
+);
+
+_is_alnum :: (fn(b: u8) -> bool)(
+  ((((b >= u8(0x61)) && (b <= u8(0x7A))) || ((b >= u8(0x41)) && (b <= u8(0x5A)))) || ((b >= u8(0x30)) && (b <= u8(0x39))))
+);
+
+// Parse hex digits from bytes, returns i32
+_parse_hex_bytes :: (fn(bytes: ArrayList(u8), start: i32, end: i32) -> i32)({
   (result : i32) = i32(0);
-  (i : usize) = usize(0);
-  (len : usize) = bytes.len();
-  while (i < len), {
-    (ch : u8) = bytes(i);
+  (i : i32) = start;
+  while (i < end), {
+    (ch : u8) = bytes(usize(i));
     (digit : i32) = cond(
       ((ch >= u8(0x30)) && (ch <= u8(0x39))) => (i32(ch) - i32(0x30)),
       ((ch >= u8(0x61)) && (ch <= u8(0x66))) => ((i32(ch) - i32(0x61)) + i32(10)),
@@ -33,22 +45,19 @@ _parse_hex :: (fn(s: String) -> i32)({
       true => i32(0)
     );
     result = ((result * i32(16)) + digit);
-    i = (i + usize(1));
+    i = (i + i32(1));
   };
   result
 });
 
-// Parse a decimal string to i32
-_parse_dec :: (fn(s: String) -> i32)({
-  (bytes : ArrayList(u8)) = s.as_bytes();
+// Parse decimal digits from bytes, returns i32
+_parse_dec_bytes :: (fn(bytes: ArrayList(u8), start: i32, end: i32) -> i32)({
   (result : i32) = i32(0);
-  (i : usize) = usize(0);
-  (len : usize) = bytes.len();
-  while (i < len), {
-    (ch : u8) = bytes(i);
-    (digit : i32) = (i32(ch) - i32(0x30));
-    result = ((result * i32(10)) + digit);
-    i = (i + usize(1));
+  (i : i32) = start;
+  while (i < end), {
+    (ch : u8) = bytes(usize(i));
+    result = ((result * i32(10)) + (i32(ch) - i32(0x30)));
+    i = (i + i32(1));
   };
   result
 });
@@ -69,25 +78,33 @@ entity :: (fn(state: *(StateInline), silent: bool) -> bool)({
 
   if((ch == i32(0x23)), {
     // Numeric entity: &#...;
-    (tail : String) = byte_substring(state.*._src_bytes, pos, max);
-    (m : Option(RegexMatch)) = _DIGITAL_RE.exec(tail);
-    match(m,
-      .Some(match_result) => {
-        if(!(silent), {
-          (group1 : String) = match_result.group(usize(1)).unwrap();
-          (first_byte : ArrayList(u8)) = group1.as_bytes();
-          (first_ch : u8) = first_byte(usize(0));
-          (code : i32) = cond(
-            ((first_ch == u8(0x78)) || (first_ch == u8(0x58))) =>
-              _parse_hex(group1.substring(usize(1), group1.len())),
-            true => _parse_dec(group1)
-          );
+    if(((pos + i32(2)) >= max), { return false; });
+    (ch2 : u8) = state.*._src_bytes(usize((pos + i32(2))));
+    (is_hex : bool) = ((ch2 == u8(0x78)) || (ch2 == u8(0x58)));
+    (is_digit : bool) = ((ch2 >= u8(0x30)) && (ch2 <= u8(0x39)));
+    if((!(is_hex) && !(is_digit)), {
+      return false;
+    });
 
+    // Manual match: &#x[0-9a-fA-F]{1,6}; or &#[0-9]{1,7};
+    if(is_hex, {
+      // Hex: scan pos+3.. for hex digits, then ';'
+      (scan : i32) = (pos + i32(3));
+      (scan_max : i32) = cond((max < (pos + i32(10))) => max, true => (pos + i32(10)));
+      while ((scan < scan_max) && _is_hex_digit(state.*._src_bytes(usize(scan)))), {
+        scan = (scan + i32(1));
+      };
+      (digit_count : i32) = (scan - (pos + i32(3)));
+      if(((((digit_count >= i32(1)) && (digit_count <= i32(6))) && (scan < max)) && (state.*._src_bytes(usize(scan)) == u8(0x3B))), {
+        // Match: &#xHHHH;
+        (match_end : i32) = (scan + i32(1));
+        if(!(silent), {
+          (code : i32) = _parse_hex_bytes(state.*._src_bytes, (pos + i32(3)), scan);
           (content : String) = cond(
             is_valid_entity_code(code) => from_code_point(code),
             true => from_code_point(i32(0xFFFD))
           );
-
+          (markup : String) = byte_substring(state.*._src_bytes, pos, match_end);
           (token : Token) = Token(
             type_name: .TT_TEXT_SPECIAL,
             tag: "",
@@ -96,7 +113,7 @@ entity :: (fn(state: *(StateInline), silent: bool) -> bool)({
             map: .None,
             children: .None,
             content: content,
-            markup: match_result.value(),
+            markup: markup,
             info: `entity`,
             block: false,
             hidden: false,
@@ -104,43 +121,88 @@ entity :: (fn(state: *(StateInline), silent: bool) -> bool)({
           );
           inline_push_token(state, token);
         });
-        state.*.pos = (state.*.pos + i32(match_result.value().len()));
+        state.*.pos = match_end;
         return true;
-      },
-      .None => ()
-    );
-  }, {
-    // Named entity: &quot;
-    (tail : String) = byte_substring(state.*._src_bytes, pos, max);
-    (m : Option(RegexMatch)) = _NAMED_RE.exec(tail);
-    match(m,
-      .Some(match_result) => {
-        (matched : String) = match_result.value();
-        (decoded : String) = decode_html(matched);
-        if(!(decoded == matched), {
-          if(!(silent), {
-            (token : Token) = Token(
-              type_name: .TT_TEXT_SPECIAL,
-              tag: "",
-              nesting: i32(0),
-              attrs: .None,
-              map: .None,
-              children: .None,
-              content: decoded,
-              markup: matched,
-              info: `entity`,
-              block: false,
-              hidden: false,
-              level: i32(0)
-            );
-            inline_push_token(state, token);
-          });
-          state.*.pos = (state.*.pos + i32(matched.len()));
-          return true;
+      });
+    }, {
+      // Decimal: scan pos+2.. for digits, then ';'
+      (scan : i32) = (pos + i32(2));
+      (scan_max : i32) = cond((max < (pos + i32(11))) => max, true => (pos + i32(11)));
+      while ((scan < scan_max) && ((state.*._src_bytes(usize(scan)) >= u8(0x30)) && (state.*._src_bytes(usize(scan)) <= u8(0x39)))), {
+        scan = (scan + i32(1));
+      };
+      (digit_count : i32) = (scan - (pos + i32(2)));
+      if(((((digit_count >= i32(1)) && (digit_count <= i32(7))) && (scan < max)) && (state.*._src_bytes(usize(scan)) == u8(0x3B))), {
+        // Match: &#NNNNNNN;
+        (match_end : i32) = (scan + i32(1));
+        if(!(silent), {
+          (code : i32) = _parse_dec_bytes(state.*._src_bytes, (pos + i32(2)), scan);
+          (content : String) = cond(
+            is_valid_entity_code(code) => from_code_point(code),
+            true => from_code_point(i32(0xFFFD))
+          );
+          (markup : String) = byte_substring(state.*._src_bytes, pos, match_end);
+          (token : Token) = Token(
+            type_name: .TT_TEXT_SPECIAL,
+            tag: "",
+            nesting: i32(0),
+            attrs: .None,
+            map: .None,
+            children: .None,
+            content: content,
+            markup: markup,
+            info: `entity`,
+            block: false,
+            hidden: false,
+            level: i32(0)
+          );
+          inline_push_token(state, token);
         });
-      },
-      .None => ()
-    );
+        state.*.pos = match_end;
+        return true;
+      });
+    });
+  }, {
+    // Named entity: &[a-zA-Z][a-zA-Z0-9]{1,31};
+    (ch_u8 : u8) = u8(ch);
+    if(!(_is_alpha(ch_u8)), {
+      return false;
+    });
+
+    // Scan for alphanumeric chars then ';'
+    (scan : i32) = (pos + i32(2));
+    (scan_max : i32) = cond((max < (pos + i32(34))) => max, true => (pos + i32(34)));
+    while ((scan < scan_max) && _is_alnum(state.*._src_bytes(usize(scan)))), {
+      scan = (scan + i32(1));
+    };
+    (name_len : i32) = (scan - (pos + i32(1)));
+    if(((((name_len >= i32(2)) && (name_len <= i32(32))) && (scan < max)) && (state.*._src_bytes(usize(scan)) == u8(0x3B))), {
+      // Potential match: &name;
+      (match_end : i32) = (scan + i32(1));
+      (matched : String) = byte_substring(state.*._src_bytes, pos, match_end);
+      (decoded : String) = decode_html(matched);
+      if(!(decoded == matched), {
+        if(!(silent), {
+          (token : Token) = Token(
+            type_name: .TT_TEXT_SPECIAL,
+            tag: "",
+            nesting: i32(0),
+            attrs: .None,
+            map: .None,
+            children: .None,
+            content: decoded,
+            markup: matched,
+            info: `entity`,
+            block: false,
+            hidden: false,
+            level: i32(0)
+          );
+          inline_push_token(state, token);
+        });
+        state.*.pos = match_end;
+        return true;
+      });
+    });
   });
 
   false

@@ -22,7 +22,7 @@ parse_link_destination :: (fn(input: String, start: i32, max: i32) -> LinkDestRe
   {
     (bytes : ArrayList(u8)) = input.as_bytes();
     (pos : i32) = start;
-    (result : LinkDestResult) = LinkDestResult(ok: false, pos: i32(0), str: ``);
+    (result : LinkDestResult) = LinkDestResult(ok: false, pos: i32(0), str: String.new());
 
     if((pos >= max), {
       return result;

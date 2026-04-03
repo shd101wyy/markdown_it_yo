@@ -79,7 +79,10 @@ _core_inline :: (fn(state: *(StateCore), inline_parser: ParserInline, html_enabl
   while (i < len), {
     (token : *(Token)) = &(state.*.tokens(usize(i)));
     if((token.*.type_name == .TT_INLINE), {
-      (children : ArrayList(Token)) = ArrayList(Token).new();
+      // Estimate ~1 inline token per 5 bytes of content
+      (content_len : usize) = token.*.content.bytes_len();
+      (est_children : usize) = ((content_len / usize(5)) + usize(4));
+      (children : ArrayList(Token)) = ArrayList(Token).with_capacity(est_children);
       inline_parser.parse(token.*.content, state.*.env, children, html_enabled, enable_strikethrough);
       token.*.children = .Some(children);
     });

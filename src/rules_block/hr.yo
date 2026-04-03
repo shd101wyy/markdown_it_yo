@@ -52,7 +52,7 @@ hr :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: bool) ->
 
   // Build markup string (repeat the marker character cnt+1 times matches JS Array(cnt+1).join())
   // Actually JS Array(cnt+1).join(char) produces cnt copies of char
-  (markup : String) = ``;
+  (markup : String) = String.new();
   (mi : i32) = i32(0);
   while (mi < cnt), {
     (&markup).push_byte(u8(marker));

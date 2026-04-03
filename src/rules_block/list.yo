@@ -187,7 +187,7 @@ list :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: bool) 
     (marker_char_code == i32(0x2B)) => `+`,
     (marker_char_code == i32(0x2E)) => `.`,
     (marker_char_code == i32(0x29)) => `)`,
-    true => ``
+    true => String.new()
   );
 
   // Start list

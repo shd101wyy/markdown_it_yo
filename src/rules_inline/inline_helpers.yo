@@ -10,6 +10,7 @@ open import "std/string";
 InlineRuleFn :: (fn(state: *(StateInline), silent: bool) -> bool);
 
 // Flush pending text into a text token.
+// Uses clone+clear to reuse the pending buffer allocation.
 flush_pending :: (fn(state: *(StateInline)) -> unit)({
   if((state.*.pending.len() > usize(0)), {
     (token : Token) = Token(
@@ -19,9 +20,9 @@ flush_pending :: (fn(state: *(StateInline)) -> unit)({
       attrs: .None,
       map: .None,
       children: .None,
-      content: state.*.pending,
-      markup: ``,
-      info: ``,
+      content: state.*.pending.clone(),
+      markup: String.new(),
+      info: String.new(),
       block: false,
       hidden: false,
       level: state.*.pending_level
@@ -29,7 +30,7 @@ flush_pending :: (fn(state: *(StateInline)) -> unit)({
     _ := state.*.tokens.push(token);
     (none_meta : Option(TokenMeta)) = .None;
     _ := state.*.tokens_meta.push(none_meta);
-    state.*.pending = ``;
+    state.*.pending.clear();
   });
 });
 
@@ -55,9 +56,9 @@ state_push :: (fn(state: *(StateInline), type_name: TokenType, tag: str, nesting
     attrs: .None,
     map: .None,
     children: .None,
-    content: ``,
-    markup: ``,
-    info: ``,
+    content: String.new(),
+    markup: String.new(),
+    info: String.new(),
     block: false,
     hidden: false,
     level: i32(0)

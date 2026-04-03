@@ -4,7 +4,6 @@
 
 open import "std/string";
 { ArrayList } :: import "std/collections/array_list";
-{ HashMap } :: import "std/collections/hash_map";
 { StateInline, Delimiter, TokenMeta } :: import "./state_inline.yo";
 
 process_delimiters :: (fn(delimiters: ArrayList(Delimiter)) -> unit)({
@@ -15,12 +14,15 @@ process_delimiters :: (fn(delimiters: ArrayList(Delimiter)) -> unit)({
 
   // openers_bottom: for each marker, stores 6 lower bounds
   // indices: [close%0, close%1, close%2, open%0, open%1, open%2]
-  (openers_bottom : HashMap(i32, ArrayList(i32))) = HashMap(i32, ArrayList(i32)).new();
+  // Use parallel arrays instead of HashMap for fewer allocations:
+  // ob_markers stores unique marker chars, ob_bottoms stores 6 ints per marker (flat)
+  (ob_markers : ArrayList(i32)) = ArrayList(i32).with_capacity(usize(4));
+  (ob_bottoms : ArrayList(i32)) = ArrayList(i32).with_capacity(usize(24));
 
   // header_idx is the first delimiter of the current delimiter run
   (header_idx : i32) = i32(0);
   (last_token_idx : i32) = i32(-2);
-  (jumps : ArrayList(i32)) = ArrayList(i32).new();
+  (jumps : ArrayList(i32)) = ArrayList(i32).with_capacity(usize(max));
 
   (closer_idx : i32) = i32(0);
   while (closer_idx < max), {
@@ -36,28 +38,37 @@ process_delimiters :: (fn(delimiters: ArrayList(Delimiter)) -> unit)({
     last_token_idx = closer.token_idx;
 
     if(closer.close, {
-      // Get or create openers_bottom entry for this marker
-      (need_init : bool) = match(openers_bottom.get(closer.marker),
-        .None => true,
-        .Some(_) => false
-      );
-      if(need_init, {
-        (bottom : ArrayList(i32)) = ArrayList(i32).new();
-        _ := bottom.push(i32(-1));
-        _ := bottom.push(i32(-1));
-        _ := bottom.push(i32(-1));
-        _ := bottom.push(i32(-1));
-        _ := bottom.push(i32(-1));
-        _ := bottom.push(i32(-1));
-        openers_bottom.set(closer.marker, bottom);
+      // Find marker index in ob_markers, or create new entry
+      (marker_slot : i32) = i32(-1);
+      {
+        (si : i32) = i32(0);
+        (smax : i32) = i32(ob_markers.len());
+        while (si < smax), {
+          if((ob_markers(usize(si)) == closer.marker), {
+            marker_slot = si;
+            si = smax;
+          }, {
+            si = (si + i32(1));
+          });
+        };
+      };
+      if((marker_slot == i32(-1)), {
+        marker_slot = i32(ob_markers.len());
+        _ := ob_markers.push(closer.marker);
+        _ := ob_bottoms.push(i32(-1));
+        _ := ob_bottoms.push(i32(-1));
+        _ := ob_bottoms.push(i32(-1));
+        _ := ob_bottoms.push(i32(-1));
+        _ := ob_bottoms.push(i32(-1));
+        _ := ob_bottoms.push(i32(-1));
       });
 
-      (bottom_arr : ArrayList(i32)) = openers_bottom.get(closer.marker).unwrap();
       (bottom_idx : i32) = cond(
         closer.open => (i32(3) + (closer.length % i32(3))),
         true => (closer.length % i32(3))
       );
-      (min_opener_idx : i32) = bottom_arr(usize(bottom_idx));
+      (flat_idx : usize) = usize(((marker_slot * i32(6)) + bottom_idx));
+      (min_opener_idx : i32) = ob_bottoms(flat_idx);
 
       (opener_idx : i32) = ((header_idx - jumps(usize(header_idx))) - i32(1));
       (new_min_opener_idx : i32) = opener_idx;
@@ -113,7 +124,7 @@ process_delimiters :: (fn(delimiters: ArrayList(Delimiter)) -> unit)({
       };
 
       if((new_min_opener_idx != i32(-1)), {
-        &(bottom_arr(usize(bottom_idx))).* = new_min_opener_idx;
+        &(ob_bottoms(flat_idx)).* = new_min_opener_idx;
       });
     });
 

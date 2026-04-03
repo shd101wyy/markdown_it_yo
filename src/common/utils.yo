@@ -95,9 +95,9 @@ escape_html :: (fn(input: String) -> String)(
 );
 
 // Append HTML-escaped version of input directly to result buffer (no intermediate String)
-escape_html_to :: (fn(result: *(String), input: String) -> unit)(
+escape_html_to :: (fn(result: *(String), input: *(String)) -> unit)(
   {
-    (bytes : ArrayList(u8)) = input.as_bytes();
+    (bytes : ArrayList(u8)) = input.*.as_bytes();
     (i : usize) = usize(0);
     (len : usize) = bytes.len();
 
@@ -121,7 +121,7 @@ escape_html_to :: (fn(result: *(String), input: String) -> unit)(
     );
 
     if(!(has_special), {
-      result.push_string(input);
+      result.push_string(input.*);
       return ();
     });
 

@@ -131,9 +131,9 @@ impl(Token,
       nesting: nesting,
       level: i32(0),
       children: .None,
-      content: ``,
-      markup: ``,
-      info: ``,
+      content: String.new(),
+      markup: String.new(),
+      info: String.new(),
       block: false,
       hidden: false
     )

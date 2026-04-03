@@ -5,9 +5,12 @@
 open import "std/string";
 { ArrayList } :: import "std/collections/array_list";
 { Token, TokenType } :: import "../token.yo";
-{ from_code_point } :: import "../common/char_utils.yo";
 { StateInline, Delimiter, TokenMeta, ScanDelimsResult } :: import "./state_inline.yo";
 { flush_pending, inline_push_token } :: import "./inline_helpers.yo";
+
+// Cached marker strings
+_TILDE := String.from("~");
+_DOUBLE_TILDE := String.from("~~");
 
 // Insert each marker as a separate text token, and add it to delimiter list
 strikethrough_tokenize :: (fn(state: *(StateInline), silent: bool) -> bool)({
@@ -24,7 +27,6 @@ strikethrough_tokenize :: (fn(state: *(StateInline), silent: bool) -> bool)({
 
   (scanned : ScanDelimsResult) = state.*.scan_delims(state.*.pos, true);
   (len : i32) = scanned.length;
-  (ch_str : String) = from_code_point(marker);
 
   if((len < i32(2)), {
     return false;
@@ -33,7 +35,7 @@ strikethrough_tokenize :: (fn(state: *(StateInline), silent: bool) -> bool)({
   // If odd count, push one single marker text token and reduce len
   if(((len % i32(2)) != i32(0)), {
     (token : Token) = Token.new(.TT_TEXT, "", i32(0));
-    token.content = ch_str;
+    token.content = _TILDE;
     token.level = state.*.level;
     inline_push_token(state, token);
     len = (len - i32(1));
@@ -43,7 +45,7 @@ strikethrough_tokenize :: (fn(state: *(StateInline), silent: bool) -> bool)({
   (i : i32) = i32(0);
   while (i < len), {
     (token : Token) = Token.new(.TT_TEXT, "", i32(0));
-    token.content = `${ch_str}${ch_str}`;
+    token.content = _DOUBLE_TILDE;
     token.level = state.*.level;
     inline_push_token(state, token);
 
@@ -82,21 +84,21 @@ _post_process_strikethrough :: (fn(tokens: ArrayList(Token), delimiters: ArrayLi
       (s_tag : str) = "s";
       token_o.*.tag = s_tag;
       token_o.*.nesting = i32(1);
-      token_o.*.markup = `~~`;
-      token_o.*.content = ``;
+      token_o.*.markup = _DOUBLE_TILDE;
+      token_o.*.content = String.new();
 
       // Closing token
       (token_c : *(Token)) = &(tokens(usize(end_delim.token_idx)));
       token_c.*.type_name = .TT_S_CLOSE;
       token_c.*.tag = s_tag;
       token_c.*.nesting = i32(-1);
-      token_c.*.markup = `~~`;
-      token_c.*.content = ``;
+      token_c.*.markup = _DOUBLE_TILDE;
+      token_c.*.content = String.new();
 
       // Check for lone marker before closing token
       if(((end_delim.token_idx - i32(1)) >= i32(0)), {
         (prev_tok : *(Token)) = &(tokens(usize((end_delim.token_idx - i32(1)))));
-        if(((prev_tok.*.type_name == .TT_TEXT) && (prev_tok.*.content == `~`)), {
+        if(((prev_tok.*.type_name == .TT_TEXT) && (prev_tok.*.content == _TILDE)), {
           _ := lone_markers.push((end_delim.token_idx - i32(1)));
         });
       });

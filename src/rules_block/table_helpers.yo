@@ -21,7 +21,7 @@ escaped_split :: (fn(input: String) -> ArrayList(String))({
   (pos : i32) = i32(0);
   (is_escaped : bool) = false;
   (last_pos : i32) = i32(0);
-  (current : String) = ``;
+  (current : String) = String.new();
 
   while (pos < max), {
     (ch : i32) = i32(bytes(usize(pos)));
@@ -34,7 +34,7 @@ escaped_split :: (fn(input: String) -> ArrayList(String))({
         (seg : String) = String.from_bytes(seg_bytes);
         (&current).push_string(seg);
         _ := result.push(current);
-        current = ``;
+        current = String.new();
         last_pos = (pos + i32(1));
       }, {
         // escaped pipe '\|'

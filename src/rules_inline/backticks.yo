@@ -32,7 +32,10 @@ backtick :: (fn(state: *(StateInline), silent: bool) -> bool)({
   // Check cache: if we already scanned and found no closer at this length,
   // skip if the cached position is past current start
   if(state.*.backticks_scanned, {
-    (cached : Option(i32)) = state.*.backticks.get(opener_length);
+    (cached : Option(i32)) = match(state.*.backticks,
+      .Some(bt) => bt.get(opener_length),
+      .None => .None
+    );
     match(cached,
       .Some(cached_pos) => {
         if((cached_pos <= start), {
@@ -105,7 +108,7 @@ backtick :: (fn(state: *(StateInline), silent: bool) -> bool)({
             children: .None,
             content: content,
             markup: marker,
-            info: ``,
+            info: String.new(),
             block: false,
             hidden: false,
             level: i32(0)
@@ -117,7 +120,16 @@ backtick :: (fn(state: *(StateInline), silent: bool) -> bool)({
       });
 
       // Different length found, cache it as upper limit
-      state.*.backticks.set(closer_length, match_start);
+      match(state.*.backticks,
+        .Some(bt) => {
+          _ := bt.set(closer_length, match_start);
+        },
+        .None => {
+          (bt : HashMap(i32, i32)) = HashMap(i32, i32).new();
+          _ := bt.set(closer_length, match_start);
+          state.*.backticks = .Some(bt);
+        }
+      );
     });
   };
 

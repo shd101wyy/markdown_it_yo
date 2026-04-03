@@ -85,7 +85,7 @@ impl(forall(F : Type), Ruler(F),
   // Build rules lookup cache
   _compile : (fn(self: *(Self)) -> unit)({
     (chains : ArrayList(String)) = ArrayList(String).new();
-    chains.push(``);
+    chains.push(String.new());
 
     // Collect unique chain names from enabled rules
     (i : i32) = i32(0);

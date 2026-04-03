@@ -4,31 +4,172 @@
 
 open import "std/string";
 { ArrayList } :: import "std/collections/array_list";
-{ Regex } :: import "std/regex";
 { StateInline } :: import "./state_inline.yo";
 { state_push } :: import "./inline_helpers.yo";
 { Token, StringPair, TokenType } :: import "../token.yo";
 { validate_link, normalize_link, normalize_link_text } :: import "../common/link_utils.yo";
+{ byte_substring } :: import "../common/utils.yo";
 
-// Cached regex patterns (compiled once at startup)
-_autolink_uri_re := Regex.new(`^([a-zA-Z][a-zA-Z0-9+.\\-]{1,31}):([^\\s<>]*)$`, ``).unwrap();
-_autolink_email_re := Regex.new(`^([a-zA-Z0-9.!#$%&'*+/=?^_\x60{|}~\\-]+@[a-zA-Z0-9](?:[a-zA-Z0-9\\-]{0,61}[a-zA-Z0-9])?(?:\\.[a-zA-Z0-9](?:[a-zA-Z0-9\\-]{0,61}[a-zA-Z0-9])?)*)$`, ``).unwrap();
+// Manual URI autolink check: [a-zA-Z][a-zA-Z0-9+.\-]{1,31}:[^\s<>]*
+// Works directly on byte range to avoid String allocation for non-matches
+_is_autolink_uri_bytes :: (fn(bytes: ArrayList(u8), start: i32, end: i32) -> bool)({
+  (len : i32) = (end - start);
+  if((len < i32(2)), { return false; }); // minimum: "a:"
 
-// Autolink URI pattern: <scheme:path>
-_is_autolink_uri :: (fn(url: String) -> bool)(
-  match(_autolink_uri_re.exec(url),
-    .Some(_) => true,
-    .None => false
-  )
-);
+  // First char must be [a-zA-Z]
+  (first : u8) = bytes(usize(start));
+  (is_alpha : bool) = (((first >= u8(0x61)) && (first <= u8(0x7A))) || ((first >= u8(0x41)) && (first <= u8(0x5A))));
+  if(!(is_alpha), { return false; });
 
-// Email pattern
-_is_email :: (fn(url: String) -> bool)(
-  match(_autolink_email_re.exec(url),
-    .Some(_) => true,
-    .None => false
-  )
-);
+  // Scan for scheme chars [a-zA-Z0-9+.\-] then ':'
+  (i : i32) = (start + i32(1));
+  (scheme_end : i32) = cond(((start + i32(33)) < end) => (start + i32(33)), true => end);
+  while (i < scheme_end), {
+    (ch : u8) = bytes(usize(i));
+    if((ch == u8(0x3A)), {
+      // Found ':' — scheme must be at least 2 chars (first + 1..31)
+      (scheme_len : i32) = (i - start);
+      if(((scheme_len >= i32(2)) && (scheme_len <= i32(32))), {
+        // Check rest is [^\s<>]
+        (j : i32) = (i + i32(1));
+        while (j < end), {
+          (rc : u8) = bytes(usize(j));
+          // Reject whitespace (\x00-\x20), '<', '>'
+          if((((rc <= u8(0x20)) || (rc == u8(0x3C))) || (rc == u8(0x3E))), {
+            return false;
+          });
+          j = (j + i32(1));
+        };
+        return true;
+      });
+      return false;
+    });
+    // Check scheme char class
+    (is_scheme_char : bool) = cond(
+      ((ch >= u8(0x61)) && (ch <= u8(0x7A))) => true,
+      ((ch >= u8(0x41)) && (ch <= u8(0x5A))) => true,
+      ((ch >= u8(0x30)) && (ch <= u8(0x39))) => true,
+      (ch == u8(0x2B)) => true, // '+'
+      (ch == u8(0x2E)) => true, // '.'
+      (ch == u8(0x2D)) => true, // '-'
+      true => false
+    );
+    if(!(is_scheme_char), { return false; });
+    i = (i + i32(1));
+  };
+  false
+});
+
+// Manual email check: [a-zA-Z0-9.!#$%&'*+/=?^_`{|}~\-]+@domain
+_is_email_bytes :: (fn(bytes: ArrayList(u8), start: i32, end: i32) -> bool)({
+  (len : i32) = (end - start);
+  if((len < i32(3)), { return false; }); // minimum: "a@b"
+
+  // Find '@'
+  (at_pos : i32) = i32(-1);
+  (i : i32) = start;
+  while (i < end), {
+    if((bytes(usize(i)) == u8(0x40)), {
+      at_pos = i;
+      i = end; // break
+    }, {
+      i = (i + i32(1));
+    });
+  };
+  if((at_pos == i32(-1)), { return false; });
+  if((at_pos == start), { return false; }); // no local part
+
+  // Check local part: [a-zA-Z0-9.!#$%&'*+/=?^_`{|}~\-]+
+  (j : i32) = start;
+  while (j < at_pos), {
+    (ch : u8) = bytes(usize(j));
+    (ok : bool) = cond(
+      ((ch >= u8(0x61)) && (ch <= u8(0x7A))) => true,
+      ((ch >= u8(0x41)) && (ch <= u8(0x5A))) => true,
+      ((ch >= u8(0x30)) && (ch <= u8(0x39))) => true,
+      (ch == u8(0x2E)) => true, // .
+      (ch == u8(0x21)) => true, // !
+      (ch == u8(0x23)) => true, // #
+      (ch == u8(0x24)) => true, // $
+      (ch == u8(0x25)) => true, // %
+      (ch == u8(0x26)) => true, // &
+      (ch == u8(0x27)) => true, // '
+      (ch == u8(0x2A)) => true, // *
+      (ch == u8(0x2B)) => true, // +
+      (ch == u8(0x2F)) => true, // /
+      (ch == u8(0x3D)) => true, // =
+      (ch == u8(0x3F)) => true, // ?
+      (ch == u8(0x5E)) => true, // ^
+      (ch == u8(0x5F)) => true, // _
+      (ch == u8(0x60)) => true, // `
+      (ch == u8(0x7B)) => true, // {
+      (ch == u8(0x7C)) => true, // |
+      (ch == u8(0x7D)) => true, // }
+      (ch == u8(0x7E)) => true, // ~
+      (ch == u8(0x2D)) => true, // -
+      true => false
+    );
+    if(!(ok), { return false; });
+    j = (j + i32(1));
+  };
+
+  // Check domain: [a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*
+  (dpos : i32) = (at_pos + i32(1));
+  if((dpos >= end), { return false; });
+
+  // First domain label
+  (first_ch : u8) = bytes(usize(dpos));
+  (is_alnum : bool) = ((((first_ch >= u8(0x61)) && (first_ch <= u8(0x7A))) || ((first_ch >= u8(0x41)) && (first_ch <= u8(0x5A)))) || ((first_ch >= u8(0x30)) && (first_ch <= u8(0x39))));
+  if(!(is_alnum), { return false; });
+  dpos = (dpos + i32(1));
+
+  // Consume label chars [a-zA-Z0-9-], max 62 more (total 63)
+  (label_start : i32) = (dpos - i32(1));
+  while ((dpos < end) && (dpos < (label_start + i32(63)))), {
+    (dch : u8) = bytes(usize(dpos));
+    (is_label : bool) = ((((dch >= u8(0x61)) && (dch <= u8(0x7A))) || ((dch >= u8(0x41)) && (dch <= u8(0x5A)))) || (((dch >= u8(0x30)) && (dch <= u8(0x39))) || (dch == u8(0x2D))));
+    if(!(is_label), {
+      // Not a label char — must be '.' for next label or end
+      dpos = dpos; // break by making condition false
+      label_start = (dpos - i32(63)); // force loop exit
+    }, {
+      dpos = (dpos + i32(1));
+    });
+  };
+
+  // Last char of label must not be '-'
+  if(((dpos > (at_pos + i32(2))) && (bytes(usize((dpos - i32(1)))) == u8(0x2D))), {
+    return false;
+  });
+
+  // Consume additional labels: \.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?
+  while ((dpos < end) && (bytes(usize(dpos)) == u8(0x2E))), {
+    dpos = (dpos + i32(1)); // skip '.'
+    if((dpos >= end), { return false; });
+    (lch : u8) = bytes(usize(dpos));
+    (is_la : bool) = ((((lch >= u8(0x61)) && (lch <= u8(0x7A))) || ((lch >= u8(0x41)) && (lch <= u8(0x5A)))) || ((lch >= u8(0x30)) && (lch <= u8(0x39))));
+    if(!(is_la), { return false; });
+    dpos = (dpos + i32(1));
+    (ls : i32) = (dpos - i32(1));
+    while ((dpos < end) && (dpos < (ls + i32(63)))), {
+      (lch2 : u8) = bytes(usize(dpos));
+      (is_l2 : bool) = ((((lch2 >= u8(0x61)) && (lch2 <= u8(0x7A))) || ((lch2 >= u8(0x41)) && (lch2 <= u8(0x5A)))) || (((lch2 >= u8(0x30)) && (lch2 <= u8(0x39))) || (lch2 == u8(0x2D))));
+      if(!(is_l2), {
+        dpos = dpos;
+        ls = (dpos - i32(63));
+      }, {
+        dpos = (dpos + i32(1));
+      });
+    };
+    // Last char of label must not be '-'
+    if((bytes(usize((dpos - i32(1)))) == u8(0x2D)), {
+      return false;
+    });
+  };
+
+  // Must consume entire string
+  (dpos == end)
+});
 
 // Helper to emit autolink tokens
 _emit_autolink :: (fn(state: *(StateInline), full_url: String, display_text: String) -> unit)({
@@ -58,26 +199,34 @@ autolink :: (fn(state: *(StateInline), silent: bool) -> bool)({
     return false;
   });
 
-  // Scan for '>', bail on '<'
+  // Scan for '>', bail on '<'. Track ':' and '@' for fast rejection.
   (scan : i32) = (pos + i32(1));
   (found_close : bool) = false;
+  (has_colon : bool) = false;
+  (has_at : bool) = false;
   while (((scan < max) && !(found_close))), {
     (ch : i32) = i32(state.*._src_bytes(usize(scan)));
     if((ch == i32(0x3C)), { return false; });
     if((ch == i32(0x3E)), {
       found_close = true;
     }, {
+      if((ch == i32(0x3A)), { has_colon = true; });
+      if((ch == i32(0x40)), { has_at = true; });
       scan = (scan + i32(1));
     });
   };
 
   if(!(found_close), { return false; });
 
-  // Extract URL between < and >
-  (url_bytes : ArrayList(u8)) = state.*._src_bytes.slice(usize((pos + i32(1))), usize(scan)).unwrap();
-  (url : String) = String.from_bytes(url_bytes);
+  // Quick rejection: autolinks must contain ':' (URI) or '@' (email)
+  if((!(has_colon) && !(has_at)), { return false; });
 
-  if(_is_autolink_uri(url), {
+  // URL byte range is (pos+1, scan)
+  (url_start : i32) = (pos + i32(1));
+  (url_end : i32) = scan;
+
+  if((has_colon && _is_autolink_uri_bytes(state.*._src_bytes, url_start, url_end)), {
+    (url : String) = byte_substring(state.*._src_bytes, url_start, url_end);
     (full_url : String) = normalize_link(url);
     if(!(validate_link(full_url)), { return false; });
     if(!(silent), {
@@ -87,7 +236,8 @@ autolink :: (fn(state: *(StateInline), silent: bool) -> bool)({
     return true;
   });
 
-  if(_is_email(url), {
+  if((has_at && _is_email_bytes(state.*._src_bytes, url_start, url_end)), {
+    (url : String) = byte_substring(state.*._src_bytes, url_start, url_end);
     (full_url : String) = normalize_link(`mailto:${url}`);
     if(!(validate_link(full_url)), { return false; });
     if(!(silent), {

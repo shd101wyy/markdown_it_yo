@@ -12,17 +12,17 @@ open import "std/string";
 
 // Render attributes of a token, appending to result.
 // Appends strings like ` class="foo" id="bar"`.
-render_attrs :: (fn(result: *(String), token: Token) -> unit)(
-  match(token.attrs,
+render_attrs :: (fn(result: *(String), token: *(Token)) -> unit)(
+  match(token.*.attrs,
     .None => (),
     .Some(attrs) => {
       (i : i32) = i32(0);
       while (i < i32(attrs.len())), {
-        (pair : StringPair) = attrs(usize(i));
+        (pair : *(StringPair)) = &(attrs(usize(i)));
         result.push_str(" ");
-        escape_html_to(result, pair.name);
+        escape_html_to(result, &(pair.*.name));
         result.push_str("=\"");
-        escape_html_to(result, pair.value);
+        escape_html_to(result, &(pair.*.value));
         result.push_str("\"");
         i = (i + i32(1));
       };
@@ -58,7 +58,7 @@ render_token :: (fn(result: *(String), tokens: ArrayList(Token), idx: i32, optio
   });
 
   // Render attributes
-  render_attrs(result, token.*);
+  render_attrs(result, token);
 
   // Self-closing tag
   if(((token.*.nesting == i32(0)) && options.*.xhtml_out), {
@@ -97,18 +97,18 @@ render_token :: (fn(result: *(String), tokens: ArrayList(Token), idx: i32, optio
 _render_code_inline :: (fn(result: *(String), tokens: ArrayList(Token), idx: i32, options: *(Options)) -> unit)({
   (token : *(Token)) = &(tokens(usize(idx)));
   result.push_str("<code");
-  render_attrs(result, token.*);
+  render_attrs(result, token);
   result.push_str(">");
-  escape_html_to(result, token.*.content);
+  escape_html_to(result, &(token.*.content));
   result.push_str("</code>");
 });
 
 _render_code_block :: (fn(result: *(String), tokens: ArrayList(Token), idx: i32, options: *(Options)) -> unit)({
   (token : *(Token)) = &(tokens(usize(idx)));
   result.push_str("<pre");
-  render_attrs(result, token.*);
+  render_attrs(result, token);
   result.push_str("><code>");
-  escape_html_to(result, token.*.content);
+  escape_html_to(result, &(token.*.content));
   result.push_str("</code></pre>\n");
 });
 
@@ -116,11 +116,11 @@ _render_fence :: (fn(result: *(String), tokens: ArrayList(Token), idx: i32, opti
   (token : *(Token)) = &(tokens(usize(idx)));
   (info : String) = cond(
     (token.*.info.bytes_len() > usize(0)) => unescape_all(token.*.info).trim(),
-    true => ``
+    true => String.new()
   );
 
   // Extract language name (first word of info string)
-  (lang_name : String) = ``;
+  (lang_name : String) = String.new();
   if((info.bytes_len() > usize(0)), {
     // Split on first space
     (info_bytes : ArrayList(u8)) = info.as_bytes();
@@ -145,17 +145,17 @@ _render_fence :: (fn(result: *(String), tokens: ArrayList(Token), idx: i32, opti
   if((lang_name.bytes_len() > usize(0)), {
     result.push_str("<pre><code class=\"");
     result.push_string(options.*.lang_prefix);
-    escape_html_to(result, lang_name);
+    escape_html_to(result, &(lang_name));
     result.push_str("\"");
-    render_attrs(result, token.*);
+    render_attrs(result, token);
     result.push_str(">");
-    escape_html_to(result, token.*.content);
+    escape_html_to(result, &(token.*.content));
     result.push_str("</code></pre>\n");
   }, {
     result.push_str("<pre><code");
-    render_attrs(result, token.*);
+    render_attrs(result, token);
     result.push_str(">");
-    escape_html_to(result, token.*.content);
+    escape_html_to(result, &(token.*.content));
     result.push_str("</code></pre>\n");
   });
 });
@@ -194,7 +194,7 @@ _render_image :: (fn(result: *(String), tokens: ArrayList(Token), idx: i32, opti
   // Alt text: strip markdown from children (render_inline_as_text)
   (alt_text : String) = match(token.*.children,
     .Some(children) => {
-      (buf : String) = ``;
+      (buf : String) = String.new();
       render_inline_as_text((&buf), children);
       buf
     },
@@ -236,16 +236,16 @@ _render_softbreak :: (fn(result: *(String), options: *(Options)) -> unit)(
   )
 );
 
-_render_text :: (fn(result: *(String), token: Token) -> unit)(
-  escape_html_to(result, token.content)
+_render_text :: (fn(result: *(String), token: *(Token)) -> unit)(
+  escape_html_to(result, &(token.*.content))
 );
 
-_render_html_block :: (fn(result: *(String), token: Token) -> unit)(
-  result.push_string(token.content)
+_render_html_block :: (fn(result: *(String), token: *(Token)) -> unit)(
+  result.push_string(token.*.content)
 );
 
-_render_html_inline :: (fn(result: *(String), token: Token) -> unit)(
-  result.push_string(token.content)
+_render_html_inline :: (fn(result: *(String), token: *(Token)) -> unit)(
+  result.push_string(token.*.content)
 );
 
 // ============================================================================
@@ -264,10 +264,10 @@ _render_one_token :: (fn(result: *(String), tokens: ArrayList(Token), idx: i32, 
     (type_name == .TT_IMAGE) => _render_image(result, tokens, idx, options),
     (type_name == .TT_HARDBREAK) => _render_hardbreak(result, options),
     (type_name == .TT_SOFTBREAK) => _render_softbreak(result, options),
-    (type_name == .TT_TEXT) => _render_text(result, token.*),
-    (type_name == .TT_TEXT_SPECIAL) => _render_text(result, token.*),
-    (type_name == .TT_HTML_BLOCK) => _render_html_block(result, token.*),
-    (type_name == .TT_HTML_INLINE) => _render_html_inline(result, token.*),
+    (type_name == .TT_TEXT) => _render_text(result, token),
+    (type_name == .TT_TEXT_SPECIAL) => _render_text(result, token),
+    (type_name == .TT_HTML_BLOCK) => _render_html_block(result, token),
+    (type_name == .TT_HTML_INLINE) => _render_html_inline(result, token),
     true => render_token(result, tokens, idx, options)
   );
 });

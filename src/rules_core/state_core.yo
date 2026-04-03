@@ -17,12 +17,20 @@ StateCore :: struct(
 
 // Create a new StateCore
 new_state_core :: (fn(src: String, env: *(Env)) -> StateCore)(
-  StateCore(
-    src: src,
-    tokens: ArrayList(Token).new(),
-    inline_mode: false,
-    env: env
-  )
+  {
+    // Estimate ~3 block tokens per line, ~1 line per 20 bytes
+    (estimated_tokens : usize) = ((src.bytes_len() / usize(20)) * usize(3));
+    (cap : usize) = cond(
+      (estimated_tokens > usize(64)) => estimated_tokens,
+      true => usize(64)
+    );
+    StateCore(
+      src: src,
+      tokens: ArrayList(Token).with_capacity(cap),
+      inline_mode: false,
+      env: env
+    )
+  }
 );
 
 export StateCore, new_state_core;

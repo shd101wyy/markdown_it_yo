@@ -45,17 +45,14 @@ StateInline :: struct(
   pending : String,
   pending_level : i32,
 
-  // Stores { start: end } pairs for backtrack optimization
-  cache : HashMap(i32, i32),
-
   // List of emphasis-like delimiters for current tag
   delimiters : ArrayList(Delimiter),
 
   // Stack of delimiter lists for upper level tags
   _prev_delimiters : ArrayList(ArrayList(Delimiter)),
 
-  // Backtick length => last seen position
-  backticks : HashMap(i32, i32),
+  // Backtick length => last seen position (lazy-allocated)
+  backticks : Option(HashMap(i32, i32)),
   backticks_scanned : bool,
 
   // Counter for disabling linkify inside <a> and markdown links
@@ -90,12 +87,11 @@ new_state_inline :: (fn(src: String, env: *(Env), out_tokens: ArrayList(Token), 
       pos: i32(0),
       pos_max: pos_max,
       level: i32(0),
-      pending: ``,
+      pending: String.new(),
       pending_level: i32(0),
-      cache: HashMap(i32, i32).new(),
       delimiters: ArrayList(Delimiter).new(),
       _prev_delimiters: ArrayList(ArrayList(Delimiter)).new(),
-      backticks: HashMap(i32, i32).new(),
+      backticks: .None,
       backticks_scanned: false,
       link_level: i32(0),
       html_enabled: html_enabled,
@@ -117,15 +113,15 @@ impl(StateInline,
       attrs: .None,
       map: .None,
       children: .None,
-      content: self.pending,
-      markup: ``,
-      info: ``,
+      content: self.pending.clone(),
+      markup: String.new(),
+      info: String.new(),
       block: false,
       hidden: false,
       level: self.pending_level
     );
     _ := self.tokens.push(token);
-    self.pending = ``;
+    self.pending.clear();
     token
   }),
 
@@ -142,9 +138,9 @@ impl(StateInline,
       attrs: .None,
       map: .None,
       children: .None,
-      content: ``,
-      markup: ``,
-      info: ``,
+      content: String.new(),
+      markup: String.new(),
+      info: String.new(),
       block: false,
       hidden: false,
       level: i32(0)

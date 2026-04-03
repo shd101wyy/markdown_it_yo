@@ -82,7 +82,7 @@ _build_html_sequences :: (fn() -> ArrayList(HtmlSequence))({
   _ := blocks.push(`thead`); _ := blocks.push(`title`); _ := blocks.push(`tr`);
   _ := blocks.push(`track`); _ := blocks.push(`ul`);
 
-  (block_names_pattern : String) = ``;
+  (block_names_pattern : String) = String.new();
   (bi : usize) = usize(0);
   while (bi < blocks.len()), {
     if((bi > usize(0)), {

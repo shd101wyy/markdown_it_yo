@@ -191,9 +191,9 @@ impl(StateBlock,
       attrs: .None,
       map: .None,
       children: .None,
-      content: ``,
-      markup: ``,
-      info: ``,
+      content: String.new(),
+      markup: String.new(),
+      info: String.new(),
       block: true,
       hidden: false,
       level: i32(0)
@@ -287,7 +287,7 @@ impl(StateBlock,
   // Cut lines range from source
   get_lines : (fn(self: Self, begin: i32, end: i32, indent: i32, keep_last_lf: bool) -> String)({
     if((begin >= end), {
-      return ``;
+      return String.new();
     });
 
     (out : ArrayList(u8)) = ArrayList(u8).with_capacity(usize(256));

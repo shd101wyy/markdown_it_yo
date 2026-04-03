@@ -173,7 +173,7 @@ reference :: (fn(state: *(StateBlock), start_line: i32, _end_line: i32, silent: 
     });
   };
 
-  (title : String) = ``;
+  (title : String) = String.new();
   if((((pos < str_max) && (start != pos)) && title_result.ok), {
     title = title_result.str;
     pos = title_result.pos;
@@ -193,7 +193,7 @@ reference :: (fn(state: *(StateBlock), start_line: i32, _end_line: i32, silent: 
   if(((pos < str_max) && (i32(buf_bytes(usize(pos))) != i32(0x0A))), {
     if((title.len() > usize(0)), {
       // Garbage after title — roll back title
-      title = ``;
+      title = String.new();
       pos = dest_end_pos;
       next_line = dest_end_line_no;
       while ((pos < str_max) && is_space(i32(buf_bytes(usize(pos))))), {

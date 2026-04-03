@@ -31,20 +31,28 @@ open import "std/string";
 // to allow recursive calls from link/image rules without circular imports.
 _inline_tokenize :: (fn(state: *(StateInline)) -> unit)({
   while (state.*.pos < state.*.pos_max), {
-    // Try inline rules in order (same as markdown-it default preset)
-    (ok : bool) = false;
+    // First-byte dispatch: skip rules that can't match the current byte
+    (ch : i32) = i32(state.*._src_bytes(usize(state.*.pos)));
+    (ok : bool) = cond(
+      (ch == i32(0x0A)) => newline(state, false),                          // \n
+      (ch == i32(0x5C)) => escape_rule(state, false),                      // backslash
+      (ch == i32(0x60)) => backtick(state, false),                         // backtick
+      (ch == i32(0x7E)) => cond(                                           // ~
+        state.*.enable_strikethrough => strikethrough_tokenize(state, false),
+        true => false
+      ),
+      ((ch == i32(0x2A)) || (ch == i32(0x5F))) => emphasis_tokenize(state, false), // * _
+      (ch == i32(0x5B)) => link_rule(state, false),                        // [
+      (ch == i32(0x21)) => image_rule(state, false),                       // !
+      (ch == i32(0x3C)) => cond(                                           // <
+        autolink(state, false) => true,
+        true => html_inline(state, false)
+      ),
+      (ch == i32(0x26)) => entity(state, false),                           // &
+      true => false
+    );
+    // If dispatch didn't match, try text rule (scans non-special chars)
     if(!(ok), { ok = text(state, false); });
-    if(!(ok), { ok = newline(state, false); });
-    if(!(ok), { ok = escape_rule(state, false); });
-    if(!(ok), { ok = backtick(state, false); });
-    if((!(ok) && state.*.enable_strikethrough), { ok = strikethrough_tokenize(state, false); });
-    if(!(ok), { ok = emphasis_tokenize(state, false); });
-    if(!(ok), { ok = link_rule(state, false); });
-    if(!(ok), { ok = image_rule(state, false); });
-    if(!(ok), { ok = autolink(state, false); });
-    if(!(ok), { ok = html_inline(state, false); });
-    if(!(ok), { ok = entity(state, false); });
-
     if(!(ok), {
       // No rule matched — consume character as pending text
       (ch_byte : u8) = state.*._src_bytes(usize(state.*.pos));

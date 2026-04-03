@@ -18,7 +18,7 @@ LinkTitleResult :: struct(
 
 // Create a default (failed) result
 _default_title_result :: (fn() -> LinkTitleResult)(
-  LinkTitleResult(ok: false, can_continue: false, pos: i32(0), str: ``, marker: i32(0))
+  LinkTitleResult(ok: false, can_continue: false, pos: i32(0), str: String.new(), marker: i32(0))
 );
 
 // Parse link title within `input` in [start, max] range.
@@ -66,7 +66,7 @@ parse_link_title :: (fn(input: String, start_param: i32, max: i32, prev_state: O
           ok: false,
           can_continue: false,
           pos: i32(0),
-          str: ``,
+          str: String.new(),
           marker: marker
         );
       }

@@ -38,7 +38,7 @@ impl(Url,
 _byte_substr :: (fn(s: *(String), start: usize, end: usize) -> String)(
   match(s.*.as_bytes().slice(start, end),
     .Ok(sub) => String.from_bytes(sub),
-    .Err(_e) => ``
+    .Err(_e) => String.new()
   )
 );
 
@@ -215,7 +215,7 @@ _split_dot :: (fn(s: *(String)) -> ArrayList(String))({
 
 // Join strings with '.' separator
 _join_dot :: (fn(parts: *(ArrayList(String))) -> String)({
-  (result : String) = ``;
+  (result : String) = String.new();
   (i : usize) = usize(0);
   while (i < parts.*.len()), {
     if((i > usize(0)), {
@@ -442,13 +442,13 @@ parse :: (fn(url_str: String, slashes_denote_host: bool) -> Url)({
     // Hostname defaults to empty string
     match(u.hostname,
       .Some(_h) => (),
-      .None => { u.hostname = .Some(``); }
+      .None => { u.hostname = .Some(String.new()); }
     );
 
     // IPv6 handling
     (hn : String) = match(u.hostname,
       .Some(h) => h,
-      .None => ``
+      .None => String.new()
     );
     (hn_bytes : ArrayList(u8)) = hn.as_bytes();
     (is_ipv6 : bool) = (((hn_bytes.len() >= usize(2)) && (hn_bytes(usize(0)) == u8(0x5B))) && (hn_bytes((hn_bytes.len() - usize(1))) == u8(0x5D)));
@@ -528,7 +528,7 @@ parse :: (fn(url_str: String, slashes_denote_host: bool) -> Url)({
     match(u.hostname,
       .Some(h2) => {
         if((h2.as_bytes().len() > usize(255)), {
-          u.hostname = .Some(``);
+          u.hostname = .Some(String.new());
         });
       },
       .None => ()
@@ -575,7 +575,7 @@ parse :: (fn(url_str: String, slashes_denote_host: bool) -> Url)({
     (has_hn : bool) = match(u.hostname, .Some(_h) => true, .None => false);
     (has_pn : bool) = match(u.pathname, .Some(_p) => true, .None => false);
     if((has_hn && !(has_pn)), {
-      u.pathname = .Some(``);
+      u.pathname = .Some(String.new());
     });
   });
 

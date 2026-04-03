@@ -133,7 +133,7 @@ table :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: bool,
           if(first_colon, {
             _ := aligns.push(`left`);
           }, {
-            _ := aligns.push(``);
+            _ := aligns.push(String.new());
           });
         });
         ci = (ci + i32(1));
@@ -281,7 +281,7 @@ table :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: bool,
                 if((ri < i32(row_columns.len())), {
                   token_il.content = row_columns(usize(ri)).trim();
                 }, {
-                  token_il.content = ``;
+                  token_il.content = String.new();
                 });
                 token_il.children = .Some(ArrayList(Token).new());
                 block_push_token(state, token_il);

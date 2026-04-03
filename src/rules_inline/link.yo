@@ -29,8 +29,8 @@ link_rule :: (fn(state: *(StateInline), silent: bool) -> bool)({
   // Parser failed to find ']', not a valid link
   if((label_end < i32(0)), { return false; });
 
-  (href : String) = ``;
-  (title : String) = ``;
+  (href : String) = String.new();
+  (title : String) = String.new();
   pos = (label_end + i32(1));
 
   (parse_reference : bool) = true;
@@ -84,7 +84,7 @@ link_rule :: (fn(state: *(StateInline), silent: bool) -> bool)({
 
   // Reference link: [text][ref] or [text][] or [text]
   if(parse_reference, {
-    (ref_label : String) = ``;
+    (ref_label : String) = String.new();
 
     if(((pos < max) && (i32(state.*._src_bytes(usize(pos))) == i32(0x5B))), {
       // [link][ref] — full form or [link][] — collapsed form
