@@ -169,6 +169,9 @@ _process_inlines :: (fn(tokens: ArrayList(Token), quotes: ArrayList(String)) -> 
               text = _replace_at(text, quote_pos, APOSTROPHE);
               token.*.content = text.as_str();
               token.*._content_owned = .Some(text);
+            });
+          }, {
+            if(can_close, {
               // Try to find matching opening quote on stack
               (sj : i32) = (i32(stack.len()) - i32(1));
               (matched : bool) = false;
@@ -231,8 +234,15 @@ _process_inlines :: (fn(tokens: ArrayList(Token), quotes: ArrayList(String)) -> 
                 });
               });
             }, {
-              // can_open only
-              _ := stack.push(_QuoteEntry(token_idx: i, pos: quote_pos, single: is_single, level: this_level));
+              if(can_open, {
+                _ := stack.push(_QuoteEntry(token_idx: i, pos: quote_pos, single: is_single, level: this_level));
+              }, {
+                if(is_single, {
+                  text = _replace_at(text, quote_pos, APOSTROPHE);
+                  token.*.content = text.as_str();
+                  token.*._content_owned = .Some(text);
+                });
+              });
             });
           });
         });
