@@ -29,8 +29,13 @@ jobs:
       - name: Unit tests
         run: yo build test
 
-      - name: Fixture tests
-        run: node scripts/run_fixture_tests.js
+      - name: Setup Emscripten
+        uses: mymindstorm/setup-emsdk@v14
 
-      - name: Benchmark
-        run: node benchmark/run.js
+      - name: Build WASM
+        run: yo build wasm
+
+      - name: Fixture tests & Benchmark
+        run: |
+          node scripts/run_fixture_tests.js
+          node benchmark/run.js
