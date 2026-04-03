@@ -106,10 +106,13 @@ escape_html_to :: (fn(result: *(String), input: str) -> unit)(
     (src_ptr : *(u8)) = &(input.bytes(usize(0)));
 
     // Single-pass: find first special char position
+    // Special chars: " (0x22), & (0x26), < (0x3C), > (0x3E) — all in [0x22, 0x3E].
+    // Most text bytes (a-z 0x61+, A-Z 0x41+, space 0x20, newline 0x0A) are outside
+    // this range, so the range pre-check skips them with 2 comparisons instead of 4.
     (first : usize) = usize(0);
     while (first < len), {
       (ch : u8) = (src_ptr &+ first).*;
-      if(((ch == u8(0x26)) || ((ch == u8(0x3C)) || ((ch == u8(0x3E)) || (ch == u8(0x22))))), {
+      if((((ch >= u8(0x22)) && (ch <= u8(0x3E))) && ((ch == u8(0x26)) || ((ch == u8(0x3C)) || ((ch == u8(0x3E)) || (ch == u8(0x22)))))), {
         // Found special char — break to escape loop
         result.reserve((len + (len / usize(8))));
         (result_al : ArrayList(u8)) = result.*._bytes.unwrap();
@@ -129,37 +132,39 @@ escape_html_to :: (fn(result: *(String), input: str) -> unit)(
         (run_start : usize) = i;
         while (i < len), {
           (ch2 : u8) = (src_ptr &+ i).*;
-          cond(
-            (ch2 == u8(0x26)) => {
-              if((i > run_start), {
-                result_al.extend_from_ptr((src_ptr &+ run_start), (i - run_start));
-              });
-              result_al.extend_from_ptr(*(u8)("&amp;"), usize(5));
-              run_start = (i + usize(1));
-            },
-            (ch2 == u8(0x3C)) => {
-              if((i > run_start), {
-                result_al.extend_from_ptr((src_ptr &+ run_start), (i - run_start));
-              });
-              result_al.extend_from_ptr(*(u8)("&lt;"), usize(4));
-              run_start = (i + usize(1));
-            },
-            (ch2 == u8(0x3E)) => {
-              if((i > run_start), {
-                result_al.extend_from_ptr((src_ptr &+ run_start), (i - run_start));
-              });
-              result_al.extend_from_ptr(*(u8)("&gt;"), usize(4));
-              run_start = (i + usize(1));
-            },
-            (ch2 == u8(0x22)) => {
-              if((i > run_start), {
-                result_al.extend_from_ptr((src_ptr &+ run_start), (i - run_start));
-              });
-              result_al.extend_from_ptr(*(u8)("&quot;"), usize(6));
-              run_start = (i + usize(1));
-            },
-            true => ()
-          );
+          if(((ch2 >= u8(0x22)) && (ch2 <= u8(0x3E))), {
+            cond(
+              (ch2 == u8(0x26)) => {
+                if((i > run_start), {
+                  result_al.extend_from_ptr((src_ptr &+ run_start), (i - run_start));
+                });
+                result_al.extend_from_ptr(*(u8)("&amp;"), usize(5));
+                run_start = (i + usize(1));
+              },
+              (ch2 == u8(0x3C)) => {
+                if((i > run_start), {
+                  result_al.extend_from_ptr((src_ptr &+ run_start), (i - run_start));
+                });
+                result_al.extend_from_ptr(*(u8)("&lt;"), usize(4));
+                run_start = (i + usize(1));
+              },
+              (ch2 == u8(0x3E)) => {
+                if((i > run_start), {
+                  result_al.extend_from_ptr((src_ptr &+ run_start), (i - run_start));
+                });
+                result_al.extend_from_ptr(*(u8)("&gt;"), usize(4));
+                run_start = (i + usize(1));
+              },
+              (ch2 == u8(0x22)) => {
+                if((i > run_start), {
+                  result_al.extend_from_ptr((src_ptr &+ run_start), (i - run_start));
+                });
+                result_al.extend_from_ptr(*(u8)("&quot;"), usize(6));
+                run_start = (i + usize(1));
+              },
+              true => ()
+            );
+          });
           i = (i + usize(1));
         };
         if((len > run_start), {

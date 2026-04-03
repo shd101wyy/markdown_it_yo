@@ -85,11 +85,11 @@ node benchmark/run.js
 
 | Input | markdown-it (JS) | Native | WASM | Native× | WASM× |
 | ----- | ----------------- | ------ | ---- | ------- | ----- |
-| 1 MB  | 14.4 ms           | 9.9 ms | 14.8 ms | 1.5× | 1.0× |
-| 5 MB  | 70.5 ms           | 54.7 ms | 76.5 ms | 1.3× | 0.9× |
-| 20 MB | 335.6 ms          | 231.6 ms | 315.8 ms | 1.4× | 1.1× |
+| 1 MB  | 14.8 ms           | 9.7 ms | 14.5 ms | 1.5× | 1.0× |
+| 5 MB  | 73.2 ms           | 53.5 ms | 74.8 ms | 1.4× | 1.0× |
+| 20 MB | 344.5 ms          | 226.3 ms | 308.7 ms | 1.5× | 1.1× |
 
-The native build is **1.3–1.5× faster** than JS. WASM matches or beats JS at large inputs (1.0–1.1×) and is within 10% at small inputs (0.9×).
+The native build is **1.4–1.5× faster** than JS. WASM matches or beats JS at all input sizes (1.0–1.1×).
 
 > **Note on wall-clock benchmarks:** Single-run wall-clock timings (e.g., `/usr/bin/time`) can be misleading — Node.js startup adds ~30-60ms of overhead for WASM (module compilation + runtime init) that amortizes away with higher repeat counts. The numbers above use `--repeat 100/20/10` for 1MB/5MB/20MB to properly amortize startup.
 
@@ -119,6 +119,8 @@ Despite being a faithful 1:1 port, several optimizations bring performance well 
 20. **Force-inlined RC functions** — `___drop`/`___dup`/`___dispose` use `__attribute__((always_inline))` for better codegen at `-Os`
 21. **Single-pass HTML escaping** — `escape_html_to()` merges the two-pass scan (has_special check + escape loop) into a single pass, and uses direct `ArrayList.extend_from_ptr` instead of `String.push_str` for entity strings
 22. **Pre-allocated tokens_meta** — Inline parser pre-allocates `tokens_meta` ArrayList to match the token array capacity, avoiding repeated reallocations
+23. **Byte-range pre-check in escape_html_to** — All 4 special chars (`"`, `&`, `<`, `>`) fall in [0x22, 0x3E]; a range test skips most text bytes (letters, spaces) with 2 comparisons instead of 4
+24. **WASM 64MB initial memory** — Pre-allocates 64MB WASM linear memory to avoid expensive memory growth events (each growth copies the entire linear memory)
 
 ### Performance Analysis
 
@@ -140,7 +142,7 @@ Token disposal dropped from ~25% → 2.0% after always_inline RC functions and s
 
 V8's generational GC handles short-lived objects nearly for free (young generation bump allocation ~2-3ns), while RC incurs per-operation overhead on every increment/decrement (~5-10ns each). Despite this structural disadvantage, the optimizations above make the native build 1.3–1.5× faster than JS.
 
-For WASM, the `-Os` optimization level provides the best tradeoff between compile time (<30s) and runtime performance. The `-sENVIRONMENT=node` flag strips unused browser glue code. WASM matches or beats JS at large inputs (1.0–1.1×) thanks to efficient memory access patterns, though small inputs show ~10% overhead from WASM module compilation and runtime initialization.
+For WASM, the `-Os` optimization level provides the best tradeoff between compile time (<30s) and runtime performance. The `-sENVIRONMENT=node` flag strips unused browser glue code. Pre-allocating 64MB initial memory (`-sINITIAL_MEMORY=64MB`) eliminates expensive memory growth events for small/medium inputs — each growth copies the entire linear memory, costing ~2-5ms. WASM now matches or beats JS at all input sizes (1.0–1.1×).
 
 See [markdown_yo](https://github.com/shd101wyy/markdown_yo) for a **ground-up rewrite** using a SAX architecture with value-type tokens, targeting 2-5× faster than JS.
 
