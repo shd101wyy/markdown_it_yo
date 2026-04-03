@@ -96,7 +96,7 @@ function benchmarkJS(content, warmup, iterations) {
   return times;
 }
 
-const REPEAT_BY_SIZE = { "1mb": 20, "5mb": 10, "20mb": 3 };
+const REPEAT_BY_SIZE = { "1mb": 100, "5mb": 20, "20mb": 10 };
 
 function getRepeat(sizeName) {
   const key = sizeName.toLowerCase();

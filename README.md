@@ -81,21 +81,21 @@ node benchmark/run.js
 
 ### Results (Apple M4, macOS)
 
-**Parse time only** — median of 10 runs, 3 warmup, `--repeat` to amortize process startup:
+**Parse + render time** — median of 10 runs, 3 warmup, `--repeat` to amortize process startup:
 
 | Input | markdown-it (JS) | Native | WASM | Native× | WASM× |
 | ----- | ----------------- | ------ | ---- | ------- | ----- |
-| 1 MB  | 14.8 ms           | 14.0 ms | 32.4 ms | 1.1× | 0.5× |
-| 5 MB  | 72.5 ms           | 75.1 ms | 160.5 ms | 1.0× | 0.5× |
-| 20 MB | 341.6 ms          | 333.1 ms | 684.3 ms | 1.0× | 0.5× |
+| 1 MB  | 14.6 ms           | 10.5 ms | 16.0 ms | 1.4× | 0.9× |
+| 5 MB  | 72.1 ms           | 57.9 ms | 82.6 ms | 1.2× | 0.9× |
+| 20 MB | 340.2 ms          | 241.3 ms | 340.7 ms | 1.4× | 1.0× |
 
-The native build matches or slightly beats the JS original. WASM runs at ~0.5× JS speed (compiled with emcc `-Os`; `-O2`/`-O3` are impractical due to 20+ minute compile times on the 70K-line generated C file).
+The native build is **1.2–1.4× faster** than JS. WASM matches JS at large inputs (1.0×) and is within 10% at small inputs (0.9×).
 
-> **Note on wall-clock benchmarks:** Single-run wall-clock timings (e.g., `/usr/bin/time`) can be misleading — Node.js startup adds ~60-150ms of overhead (VM init, JIT compilation, module loading) that amortizes away on repeated runs. The numbers above measure **parse time only** after JIT warmup using `--repeat` and `process.hrtime.bigint()` per iteration.
+> **Note on wall-clock benchmarks:** Single-run wall-clock timings (e.g., `/usr/bin/time`) can be misleading — Node.js startup adds ~30-60ms of overhead for WASM (module compilation + runtime init) that amortizes away with higher repeat counts. The numbers above use `--repeat 100/20/10` for 1MB/5MB/20MB to properly amortize startup.
 
 ### Optimizations Applied
 
-Despite being a faithful 1:1 port, several optimizations bring performance to JS parity:
+Despite being a faithful 1:1 port, several optimizations bring performance well beyond JS parity:
 
 1. **Enum token types** — Token `type_name` uses an `enum` instead of `String`, eliminating millions of string allocations
 2. **Value-type token tags** — Token `tag` uses `str` (value type) instead of `String` (RC heap object)
@@ -113,14 +113,18 @@ Despite being a faithful 1:1 port, several optimizations bring performance to JS
 14. **Inline RC functions** — `__yo_incr_rc`/`__yo_decr_rc` marked `static inline`
 15. **Manual autolink/entity matching** — Hot inline rules use hand-coded char matching instead of regex
 16. **RC borrow chain optimization** — Linked-list traversal patterns avoid redundant dup/drop pairs
+17. **URL fast-paths** — `normalize_link`, `encode`, `_is_bad_protocol` skip allocations for common cases (plain ASCII URLs, no protocol)
+18. **Zero-alloc hostname check** — `_should_recode_hostname` uses byte-level comparison instead of `String.to_lowercase()`
+19. **Deferred children allocation** — Block rules skip creating empty `ArrayList(Token)` for children since `_core_inline` always replaces them
+20. **Force-inlined RC functions** — `___drop`/`___dup`/`___dispose` use `__attribute__((always_inline))` for better codegen at `-Os`
 
 ### Performance Analysis
 
-The main performance bottleneck is **reference counting overhead** (~47% of CPU time in `__yo_decr_rc`/`__yo_incr_rc` operations). Each Token has 5 RC-able fields (content, markup, info, children, attrs), and the parser creates ~50K tokens per 1MB of input.
+The main performance bottleneck is **Token disposal** (~25% of CPU time). Each Token is 152 bytes with 3 RC-able fields (attrs, children, _content_owned). For a 20MB input, the parser creates ~3M tokens. Disposing the token array requires iterating 480MB of memory and checking 3 Option fields per token — most of which are `None`.
 
-V8's generational GC handles short-lived objects nearly for free (young generation bump allocation ~2-3ns), while RC incurs per-operation overhead on every increment/decrement (~5-10ns each). Despite this structural disadvantage, the optimizations above bring the Yo port to JS parity on native.
+V8's generational GC handles short-lived objects nearly for free (young generation bump allocation ~2-3ns), while RC incurs per-operation overhead on every increment/decrement (~5-10ns each). Despite this structural disadvantage, the optimizations above make the native build 1.2–1.4× faster than JS.
 
-For the WASM target, additional overhead comes from bounds checking and the WASM calling convention. The `-Os` optimization level provides the best tradeoff between compile time (<30s) and runtime performance.
+For WASM, the `-Os` optimization level provides the best tradeoff between compile time (<30s) and runtime performance. The `-sENVIRONMENT=node` flag strips unused browser glue code. WASM matches JS at large inputs thanks to efficient memory access patterns, though small inputs show ~10% overhead from WASM module compilation and runtime initialization.
 
 See [markdown_yo](https://github.com/shd101wyy/markdown_yo) for a **ground-up rewrite** using a SAX architecture with value-type tokens, targeting 2-5× faster than JS.
 

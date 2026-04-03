@@ -10,7 +10,7 @@ exe.add_c_flags("-march=native");
 // -Os compiles in <30s and gives best runtime performance.
 // -finline-functions helps ~4% by inlining small RC functions.
 wasm_exe :: build.executable({ name: "markdown_it_yo_wasm", root: "./src/main.yo", target: "wasm32-emscripten", optimize: build.Optimize.Debug, allocator: build.Allocator.Libc });
-wasm_exe.add_c_flags("-Os -finline-functions -sALLOW_MEMORY_GROWTH=1 -sSTACK_SIZE=1MB -sNODERAWFS=1");
+wasm_exe.add_c_flags("-Os -finline-functions -sALLOW_MEMORY_GROWTH=1 -sSTACK_SIZE=1MB -sNODERAWFS=1 -sENVIRONMENT=node");
 
 lib :: build.static_library({ name: "markdown_it_yo-lib", root: "./src/lib.yo" });
 
