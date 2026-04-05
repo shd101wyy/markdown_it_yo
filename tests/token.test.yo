@@ -10,9 +10,9 @@ test "Token — constructor defaults", {
   assert((tok.tag == "p"), "tag should match");
   assert((tok.nesting == i32(1)), "nesting should match");
   assert((tok.level == i32(0)), "level should default to 0");
-  assert((tok.content == ``), "content should default to empty");
-  assert((tok.markup == ``), "markup should default to empty");
-  assert((tok.info == ``), "info should default to empty");
+  assert((tok.content == ""), "content should default to empty");
+  assert((tok.markup == ""), "markup should default to empty");
+  assert((tok.info == ""), "info should default to empty");
   assert((tok.block == false), "block should default to false");
   assert((tok.hidden == false), "hidden should default to false");
 };
