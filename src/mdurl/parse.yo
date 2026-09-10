@@ -3,8 +3,9 @@
 // Parse a URL string into components.
 // Based on Node.js url.parse() with modifications per mdurl spec.
 
-open import "std/string";
-{ ArrayList } :: import "std/collections/array_list";
+pragma(Pragma.AllowUnsafe);
+{ String } :: import("std/string");
+{ ArrayList } :: import("std/collections/array_list");
 
 // Parsed URL components
 Url :: struct(
@@ -46,10 +47,10 @@ _byte_substr :: (fn(s: *(String), start: usize, end: usize) -> String)(
 _index_of :: (fn(s: *(String), ch: u8) -> i32)({
   (bytes : ArrayList(u8)) = s.*.as_bytes();
   (i : usize) = usize(0);
-  while (i < bytes.len()), {
-    if((bytes(i) == ch), { return i32(i); });
+  while((i < bytes.len()), {
+    if((bytes(i) == ch), { return(i32(i)); });
     i = (i + usize(1));
-  };
+  });
   i32(-1)
 });
 
@@ -57,10 +58,10 @@ _index_of :: (fn(s: *(String), ch: u8) -> i32)({
 _last_index_of :: (fn(s: *(String), ch: u8) -> i32)({
   (bytes : ArrayList(u8)) = s.*.as_bytes();
   (i : i32) = (i32(bytes.len()) - i32(1));
-  while (i >= i32(0)), {
-    if((bytes(usize(i)) == ch), { return i; });
+  while((i >= i32(0)), {
+    if((bytes(usize(i)) == ch), { return(i); });
     i = (i - i32(1));
-  };
+  });
   i32(-1)
 });
 
@@ -68,20 +69,20 @@ _last_index_of :: (fn(s: *(String), ch: u8) -> i32)({
 _last_index_of_before :: (fn(s: *(String), ch: u8, before: i32) -> i32)({
   (bytes : ArrayList(u8)) = s.*.as_bytes();
   (i : i32) = (before - i32(1));
-  while (i >= i32(0)), {
-    if((bytes(usize(i)) == ch), { return i; });
+  while((i >= i32(0)), {
+    if((bytes(usize(i)) == ch), { return(i); });
     i = (i - i32(1));
-  };
+  });
   i32(-1)
 });
 
 // Check if a character is in a given set
 _char_in_set :: (fn(ch: u8, set: str) -> bool)({
   (j : usize) = usize(0);
-  while (j < set.len()), {
-    if((set.bytes(j) == ch), { return true; });
+  while((j < set.len()), {
+    if((set.bytes(j) == ch), { return(true); });
     j = (j + usize(1));
-  };
+  });
   false
 });
 
@@ -89,10 +90,10 @@ _char_in_set :: (fn(ch: u8, set: str) -> bool)({
 _find_earliest :: (fn(bytes: *(ArrayList(u8)), set: str, start: usize) -> i32)({
   (result : i32) = i32(-1);
   (j : usize) = usize(0);
-  while (j < set.len()), {
+  while((j < set.len()), {
     (ch : u8) = set.bytes(j);
     (i : usize) = start;
-    while (i < bytes.*.len()), {
+    while((i < bytes.*.len()), {
       if((bytes.*(i) == ch), {
         (pos : i32) = i32(i);
         if(((result == i32(-1)) || (pos < result)), {
@@ -102,9 +103,9 @@ _find_earliest :: (fn(bytes: *(ArrayList(u8)), set: str, start: usize) -> i32)({
       }, {
         i = (i + usize(1));
       });
-    };
+    });
     j = (j + usize(1));
-  };
+  });
   result
 });
 
@@ -117,33 +118,33 @@ HOST_ENDING_CHARS :: "/?#";
 // Check if a protocol is hostless (javascript:)
 _is_hostless :: (fn(proto: *(String)) -> bool)({
   (lower : String) = proto.*.to_lowercase();
-  if(lower.starts_with(`javascript`), { return true; });
-  if((lower == `javascript:`), { return true; });
+  if(lower.starts_with(`javascript`), { return(true); });
+  if((lower == `javascript:`), { return(true); });
   false
 });
 
 // Check if a protocol is slashed (http:, https:, ftp:, gopher:, file:)
 _is_slashed_protocol :: (fn(proto: *(String)) -> bool)({
   (lower : String) = proto.*.to_lowercase();
-  if(lower.starts_with(`http:`), { return true; });
-  if(lower.starts_with(`https:`), { return true; });
-  if(lower.starts_with(`ftp:`), { return true; });
-  if(lower.starts_with(`gopher:`), { return true; });
-  if(lower.starts_with(`file:`), { return true; });
-  if((lower == `http`), { return true; });
-  if((lower == `https`), { return true; });
-  if((lower == `ftp`), { return true; });
-  if((lower == `gopher`), { return true; });
-  if((lower == `file`), { return true; });
+  if(lower.starts_with(`http:`), { return(true); });
+  if(lower.starts_with(`https:`), { return(true); });
+  if(lower.starts_with(`ftp:`), { return(true); });
+  if(lower.starts_with(`gopher:`), { return(true); });
+  if(lower.starts_with(`file:`), { return(true); });
+  if((lower == `http`), { return(true); });
+  if((lower == `https`), { return(true); });
+  if((lower == `ftp`), { return(true); });
+  if((lower == `gopher`), { return(true); });
+  if((lower == `file`), { return(true); });
   false
 });
 
 // Check if hostname part matches [+a-z0-9A-Z_-]{0,63}
 _valid_hostname_part :: (fn(part: *(String)) -> bool)({
   (bytes : ArrayList(u8)) = part.*.as_bytes();
-  if((bytes.len() > usize(63)), { return false; });
+  if((bytes.len() > usize(63)), { return(false); });
   (i : usize) = usize(0);
-  while (i < bytes.len()), {
+  while((i < bytes.len()), {
     (b : u8) = bytes(i);
     (valid : bool) = cond(
       ((b >= u8(0x61)) && (b <= u8(0x7A))) => true,
@@ -154,9 +155,9 @@ _valid_hostname_part :: (fn(part: *(String)) -> bool)({
       (b == u8(0x5F)) => true,
       true => false
     );
-    if(!(valid), { return false; });
+    if(!(valid), { return(false); });
     i = (i + usize(1));
-  };
+  });
   true
 });
 
@@ -169,7 +170,7 @@ _hostname_part_start :: (fn(part: *(String)) -> Option(String))({
     (bytes.len() < usize(63)) => bytes.len(),
     true => usize(63)
   );
-  while (i < limit), {
+  while((i < limit), {
     (b : u8) = bytes(i);
     (valid : bool) = cond(
       ((b >= u8(0x61)) && (b <= u8(0x7A))) => true,
@@ -182,18 +183,17 @@ _hostname_part_start :: (fn(part: *(String)) -> Option(String))({
     );
     if(!(valid), {
       if((i > usize(0)), {
-        return .Some(_byte_substr(part, usize(0), i));
+        return(.Some(_byte_substr(part, usize(0), i)));
       }, {
-        return .None;
+        return(.None);
       });
     });
     i = (i + usize(1));
-  };
-  if((i > usize(0)), {
-    .Some(_byte_substr(part, usize(0), i))
-  }, {
-    .None
-  })
+  });
+  cond(
+    (i > usize(0)) => .Some(_byte_substr(part, usize(0), i)),
+    true => .None
+  )
 });
 
 // Split a string by '.' into parts
@@ -202,13 +202,13 @@ _split_dot :: (fn(s: *(String)) -> ArrayList(String))({
   (bytes : ArrayList(u8)) = s.*.as_bytes();
   (start : usize) = usize(0);
   (i : usize) = usize(0);
-  while (i < bytes.len()), {
+  while((i < bytes.len()), {
     if((bytes(i) == u8(0x2E)), {
       parts.push(_byte_substr(s, start, i));
       start = (i + usize(1));
     });
     i = (i + usize(1));
-  };
+  });
   parts.push(_byte_substr(s, start, bytes.len()));
   parts
 });
@@ -217,13 +217,13 @@ _split_dot :: (fn(s: *(String)) -> ArrayList(String))({
 _join_dot :: (fn(parts: *(ArrayList(String))) -> String)({
   (result : String) = String.new();
   (i : usize) = usize(0);
-  while (i < parts.*.len()), {
+  while((i < parts.*.len()), {
     if((i > usize(0)), {
       result = (result + `.`);
     });
     result = (result + parts.*(i));
     i = (i + usize(1));
-  };
+  });
   result
 });
 
@@ -233,7 +233,7 @@ _parse_host :: (fn(url: *(Url), host: String) -> unit)({
   // Look for trailing :digits
   (port_start : i32) = i32(-1);
   (i : i32) = (i32(bytes.len()) - i32(1));
-  while (i >= i32(0)), {
+  while((i >= i32(0)), {
     (b : u8) = bytes(usize(i));
     cond(
       (b == u8(0x3A)) => {
@@ -247,7 +247,7 @@ _parse_host :: (fn(url: *(Url), host: String) -> unit)({
         i = i32(-1);
       }
     );
-  };
+  });
 
   if((port_start >= i32(0)), {
     (port_str : String) = _byte_substr(&(host), usize((port_start + i32(1))), bytes.len());
@@ -268,26 +268,26 @@ _parse_host :: (fn(url: *(Url), host: String) -> unit)({
 // Check if rest starts with // followed by non-@/ then @
 _has_auth_pattern :: (fn(rest: *(String)) -> bool)({
   (bytes : ArrayList(u8)) = rest.*.as_bytes();
-  if((bytes.len() < usize(5)), { return false; });
-  if((bytes(usize(0)) != u8(0x2F)), { return false; });
-  if((bytes(usize(1)) != u8(0x2F)), { return false; });
+  if((bytes.len() < usize(5)), { return(false); });
+  if((bytes(usize(0)) != u8(0x2F)), { return(false); });
+  if((bytes(usize(1)) != u8(0x2F)), { return(false); });
   // Check for pattern //[^@/]+@[^@/]+
   (i : usize) = usize(2);
   (found_non_at : bool) = false;
-  while (i < bytes.len()), {
+  while((i < bytes.len()), {
     (b : u8) = bytes(i);
     cond(
       (b == u8(0x40)) => {
-        if(found_non_at, { return true; });
-        return false;
+        if(found_non_at, { return(true); });
+        return(false);
       },
-      (b == u8(0x2F)) => { return false; },
+      (b == u8(0x2F)) => { return(false); },
       true => {
         found_non_at = true;
       }
     );
     i = (i + usize(1));
-  };
+  });
   false
 });
 
@@ -310,13 +310,13 @@ parse :: (fn(url_str: String, slashes_denote_host: bool) -> Url)({
         if(!(has_space), {
           u.pathname = .Some(path_part);
           u.search = .Some(_byte_substr(&(rest), usize(qm), rest_bytes.len()));
-          return u;
+          return(u);
         });
       }, {
         // No ?, check no space/whitespace
         (has_ws : bool) = false;
         (wi : usize) = usize(0);
-        while (wi < rest_bytes.len()), {
+        while((wi < rest_bytes.len()), {
           (wb : u8) = rest_bytes(wi);
           if(((((wb == u8(0x20)) || (wb == u8(0x09))) || (wb == u8(0x0A))) || (wb == u8(0x0D))), {
             has_ws = true;
@@ -324,10 +324,10 @@ parse :: (fn(url_str: String, slashes_denote_host: bool) -> Url)({
           }, {
             wi = (wi + usize(1));
           });
-        };
+        });
         if(!(has_ws), {
           u.pathname = .Some(rest);
-          return u;
+          return(u);
         });
       });
     });
@@ -341,7 +341,7 @@ parse :: (fn(url_str: String, slashes_denote_host: bool) -> Url)({
     (pi : usize) = usize(0);
     (found_colon : bool) = false;
     (valid_proto : bool) = true;
-    while ((pi < rest_bytes2.len()) && !(found_colon)), {
+    while(((pi < rest_bytes2.len()) && !(found_colon)), {
       (b : u8) = rest_bytes2(pi);
       cond(
         (b == u8(0x3A)) => {
@@ -378,7 +378,7 @@ parse :: (fn(url_str: String, slashes_denote_host: bool) -> Url)({
           found_colon = true;
         }
       );
-    };
+    });
     ();
   };
 
@@ -458,7 +458,7 @@ parse :: (fn(url_str: String, slashes_denote_host: bool) -> Url)({
       (parts : ArrayList(String)) = _split_dot(&(hn));
       (pi2 : usize) = usize(0);
       (done : bool) = false;
-      while ((pi2 < parts.len()) && !(done)), {
+      while(((pi2 < parts.len()) && !(done)), {
         (part : String) = parts(pi2);
         if((part.as_bytes().len() > usize(0)), {
           if(!(_valid_hostname_part(&(part))), {
@@ -466,7 +466,7 @@ parse :: (fn(url_str: String, slashes_denote_host: bool) -> Url)({
             (part_bytes : ArrayList(u8)) = part.as_bytes();
             (new_part : ArrayList(u8)) = ArrayList(u8).with_capacity(part_bytes.len());
             (pj : usize) = usize(0);
-            while (pj < part_bytes.len()), {
+            while((pj < part_bytes.len()), {
               (pb : u8) = part_bytes(pj);
               if((pb > u8(127)), {
                 new_part.push(u8(0x78));
@@ -474,22 +474,22 @@ parse :: (fn(url_str: String, slashes_denote_host: bool) -> Url)({
                 new_part.push(pb);
               });
               pj = (pj + usize(1));
-            };
+            });
             (ascii_part : String) = String.from_bytes(new_part);
             if(!(_valid_hostname_part(&(ascii_part))), {
               // Invalid hostname part
               (valid_parts : ArrayList(String)) = ArrayList(String).new();
               (vk : usize) = usize(0);
-              while (vk < pi2), {
+              while((vk < pi2), {
                 valid_parts.push(parts(vk));
                 vk = (vk + usize(1));
-              };
+              });
               (not_host : ArrayList(String)) = ArrayList(String).new();
               (nk : usize) = (pi2 + usize(1));
-              while (nk < parts.len()), {
+              while((nk < parts.len()), {
                 not_host.push(parts(nk));
                 nk = (nk + usize(1));
-              };
+              });
 
               // Try to extract valid prefix from this part
               match(_hostname_part_start(&(part)),
@@ -501,10 +501,10 @@ parse :: (fn(url_str: String, slashes_denote_host: bool) -> Url)({
                     (new_not_host : ArrayList(String)) = ArrayList(String).new();
                     new_not_host.push(remainder);
                     (nh2 : usize) = usize(0);
-                    while (nh2 < not_host.len()), {
+                    while((nh2 < not_host.len()), {
                       new_not_host.push(not_host(nh2));
                       nh2 = (nh2 + usize(1));
-                    };
+                    });
                     not_host = new_not_host;
                   });
                 },
@@ -521,7 +521,7 @@ parse :: (fn(url_str: String, slashes_denote_host: bool) -> Url)({
           });
         });
         pi2 = (pi2 + usize(1));
-      };
+      });
     });
 
     // Hostname max length check
@@ -582,4 +582,4 @@ parse :: (fn(url_str: String, slashes_denote_host: bool) -> Url)({
   u
 });
 
-export Url, parse;
+export(Url, parse);

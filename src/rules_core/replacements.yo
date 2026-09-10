@@ -5,12 +5,14 @@
 //   +- → ±    ... → …    --- → —    -- → –
 //   Collapse repeated ?, !, and , characters.
 
-open import "std/string";
-{ ArrayList } :: import "std/collections/array_list";
-{ Token, TokenType } :: import "../token.yo";
-{ from_code_point } :: import "../common/char_utils.yo";
-{ byte_substring } :: import "../common/utils.yo";
-{ StateCore } :: import "./state_core.yo";
+pragma(Pragma.AllowUnsafe);
+{ String, rune } :: import("std/string");
+{ ArrayList } :: import("std/collections/array_list");
+{ Token, TokenType } :: import("../token.yo");
+{ from_code_point } :: import("../common/char_utils.yo");
+{ str_view } :: import("../common/utils.yo");
+{ byte_substring } :: import("../common/utils.yo");
+{ StateCore } :: import("./state_core.yo");
 
 // Check if a rune is ASCII whitespace (space, tab, LF, CR)
 _is_whitespace :: (fn(ch: rune) -> bool)(
@@ -70,16 +72,16 @@ _collapse_dots :: (fn(content: String) -> String)({
 
   match(bytes.ptr(),
     .Some(src_ptr) => {
-      while (i < len), {
-        if(((src_ptr &+ i).* == u8(0x2E)), {
+      while((i < len), {
+        if(((src_ptr.add(i)).* == u8(0x2E)), {
           // Flush bytes before dot run
           if((i > run_start), {
-            out.extend_from_ptr((src_ptr &+ run_start), (i - run_start));
+            out.extend_from_ptr((src_ptr.add(run_start)), (i - run_start));
           });
           (dot_start : usize) = i;
-          while ((i < len) && ((src_ptr &+ i).* == u8(0x2E))), {
+          while(((i < len) && ((src_ptr.add(i)).* == u8(0x2E))), {
             i = (i + usize(1));
-          };
+          });
           if(((i - dot_start) >= usize(2)), {
             // U+2026 ellipsis in UTF-8: 0xE2 0x80 0xA6
             out.push(u8(0xE2));
@@ -92,9 +94,9 @@ _collapse_dots :: (fn(content: String) -> String)({
         }, {
           i = (i + usize(1));
         });
-      };
+      });
       if((len > run_start), {
-        out.extend_from_ptr((src_ptr &+ run_start), (len - run_start));
+        out.extend_from_ptr((src_ptr.add(run_start)), (len - run_start));
       });
     },
     .None => ()
@@ -113,17 +115,17 @@ _collapse_excl_question :: (fn(content: String) -> String)({
 
   match(bytes.ptr(),
     .Some(src_ptr) => {
-      while (i < len), {
-        (b : u8) = (src_ptr &+ i).*;
+      while((i < len), {
+        (b : u8) = (src_ptr.add(i)).*;
         if(((b == u8(0x3F)) || (b == u8(0x21))), {
           // Flush bytes before this run
           if((i > run_start), {
-            out.extend_from_ptr((src_ptr &+ run_start), (i - run_start));
+            out.extend_from_ptr((src_ptr.add(run_start)), (i - run_start));
           });
           (char_start : usize) = i;
-          while ((i < len) && ((src_ptr &+ i).* == b)), {
+          while(((i < len) && ((src_ptr.add(i)).* == b)), {
             i = (i + usize(1));
-          };
+          });
           (run_len : usize) = (i - char_start);
           if((run_len >= usize(4)), {
             out.push(b);
@@ -131,18 +133,18 @@ _collapse_excl_question :: (fn(content: String) -> String)({
             out.push(b);
           }, {
             (j : usize) = usize(0);
-            while (j < run_len), {
+            while((j < run_len), {
               out.push(b);
               j = (j + usize(1));
-            };
+            });
           });
           run_start = i;
         }, {
           i = (i + usize(1));
         });
-      };
+      });
       if((len > run_start), {
-        out.extend_from_ptr((src_ptr &+ run_start), (len - run_start));
+        out.extend_from_ptr((src_ptr.add(run_start)), (len - run_start));
       });
     },
     .None => ()
@@ -161,23 +163,23 @@ _collapse_commas :: (fn(content: String) -> String)({
 
   match(bytes.ptr(),
     .Some(src_ptr) => {
-      while (i < len), {
-        if(((src_ptr &+ i).* == u8(0x2C)), {
+      while((i < len), {
+        if(((src_ptr.add(i)).* == u8(0x2C)), {
           // Flush bytes before comma run
           if((i > run_start), {
-            out.extend_from_ptr((src_ptr &+ run_start), (i - run_start));
+            out.extend_from_ptr((src_ptr.add(run_start)), (i - run_start));
           });
-          while ((i < len) && ((src_ptr &+ i).* == u8(0x2C))), {
+          while(((i < len) && ((src_ptr.add(i)).* == u8(0x2C))), {
             i = (i + usize(1));
-          };
+          });
           out.push(u8(0x2C));
           run_start = i;
         }, {
           i = (i + usize(1));
         });
-      };
+      });
       if((len > run_start), {
-        out.extend_from_ptr((src_ptr &+ run_start), (len - run_start));
+        out.extend_from_ptr((src_ptr.add(run_start)), (len - run_start));
       });
     },
     .None => ()
@@ -205,23 +207,23 @@ _replace_dashes :: (fn(content: String) -> String)({
 
   match(bytes.ptr(),
     .Some(src_ptr) => {
-      while (i < len), {
-        if(((src_ptr &+ i).* == u8(0x2D)), {
+      while((i < len), {
+        if(((src_ptr.add(i)).* == u8(0x2D)), {
           // Flush bytes before dash run
           if((i > run_start), {
-            out.extend_from_ptr((src_ptr &+ run_start), (i - run_start));
+            out.extend_from_ptr((src_ptr.add(run_start)), (i - run_start));
           });
           (dash_start : usize) = i;
-          while ((i < len) && ((src_ptr &+ i).* == u8(0x2D))), {
+          while(((i < len) && ((src_ptr.add(i)).* == u8(0x2D))), {
             i = (i + usize(1));
-          };
+          });
           (dash_count : usize) = (i - dash_start);
 
           // Get prev/next bytes for context
           (has_prev : bool) = (dash_start > usize(0));
-          (prev_byte : u8) = cond(has_prev => (src_ptr &+ (dash_start - usize(1))).*, true => u8(0));
+          (prev_byte : u8) = cond(has_prev => (src_ptr.add((dash_start - usize(1)))).*, true => u8(0));
           (has_next : bool) = (i < len);
-          (next_byte : u8) = cond(has_next => (src_ptr &+ i).*, true => u8(0));
+          (next_byte : u8) = cond(has_next => (src_ptr.add(i)).*, true => u8(0));
 
           cond(
             (dash_count == usize(3)) => {
@@ -258,19 +260,19 @@ _replace_dashes :: (fn(content: String) -> String)({
             },
             true => {
               (d : usize) = usize(0);
-              while (d < dash_count), {
+              while((d < dash_count), {
                 out.push(u8(0x2D));
                 d = (d + usize(1));
-              };
+              });
             }
           );
           run_start = i;
         }, {
           i = (i + usize(1));
         });
-      };
+      });
       if((len > run_start), {
-        out.extend_from_ptr((src_ptr &+ run_start), (len - run_start));
+        out.extend_from_ptr((src_ptr.add(run_start)), (len - run_start));
       });
     },
     .None => ()
@@ -305,12 +307,12 @@ _replace_rare :: (fn(content: String) -> String)({
 _replace_scoped :: (fn(inline_tokens: ArrayList(Token)) -> unit)({
   (inside_autolink : i32) = i32(0);
   (i : i32) = (i32(inline_tokens.len()) - i32(1));
-  while (i >= i32(0)), {
+  while((i >= i32(0)), {
     (token : *(Token)) = &(inline_tokens(usize(i)));
     if(((token.*.type_name == .TT_TEXT) && (inside_autolink == i32(0))), {
       (content_s : String) = byte_substring(token.*.content, i32(0), i32(token.*.content.len()));
       (replaced : String) = _replace_scoped_abbrs(content_s);
-      token.*.content = replaced.as_str();
+      token.*.content = str_view(replaced);
       token.*._content_owned = .Some(replaced);
     });
     if(((token.*.type_name == .TT_LINK_OPEN) && (token.*.info == "auto")), {
@@ -320,7 +322,7 @@ _replace_scoped :: (fn(inline_tokens: ArrayList(Token)) -> unit)({
       inside_autolink = (inside_autolink + i32(1));
     });
     i = (i - i32(1));
-  };
+  });
 });
 
 // Iterate inline children in reverse, replace rare sequences in text tokens,
@@ -328,13 +330,13 @@ _replace_scoped :: (fn(inline_tokens: ArrayList(Token)) -> unit)({
 _replace_rare_tokens :: (fn(inline_tokens: ArrayList(Token)) -> unit)({
   (inside_autolink : i32) = i32(0);
   (i : i32) = (i32(inline_tokens.len()) - i32(1));
-  while (i >= i32(0)), {
+  while((i >= i32(0)), {
     (token : *(Token)) = &(inline_tokens(usize(i)));
     if(((token.*.type_name == .TT_TEXT) && (inside_autolink == i32(0))), {
       if(_has_rare_chars(token.*.content), {
         (content_s : String) = byte_substring(token.*.content, i32(0), i32(token.*.content.len()));
         (replaced : String) = _replace_rare(content_s);
-        token.*.content = replaced.as_str();
+        token.*.content = str_view(replaced);
         token.*._content_owned = .Some(replaced);
       });
     });
@@ -345,14 +347,14 @@ _replace_rare_tokens :: (fn(inline_tokens: ArrayList(Token)) -> unit)({
       inside_autolink = (inside_autolink + i32(1));
     });
     i = (i - i32(1));
-  };
+  });
 });
 
 // Main replacements rule — iterate block tokens in reverse, process inline tokens.
 replacements :: (fn(state: *(StateCore)) -> unit)({
   (block_tokens : ArrayList(Token)) = state.*.tokens;
   (blk_idx : i32) = (i32(block_tokens.len()) - i32(1));
-  while (blk_idx >= i32(0)), {
+  while((blk_idx >= i32(0)), {
     (block_tok : *(Token)) = &(block_tokens(usize(blk_idx)));
     if((block_tok.*.type_name == .TT_INLINE), {
       match(block_tok.*.children,
@@ -368,7 +370,7 @@ replacements :: (fn(state: *(StateCore)) -> unit)({
       );
     });
     blk_idx = (blk_idx - i32(1));
-  };
+  });
 });
 
-export replacements;
+export(replacements);

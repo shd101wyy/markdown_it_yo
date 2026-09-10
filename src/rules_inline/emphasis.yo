@@ -2,11 +2,13 @@
 //
 // Process *this* and _that_
 
-open import "std/string";
-{ ArrayList } :: import "std/collections/array_list";
-{ Token, TokenType } :: import "../token.yo";
-{ StateInline, Delimiter, TokenMeta, ScanDelimsResult } :: import "./state_inline.yo";
-{ flush_pending, inline_push_token } :: import "./inline_helpers.yo";
+pragma(Pragma.AllowUnsafe);
+{ String } :: import("std/string");
+{ ArrayList } :: import("std/collections/array_list");
+{ Token, TokenType } :: import("../token.yo");
+{ StateInline, Delimiter, TokenMeta, ScanDelimsResult } :: import("./state_inline.yo");
+{ flush_pending, inline_push_token } :: import("./inline_helpers.yo");
+{ str_view } :: import("../common/utils.yo");
 
 // Cached marker strings to avoid per-call allocation
 _STAR := String.from("*");
@@ -20,11 +22,11 @@ emphasis_tokenize :: (fn(state: *(StateInline), silent: bool) -> bool)({
   (marker : i32) = i32(state.*._src_bytes.bytes(usize(start)));
 
   if(silent, {
-    return false;
+    return(false);
   });
 
   if(((marker != i32(0x5F)) && (marker != i32(0x2A))), {
-    return false;
+    return(false);
   });
 
   (scanned : ScanDelimsResult) = state.*.scan_delims(state.*.pos, (marker == i32(0x2A)));
@@ -34,9 +36,9 @@ emphasis_tokenize :: (fn(state: *(StateInline), silent: bool) -> bool)({
   );
 
   (i : i32) = i32(0);
-  while (i < scanned.length), {
+  while((i < scanned.length), {
     (token : Token) = Token.new(.TT_TEXT, "", i32(0));
-    token.content = marker_str.as_str();
+    token.content = str_view(marker_str);
     token._content_owned = .Some(marker_str);
     token.level = state.*.level;
     inline_push_token(state, token);
@@ -52,7 +54,7 @@ emphasis_tokenize :: (fn(state: *(StateInline), silent: bool) -> bool)({
     _ := state.*.delimiters.push(delim);
 
     i = (i + i32(1));
-  };
+  });
 
   state.*.pos = (state.*.pos + scanned.length);
   true
@@ -63,7 +65,7 @@ _post_process_emphasis :: (fn(tokens: ArrayList(Token), delimiters: ArrayList(De
   (max : i32) = i32(delimiters.len());
 
   (i : i32) = (max - i32(1));
-  while (i >= i32(0)), {
+  while((i >= i32(0)), {
     (start_delim : Delimiter) = delimiters(usize(i));
 
     if((((start_delim.marker == i32(0x5F)) || (start_delim.marker == i32(0x2A)))
@@ -130,7 +132,7 @@ _post_process_emphasis :: (fn(tokens: ArrayList(Token), delimiters: ArrayList(De
     });
 
     i = (i - i32(1));
-  };
+  });
 });
 
 emphasis_post_process :: (fn(state: *(StateInline)) -> unit)({
@@ -140,13 +142,13 @@ emphasis_post_process :: (fn(state: *(StateInline)) -> unit)({
   (max : i32) = i32(tokens_meta.len());
 
   (curr : i32) = i32(0);
-  while (curr < max), {
+  while((curr < max), {
     match(tokens_meta(usize(curr)),
       .Some(tm) => _post_process_emphasis(state.*.tokens, tm.delimiters),
       .None => ()
     );
     curr = (curr + i32(1));
-  };
+  });
 });
 
-export emphasis_tokenize, emphasis_post_process;
+export(emphasis_tokenize, emphasis_post_process);

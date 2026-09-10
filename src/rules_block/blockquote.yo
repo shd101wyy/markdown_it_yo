@@ -2,56 +2,57 @@
 //
 // Block quotes: lines starting with >
 
-open import "std/string";
-{ ArrayList } :: import "std/collections/array_list";
-{ Token, TokenType, MapRange } :: import "../token.yo";
-{StateBlock, BlockTokenizeFn, block_push_token, PARENT_BLOCKQUOTE} :: import "./state_block.yo";
-{ is_space } :: import "../common/utils.yo";
-{ fence } :: import "./fence.yo";
-{ hr } :: import "./hr.yo";
-{ html_block } :: import "./html_block.yo";
-{ heading } :: import "./heading.yo";
+pragma(Pragma.AllowUnsafe);
+import("std/string");
+{ ArrayList } :: import("std/collections/array_list");
+{ Token, TokenType, MapRange } :: import("../token.yo");
+{StateBlock, BlockTokenizeFn, block_push_token, PARENT_BLOCKQUOTE} :: import("./state_block.yo");
+{ is_space } :: import("../common/utils.yo");
+{ fence } :: import("./fence.yo");
+{ hr } :: import("./hr.yo");
+{ html_block } :: import("./html_block.yo");
+{ heading } :: import("./heading.yo");
 
 // Inline list-start check to avoid circular import with list.yo.
 // Replicates list() in silent mode when parent_type != "paragraph".
 _is_list_start :: (fn(state: *(StateBlock), line: i32) -> bool)({
   if(((state.*.s_count(usize(line)) - state.*.blk_indent) >= i32(4)), {
-    return false;
+    return(false);
   });
   if(((state.*.list_indent >= i32(0)) && (((state.*.s_count(usize(line)) - state.*.list_indent) >= i32(4)) && (state.*.s_count(usize(line)) < state.*.blk_indent))), {
-    return false;
+    return(false);
   });
   (max : i32) = state.*.e_marks(usize(line));
   (pos : i32) = (state.*.b_marks(usize(line)) + state.*.t_shift(usize(line)));
-  if((pos >= max), { return false; });
+  if((pos >= max), { return(false); });
   (ch : i32) = i32(state.*._src_bytes.bytes(usize(pos)));
   // Bullet: -, +, *
   if((((ch == i32(0x2A)) || (ch == i32(0x2D))) || (ch == i32(0x2B))), {
     if(((pos + i32(1)) < max), {
       if(!(is_space(i32(state.*._src_bytes.bytes(usize((pos + i32(1))))))), {
-        return false;
+        return(false);
       });
     });
-    return true;
+    return(true);
   });
   // Ordered: digit(s) then . or )
-  if(((ch < i32(0x30)) || (ch > i32(0x39))), { return false; });
+  if(((ch < i32(0x30)) || (ch > i32(0x39))), { return(false); });
   (opos : i32) = (pos + i32(1));
   (found : bool) = false;
-  while !(found), {
-    if((opos >= max), { return false; });
+  while(!(found), {
+    if((opos >= max), { return(false); });
     ch = i32(state.*._src_bytes.bytes(usize(opos)));
     opos = (opos + i32(1));
     if(((ch >= i32(0x30)) && (ch <= i32(0x39))), {
-      if(((opos - pos) >= i32(10)), { return false; });
+      if(((opos - pos) >= i32(10)), { return(false); });
     }, if(((ch == i32(0x29)) || (ch == i32(0x2E))), {
       found = true;
     }, {
-      return false;
+      return(false);
     }));
-  };
+  });
   if((opos < max), {
-    if(!(is_space(i32(state.*._src_bytes.bytes(usize(opos))))), { return false; });
+    if(!(is_space(i32(state.*._src_bytes.bytes(usize(opos))))), { return(false); });
   });
   true
 });
@@ -63,16 +64,16 @@ blockquote :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: 
 
   // If indented more than 3 spaces, it should be a code block
   if(((state.*.s_count(usize(start_line)) - state.*.blk_indent) >= i32(4)), {
-    return false;
+    return(false);
   });
 
   // Check the block quote marker
   if((i32(state.*._src_bytes.bytes(usize(pos))) != i32(0x3E)), {
-    return false;
+    return(false);
   });
 
   // We know it's a valid blockquote — no point scanning in silent mode
-  if(silent, { return true; });
+  if(silent, { return(true); });
 
   // Save old state for restoration
   (old_b_marks : ArrayList(i32)) = ArrayList(i32).new();
@@ -87,7 +88,7 @@ blockquote :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: 
 
   // Search the end of the blockquote
   (bq_done : bool) = false;
-  while ((next_line < end_line) && !(bq_done)), {
+  while(((next_line < end_line) && !(bq_done)), {
     (is_outdented : bool) = (state.*.s_count(usize(next_line)) < state.*.blk_indent);
 
     pos = (state.*.b_marks(usize(next_line)) + state.*.t_shift(usize(next_line)));
@@ -133,7 +134,7 @@ blockquote :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: 
 
       // Calculate remaining indentation
       (ws_done : bool) = false;
-      while ((pos < max) && !(ws_done)), {
+      while(((pos < max) && !(ws_done)), {
         (ch : i32) = i32(state.*._src_bytes.bytes(usize(pos)));
         if(is_space(ch), {
           if((ch == i32(0x09)), {
@@ -145,7 +146,7 @@ blockquote :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: 
         }, {
           ws_done = true;
         });
-      };
+      });
 
       last_line_empty = (pos >= max);
 
@@ -196,7 +197,7 @@ blockquote :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: 
         next_line = (next_line + i32(1));
       });
     })));
-  };
+  });
 
   (old_indent : i32) = state.*.blk_indent;
   state.*.blk_indent = i32(0);
@@ -233,16 +234,16 @@ blockquote :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: 
   state.*.parent_type = old_parent_type;
 
   (i : i32) = i32(0);
-  while (i < i32(old_t_shift.len())), {
+  while((i < i32(old_t_shift.len())), {
     &(state.*.b_marks(usize((i + start_line)))).* = old_b_marks(usize(i));
     &(state.*.t_shift(usize((i + start_line)))).* = old_t_shift(usize(i));
     &(state.*.s_count(usize((i + start_line)))).* = old_s_count(usize(i));
     &(state.*.bs_count(usize((i + start_line)))).* = old_bs_count(usize(i));
     i = (i + i32(1));
-  };
+  });
   state.*.blk_indent = old_indent;
 
   true
 });
 
-export blockquote;
+export(blockquote);

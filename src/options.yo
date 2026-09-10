@@ -1,9 +1,9 @@
 // Options for MarkdownIt parser.
 // Ported from: lib/index.mjs (markdown-it v14.1.1) options handling
 
-open import "std/string";
-{ ArrayList } :: import "std/collections/array_list";
-{ from_code_point } :: import "./common/char_utils.yo";
+{ String } :: import("std/string");
+{ ArrayList } :: import("std/collections/array_list");
+{ from_code_point } :: import("./common/char_utils.yo");
 
 Options :: struct(
   html : bool,
@@ -59,4 +59,4 @@ commonmark_options :: (fn() -> Options)({
   )
 });
 
-export Options, default_options, commonmark_options;
+export(Options, default_options, commonmark_options);

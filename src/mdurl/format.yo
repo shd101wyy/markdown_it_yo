@@ -2,8 +2,9 @@
 //
 // Reconstruct URL string from parsed Url object.
 
-open import "std/string";
-{ Url } :: import "./parse.yo";
+pragma(Pragma.AllowUnsafe);
+{ String } :: import("std/string");
+{ Url } :: import("./parse.yo");
 
 // Format a Url object back into a URL string.
 format :: (fn(url: *(Url)) -> String)({
@@ -66,4 +67,4 @@ format :: (fn(url: *(Url)) -> String)({
   result
 });
 
-export format;
+export(format);

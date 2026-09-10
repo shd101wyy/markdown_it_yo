@@ -2,11 +2,12 @@
 //
 // Block parser state — tracks line positions, indentation, and produces tokens.
 
-open import "std/string";
-{ ArrayList } :: import "std/collections/array_list";
-{ Token, TokenType } :: import "../token.yo";
-{ is_space } :: import "../common/utils.yo";
-{ Env } :: import "../env.yo";
+pragma(Pragma.AllowUnsafe);
+{ String } :: import("std/string");
+{ ArrayList } :: import("std/collections/array_list");
+{ Token, TokenType } :: import("../token.yo");
+{ is_space, str_view } :: import("../common/utils.yo");
+{ Env } :: import("../env.yo");
 
 // Parent type constants (replaces String-based parent_type)
 PARENT_ROOT :: i32(0);
@@ -25,8 +26,8 @@ StateBlock :: struct(
   // Line marker arrays (precomputed during construction)
   b_marks : ArrayList(i32),   // line begin offsets
   e_marks : ArrayList(i32),   // line end offsets
-  t_shift : ArrayList(i32),   // offset of first non-space char (tabs not expanded)
-  s_count : ArrayList(i32),   // indents per line (tabs expanded)
+  t_shift : ArrayList(i32),   // offset of first non-space char(tabs not expanded)
+  s_count : ArrayList(i32),   // indents per line(tabs expanded)
   bs_count : ArrayList(i32),  // blockquote shift compensation
 
   // Block parser variables
@@ -73,7 +74,7 @@ block_push_token :: (fn(state: *(StateBlock), tok: Token) -> unit)({
 // Create a new StateBlock and precompute line markers
 new_state_block :: (fn(src: String, env: *(Env), tokens: ArrayList(Token), html_enabled: bool, enable_table: bool, tokenize_fn: BlockTokenizeFn) -> StateBlock)(
   {
-    (bytes : str) = src.as_str();
+    (bytes : str) = str_view(src);
     (len : i32) = i32(bytes.len());
 
     // Estimate line count: ~60 bytes per line average, +1 for sentinel
@@ -91,7 +92,7 @@ new_state_block :: (fn(src: String, env: *(Env), tokens: ArrayList(Token), html_
     (offset : i32) = i32(0);
     (indent_found : bool) = false;
 
-    while (pos < len), {
+    while((pos < len), {
       (ch : i32) = i32(bytes.bytes(usize(pos)));
 
       if(!(indent_found), {
@@ -128,7 +129,7 @@ new_state_block :: (fn(src: String, env: *(Env), tokens: ArrayList(Token), html_
           pos = (pos + i32(1));
         });
       });
-    };
+    });
 
     // Push fake entry to simplify cache bounds checks
     _ := b_marks.push(len);
@@ -220,12 +221,12 @@ impl(StateBlock,
   // Skip empty lines from given line number, return first non-empty line
   skip_empty_lines : (fn(self: Self, from: i32) -> i32)({
     (line : i32) = from;
-    while (line < self.line_max), {
+    while((line < self.line_max), {
       if(((self.b_marks(usize(line)) + self.t_shift(usize(line))) < self.e_marks(usize(line))), {
-        return line;
+        return(line);
       });
       line = (line + i32(1));
-    };
+    });
     line
   }),
 
@@ -233,12 +234,12 @@ impl(StateBlock,
   skip_spaces : (fn(self: Self, pos_param: i32) -> i32)({
     (pos : i32) = pos_param;
     (max : i32) = i32(self._src_bytes.len());
-    while (pos < max), {
+    while((pos < max), {
       if(!(is_space(i32(self._src_bytes.bytes(usize(pos))))), {
-        return pos;
+        return(pos);
       });
       pos = (pos + i32(1));
-    };
+    });
     pos
   }),
 
@@ -246,14 +247,14 @@ impl(StateBlock,
   skip_spaces_back : (fn(self: Self, pos_param: i32, min: i32) -> i32)({
     (pos : i32) = pos_param;
     if((pos <= min), {
-      return pos;
+      return(pos);
     });
-    while (pos > min), {
+    while((pos > min), {
       pos = (pos - i32(1));
       if(!(is_space(i32(self._src_bytes.bytes(usize(pos))))), {
-        return (pos + i32(1));
+        return(pos + i32(1));
       });
-    };
+    });
     pos
   }),
 
@@ -261,12 +262,12 @@ impl(StateBlock,
   skip_chars : (fn(self: Self, pos_param: i32, code: i32) -> i32)({
     (pos : i32) = pos_param;
     (max : i32) = i32(self._src_bytes.len());
-    while (pos < max), {
+    while((pos < max), {
       if((i32(self._src_bytes.bytes(usize(pos))) != code), {
-        return pos;
+        return(pos);
       });
       pos = (pos + i32(1));
-    };
+    });
     pos
   }),
 
@@ -274,27 +275,27 @@ impl(StateBlock,
   skip_chars_back : (fn(self: Self, pos_param: i32, code: i32, min: i32) -> i32)({
     (pos : i32) = pos_param;
     if((pos <= min), {
-      return pos;
+      return(pos);
     });
-    while (pos > min), {
+    while((pos > min), {
       pos = (pos - i32(1));
       if((code != i32(self._src_bytes.bytes(usize(pos)))), {
-        return (pos + i32(1));
+        return(pos + i32(1));
       });
-    };
+    });
     pos
   }),
 
   // Cut lines range from source
   get_lines : (fn(self: Self, begin: i32, end: i32, indent: i32, keep_last_lf: bool) -> String)({
     if((begin >= end), {
-      return String.new();
+      return(String.new());
     });
 
     (out : ArrayList(u8)) = ArrayList(u8).with_capacity(usize(256));
     (line : i32) = begin;
 
-    while (line < end), {
+    while((line < end), {
       (line_indent : i32) = i32(0);
       (line_start : i32) = self.b_marks(usize(line));
       (first : i32) = line_start;
@@ -309,7 +310,7 @@ impl(StateBlock,
       );
 
       (done : bool) = false;
-      while ((first < last) && ((line_indent < indent) && !(done))), {
+      while(((first < last) && ((line_indent < indent) && !(done))), {
         (ch : i32) = i32(self._src_bytes.bytes(usize(first)));
         cond(
           is_space(ch) => {
@@ -329,29 +330,28 @@ impl(StateBlock,
         if(!(done), {
           first = (first + i32(1));
         });
-      };
+      });
 
       if((line_indent > indent), {
         // Partially expanding tabs: prepend spaces
         (spaces : i32) = (line_indent - indent);
         (s : i32) = i32(0);
-        while (s < spaces), {
+        while((s < spaces), {
           out.push(u8(0x20));
           s = (s + i32(1));
-        };
+        });
       });
 
       // Copy the line bytes directly via pointer
       if((last > first), {
-        out.extend_from_ptr(&(self._src_bytes.bytes(usize(first))), usize((last - first)));
+        out.extend_from_ptr(self._src_bytes.ptr().add(usize(first)), usize((last - first)));
       });
 
       line = (line + i32(1));
-    };
+    });
 
     String.from_bytes(out)
   })
 );
 
-export StateBlock, new_state_block, BlockTokenizeFn, block_push_token,
-       PARENT_ROOT, PARENT_PARAGRAPH, PARENT_BLOCKQUOTE, PARENT_LIST, PARENT_REFERENCE, PARENT_TABLE;
+export(StateBlock, new_state_block, BlockTokenizeFn, block_push_token, PARENT_ROOT, PARENT_PARAGRAPH, PARENT_BLOCKQUOTE, PARENT_LIST, PARENT_REFERENCE, PARENT_TABLE);

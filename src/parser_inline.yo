@@ -3,34 +3,35 @@
 // Inline-level parser. Dispatches to inline rules, then runs post-processing.
 // Does not use Ruler for now — rule chain is hardcoded.
 
-open import "std/string";
-{ ArrayList } :: import "std/collections/array_list";
-{ Token } :: import "./token.yo";
-{ StateInline, new_state_inline } :: import "./rules_inline/state_inline.yo";
-{ flush_pending } :: import "./rules_inline/inline_helpers.yo";
-{ Env } :: import "./env.yo";
+pragma(Pragma.AllowUnsafe);
+import("std/string");
+{ ArrayList } :: import("std/collections/array_list");
+{ Token } :: import("./token.yo");
+{ StateInline, new_state_inline } :: import("./rules_inline/state_inline.yo");
+{ flush_pending } :: import("./rules_inline/inline_helpers.yo");
+{ Env } :: import("./env.yo");
 
 // Inline tokenize rules
-{ text } :: import "./rules_inline/text.yo";
-{ newline } :: import "./rules_inline/newline.yo";
-{ escape_rule } :: import "./rules_inline/escape.yo";
-{ backtick } :: import "./rules_inline/backticks.yo";
-{ strikethrough_tokenize, strikethrough_post_process } :: import "./rules_inline/strikethrough.yo";
-{ emphasis_tokenize, emphasis_post_process } :: import "./rules_inline/emphasis.yo";
-{ entity } :: import "./rules_inline/entity.yo";
-{ link_rule } :: import "./rules_inline/link.yo";
-{ image_rule } :: import "./rules_inline/image.yo";
-{ autolink } :: import "./rules_inline/autolink.yo";
-{ html_inline } :: import "./rules_inline/html_inline.yo";
+{ text } :: import("./rules_inline/text.yo");
+{ newline } :: import("./rules_inline/newline.yo");
+{ escape_rule } :: import("./rules_inline/escape.yo");
+{ backtick } :: import("./rules_inline/backticks.yo");
+{ strikethrough_tokenize, strikethrough_post_process } :: import("./rules_inline/strikethrough.yo");
+{ emphasis_tokenize, emphasis_post_process } :: import("./rules_inline/emphasis.yo");
+{ entity } :: import("./rules_inline/entity.yo");
+{ link_rule } :: import("./rules_inline/link.yo");
+{ image_rule } :: import("./rules_inline/image.yo");
+{ autolink } :: import("./rules_inline/autolink.yo");
+{ html_inline } :: import("./rules_inline/html_inline.yo");
 
 // Post-processing rules
-{ link_pairs } :: import "./rules_inline/balance_pairs.yo";
-{ fragments_join } :: import "./rules_inline/fragments_join.yo";
+{ link_pairs } :: import("./rules_inline/balance_pairs.yo");
+{ fragments_join } :: import("./rules_inline/fragments_join.yo");
 
 // Standalone inline tokenize function — stored in StateInline._tokenize_fn
 // to allow recursive calls from link/image rules without circular imports.
 _inline_tokenize :: (fn(state: *(StateInline)) -> unit)({
-  while (state.*.pos < state.*.pos_max), {
+  while((state.*.pos < state.*.pos_max), {
     // First-byte dispatch: skip rules that can't match the current byte
     (ch : i32) = i32(state.*._src_bytes.bytes(usize(state.*.pos)));
     (ok : bool) = cond(
@@ -60,7 +61,7 @@ _inline_tokenize :: (fn(state: *(StateInline)) -> unit)({
       });
       state.*.pos = (state.*.pos + i32(1));
     });
-  };
+  });
 
   // Flush remaining pending text
   if((state.*.pending_start >= i32(0)), {
@@ -95,4 +96,4 @@ impl(ParserInline,
   })
 );
 
-export ParserInline, new_parser_inline;
+export(ParserInline, new_parser_inline);

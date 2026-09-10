@@ -2,13 +2,14 @@
 //
 // Process escaped chars and hardbreaks
 
-open import "std/string";
-{ ArrayList } :: import "std/collections/array_list";
-{ Token, TokenType } :: import "../token.yo";
-{ is_space, byte_substring, byte_str_slice } :: import "../common/utils.yo";
-{ from_code_point } :: import "../common/char_utils.yo";
-{ StateInline } :: import "./state_inline.yo";
-{ flush_pending, inline_push_token } :: import "./inline_helpers.yo";
+pragma(Pragma.AllowUnsafe);
+{ String } :: import("std/string");
+{ ArrayList } :: import("std/collections/array_list");
+{ Token, TokenType } :: import("../token.yo");
+{ is_space, byte_substring, byte_str_slice, str_view } :: import("../common/utils.yo");
+{ from_code_point } :: import("../common/char_utils.yo");
+{ StateInline } :: import("./state_inline.yo");
+{ flush_pending, inline_push_token } :: import("./inline_helpers.yo");
 
 // Table of escapable ASCII punctuation chars.
 // \\!"#$%&'()*+,./:;<=>?@[]^_`{|}~-
@@ -55,14 +56,14 @@ escape_rule :: (fn(state: *(StateInline), silent: bool) -> bool)({
   (max : i32) = state.*.pos_max;
 
   if((i32(state.*._src_bytes.bytes(usize(pos))) != i32(0x5C)), {
-    return false;
+    return(false);
   });
 
   pos = (pos + i32(1));
 
   // '\' at the end of the inline block
   if((pos >= max), {
-    return false;
+    return(false);
   });
 
   (ch1 : i32) = i32(state.*._src_bytes.bytes(usize(pos)));
@@ -74,12 +75,12 @@ escape_rule :: (fn(state: *(StateInline), silent: bool) -> bool)({
 
     pos = (pos + i32(1));
     // skip leading whitespaces from next line
-    while (((pos < max) && is_space(i32(state.*._src_bytes.bytes(usize(pos)))))), {
+    while((((pos < max) && is_space(i32(state.*._src_bytes.bytes(usize(pos)))))), {
       pos = (pos + i32(1));
-    };
+    });
 
     state.*.pos = pos;
-    return true;
+    return(true);
   });
 
   (escaped_str : String) = from_code_point(ch1);
@@ -93,9 +94,9 @@ escape_rule :: (fn(state: *(StateInline), silent: bool) -> bool)({
   if((ch1 >= i32(0x80)), {
     // Multi-byte UTF-8: collect all continuation bytes
     (end : i32) = (pos + i32(1));
-    while ((((end < max) && (i32(state.*._src_bytes.bytes(usize(end))) >= i32(0x80))) && (i32(state.*._src_bytes.bytes(usize(end))) < i32(0xC0)))), {
+    while(((((end < max) && (i32(state.*._src_bytes.bytes(usize(end))) >= i32(0x80))) && (i32(state.*._src_bytes.bytes(usize(end))) < i32(0xC0)))), {
       end = (end + i32(1));
-    };
+    });
     escaped_str = byte_substring(state.*._src_bytes, pos, end);
     pos = (end - i32(1));
   });
@@ -115,7 +116,7 @@ escape_rule :: (fn(state: *(StateInline), silent: bool) -> bool)({
       attrs: .None,
       map: .None,
       children: .None,
-      content: content_str.as_str(),
+      content: str_view(content_str),
       _content_owned: .Some(content_str),
       markup: byte_str_slice(state.*._src_bytes, state.*.pos, (pos + i32(1))),
       info: "escape",
@@ -130,4 +131,4 @@ escape_rule :: (fn(state: *(StateInline), silent: bool) -> bool)({
   true
 });
 
-export escape_rule;
+export(escape_rule);

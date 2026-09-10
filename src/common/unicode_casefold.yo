@@ -1,3 +1,3 @@
 // Re-exports from std/string/unicode
-_m :: import "std/string/unicode";
-export ...(_m);
+_m :: import("std/string/unicode");
+export(...(_m));

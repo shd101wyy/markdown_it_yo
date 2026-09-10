@@ -1,4 +1,4 @@
 // Re-exports from std/encoding/html_char_utils
-_m :: import "std/encoding/html_char_utils";
-export ...(_m);
+_m :: import("std/encoding/html_char_utils");
+export(...(_m));
 

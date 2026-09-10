@@ -10,9 +10,11 @@
 // - allow assign rules to additional named chains
 // - caching lists of active rules
 
-open import "std/string";
-{ ArrayList } :: import "std/collections/array_list";
-{ HashMap } :: import "std/collections/hash_map";
+pragma(Pragma.AllowUnsafe);
+{ String } :: import("std/string");
+{ ArrayList } :: import("std/collections/array_list");
+{ HashMap } :: import("std/collections/hash_map");
+{ assert } :: import("std/assert");
 
 // A single rule entry in the Ruler.
 RuleEntry :: (fn(comptime(F) : Type) -> comptime(Type))(
@@ -35,17 +37,17 @@ Ruler :: (fn(comptime(F) : Type) -> comptime(Type))(
 
 // Insert an element into an ArrayList at the given index by rebuilding the list.
 // ArrayList does not have a built-in insert method.
-_arrayListInsert :: (fn(forall(T : Type), list: ArrayList(T), index: usize, item: T) -> unit)({
+_arrayListInsert :: (fn(generic(T : Type), list: ArrayList(T), index: usize, item: T) -> unit)({
   (new_list : ArrayList(T)) = ArrayList(T).new();
   (i : usize) = usize(0);
   (len : usize) = list.len();
-  while (i < len), {
+  while((i < len), {
     if((i == index), {
       new_list.push(item);
     });
     new_list.push(list.get(i).unwrap());
     i = (i + usize(1));
-  };
+  });
   // If inserting at the end
   if((index == len), {
     new_list.push(item);
@@ -53,13 +55,13 @@ _arrayListInsert :: (fn(forall(T : Type), list: ArrayList(T), index: usize, item
   // Clear original and copy back
   list.clear();
   i = usize(0);
-  while (i < new_list.len()), {
+  while((i < new_list.len()), {
     list.push(new_list.get(i).unwrap());
     i = (i + usize(1));
-  };
+  });
 });
 
-impl(forall(F : Type), Ruler(F),
+impl(generic(F : Type), Ruler(F),
 
   new : (fn() -> Self)(
     Self(
@@ -72,13 +74,13 @@ impl(forall(F : Type), Ruler(F),
   _find : (fn(self: *(Self), name: String) -> i32)({
     (i : i32) = i32(0);
     (len : i32) = i32(self.*._rules.len());
-    while (i < len), {
+    while((i < len), {
       (rule : RuleEntry(F)) = self.*._rules.get(usize(i)).unwrap();
       if((rule.name == name), {
-        return i;
+        return(i);
       });
       i = (i + i32(1));
-    };
+    });
     i32(-1)
   }),
 
@@ -90,52 +92,52 @@ impl(forall(F : Type), Ruler(F),
     // Collect unique chain names from enabled rules
     (i : i32) = i32(0);
     (len : i32) = i32(self.*._rules.len());
-    while (i < len), {
+    while((i < len), {
       (rule : RuleEntry(F)) = self.*._rules.get(usize(i)).unwrap();
       if(rule.enabled, {
         (j : i32) = i32(0);
         (alt_len : i32) = i32(rule.alt.len());
-        while (j < alt_len), {
+        while((j < alt_len), {
           (alt_name : String) = rule.alt.get(usize(j)).unwrap();
           (found : bool) = false;
           (k : i32) = i32(0);
-          while (k < i32(chains.len())), {
+          while((k < i32(chains.len())), {
             if((chains.get(usize(k)).unwrap() == alt_name), {
               found = true;
             });
             k = (k + i32(1));
-          };
+          });
           if(!(found), {
             chains.push(alt_name);
           });
           j = (j + i32(1));
-        };
+        });
       });
       i = (i + i32(1));
-    };
+    });
 
     // Build cache for each chain
     (cache : HashMap(String, ArrayList(F))) = HashMap(String, ArrayList(F)).new();
 
     (ci : i32) = i32(0);
     (chains_len : i32) = i32(chains.len());
-    while (ci < chains_len), {
+    while((ci < chains_len), {
       (chain : String) = chains.get(usize(ci)).unwrap();
       (chain_rules : ArrayList(F)) = ArrayList(F).new();
 
       (ri : i32) = i32(0);
-      while (ri < len), {
+      while((ri < len), {
         (rule : RuleEntry(F)) = self.*._rules.get(usize(ri)).unwrap();
         if(rule.enabled, {
           if((chain.len() > usize(0)), {
             (found_alt : bool) = false;
             (ai : i32) = i32(0);
-            while (ai < i32(rule.alt.len())), {
+            while((ai < i32(rule.alt.len())), {
               if((rule.alt.get(usize(ai)).unwrap() == chain), {
                 found_alt = true;
               });
               ai = (ai + i32(1));
-            };
+            });
             if(found_alt, {
               chain_rules.push(rule.rule_fn);
             });
@@ -144,11 +146,11 @@ impl(forall(F : Type), Ruler(F),
           });
         });
         ri = (ri + i32(1));
-      };
+      });
 
-      cache.set(chain, chain_rules);
+      cache.insert(chain, chain_rules);
       ci = (ci + i32(1));
-    };
+    });
 
     self.*._cache = .Some(cache);
   }),
@@ -213,7 +215,7 @@ impl(forall(F : Type), Ruler(F),
 
     (i : i32) = i32(0);
     (len : i32) = i32(list.len());
-    while (i < len), {
+    while((i < len), {
       (name : String) = list.get(usize(i)).unwrap();
       (idx : i32) = self._find(name);
 
@@ -233,7 +235,7 @@ impl(forall(F : Type), Ruler(F),
       });
 
       i = (i + i32(1));
-    };
+    });
 
     self.*._cache = .None;
     result
@@ -243,7 +245,7 @@ impl(forall(F : Type), Ruler(F),
   enable_only : (fn(self: *(Self), list: ArrayList(String), ignore_invalid: bool) -> unit)({
     (i : i32) = i32(0);
     (len : i32) = i32(self.*._rules.len());
-    while (i < len), {
+    while((i < len), {
       (rule : RuleEntry(F)) = self.*._rules.get(usize(i)).unwrap();
       &(self.*._rules(usize(i))).* = RuleEntry(F)(
         name: rule.name,
@@ -252,7 +254,7 @@ impl(forall(F : Type), Ruler(F),
         alt: rule.alt
       );
       i = (i + i32(1));
-    };
+    });
 
     self.enable(list, ignore_invalid);
     ();
@@ -264,7 +266,7 @@ impl(forall(F : Type), Ruler(F),
 
     (i : i32) = i32(0);
     (len : i32) = i32(list.len());
-    while (i < len), {
+    while((i < len), {
       (name : String) = list.get(usize(i)).unwrap();
       (idx : i32) = self._find(name);
 
@@ -284,7 +286,7 @@ impl(forall(F : Type), Ruler(F),
       });
 
       i = (i + i32(1));
-    };
+    });
 
     self.*._cache = .None;
     result
@@ -309,4 +311,4 @@ impl(forall(F : Type), Ruler(F),
   })
 );
 
-export Ruler, RuleEntry;
+export(Ruler, RuleEntry);

@@ -1,13 +1,15 @@
 // Link validation and normalization utilities.
 // Ported from markdown-it's normalize_link/validate_link/normalize_link_text.
 
-open import "std/string";
-{ ArrayList } :: import "std/collections/array_list";
-{ Url, parse } :: import "../mdurl/parse.yo";
-{ format } :: import "../mdurl/format.yo";
-{ encode, ENCODE_DEFAULT_CHARS } :: import "../mdurl/encode.yo";
-{ decode, DECODE_DEFAULT_CHARS } :: import "../mdurl/decode.yo";
-{ to_unicode, to_ascii } :: import "./punycode.yo";
+pragma(Pragma.AllowUnsafe);
+{ String } :: import("std/string");
+{ ArrayList } :: import("std/collections/array_list");
+{ Url, parse } :: import("../mdurl/parse.yo");
+{ format } :: import("../mdurl/format.yo");
+{ encode, ENCODE_DEFAULT_CHARS } :: import("../mdurl/encode.yo");
+{ decode, DECODE_DEFAULT_CHARS } :: import("../mdurl/decode.yo");
+{ to_unicode, to_ascii } :: import("./punycode.yo");
+{ str_view } :: import("../common/utils.yo");
 
 // Protocols for which we recode hostnames (punycode)
 RECODE_HOSTNAME_FOR :: "http:,https:,mailto:";
@@ -15,25 +17,25 @@ RECODE_HOSTNAME_FOR :: "http:,https:,mailto:";
 // Check if a protocol string is in the recode list
 _should_recode_hostname :: (fn(protocol: *(String)) -> bool)({
   // Check protocol without allocating a lowercase copy
-  (p : str) = protocol.*.as_str();
+  (p : str) = str_view(protocol.*);
   (len : usize) = p.len();
   // "http:" = 5, "https:" = 6, "mailto:" = 7
   if((len == usize(5)), {
     // Check for "http:" case-insensitively
     if(((((p.bytes(usize(0)) | u8(0x20)) == u8(0x68)) && (((p.bytes(usize(1)) | u8(0x20)) == u8(0x74)) && (((p.bytes(usize(2)) | u8(0x20)) == u8(0x74)) && (((p.bytes(usize(3)) | u8(0x20)) == u8(0x70)) && (p.bytes(usize(4)) == u8(0x3A))))))), {
-      return true;
+      return(true);
     });
   });
   if((len == usize(6)), {
     // Check for "https:" case-insensitively
     if(((((p.bytes(usize(0)) | u8(0x20)) == u8(0x68)) && (((p.bytes(usize(1)) | u8(0x20)) == u8(0x74)) && (((p.bytes(usize(2)) | u8(0x20)) == u8(0x74)) && (((p.bytes(usize(3)) | u8(0x20)) == u8(0x70)) && (((p.bytes(usize(4)) | u8(0x20)) == u8(0x73)) && (p.bytes(usize(5)) == u8(0x3A)))))))), {
-      return true;
+      return(true);
     });
   });
   if((len == usize(7)), {
     // Check for "mailto:" case-insensitively
     if(((((p.bytes(usize(0)) | u8(0x20)) == u8(0x6D)) && (((p.bytes(usize(1)) | u8(0x20)) == u8(0x61)) && (((p.bytes(usize(2)) | u8(0x20)) == u8(0x69)) && (((p.bytes(usize(3)) | u8(0x20)) == u8(0x6C)) && (((p.bytes(usize(4)) | u8(0x20)) == u8(0x74)) && (((p.bytes(usize(5)) | u8(0x20)) == u8(0x6F)) && (p.bytes(usize(6)) == u8(0x3A))))))))), {
-      return true;
+      return(true);
     });
   });
   false
@@ -43,24 +45,24 @@ _should_recode_hostname :: (fn(protocol: *(String)) -> bool)({
 _is_bad_protocol :: (fn(url: String) -> bool)({
   // Fast path: most URLs start with http/https/# / . — all safe
   (bytes : ArrayList(u8)) = url.as_bytes();
-  if((bytes.len() == usize(0)), { return false; });
+  if((bytes.len() == usize(0)), { return(false); });
   (first : u8) = bytes(usize(0));
   // Common safe prefixes: 'h' (http), '#', '/', '.', '?', 'm' (mailto)
   // Only check lowercase for: 'v' (vbscript), 'j' (javascript), 'f' (file), 'd' (data)
   if(((first != u8(0x76)) && ((first != u8(0x56)) && ((first != u8(0x6A)) && ((first != u8(0x4A)) && ((first != u8(0x66)) && ((first != u8(0x46)) && ((first != u8(0x64)) && (first != u8(0x44))))))))), {
-    return false;
+    return(false);
   });
   (lower : String) = url.to_lowercase();
-  if(lower.starts_with(`vbscript:`), { return true; });
-  if(lower.starts_with(`javascript:`), { return true; });
-  if(lower.starts_with(`file:`), { return true; });
+  if(lower.starts_with(`vbscript:`), { return(true); });
+  if(lower.starts_with(`javascript:`), { return(true); });
+  if(lower.starts_with(`file:`), { return(true); });
   if(lower.starts_with(`data:`), {
     // Allow safe data URIs (images only)
-    if(lower.starts_with(`data:image/gif;`), { return false; });
-    if(lower.starts_with(`data:image/png;`), { return false; });
-    if(lower.starts_with(`data:image/jpeg;`), { return false; });
-    if(lower.starts_with(`data:image/webp;`), { return false; });
-    return true;
+    if(lower.starts_with(`data:image/gif;`), { return(false); });
+    if(lower.starts_with(`data:image/png;`), { return(false); });
+    if(lower.starts_with(`data:image/jpeg;`), { return(false); });
+    if(lower.starts_with(`data:image/webp;`), { return(false); });
+    return(true);
   });
   false
 });
@@ -85,7 +87,7 @@ normalize_link :: (fn(url: String) -> String)({
   }, {
     // Check for protocol (colon before path-like characters)
     (ci : usize) = usize(0);
-    while ((ci < url_len) && (!(needs_parse))), {
+    while(((ci < url_len) && (!(needs_parse))), {
       (b : u8) = bytes(ci);
       if((b == u8(0x3A)), {
         needs_parse = true;
@@ -95,12 +97,12 @@ normalize_link :: (fn(url: String) -> String)({
       }, {
         ci = (ci + usize(1));
       }));
-    };
+    });
   });
 
   if(!(needs_parse), {
     // No protocol or hostname — skip parse/format, just encode
-    return encode(url, ENCODE_DEFAULT_CHARS, true);
+    return(encode(url, ENCODE_DEFAULT_CHARS, true));
   });
 
   (parsed : Url) = parse(url, true);
@@ -157,7 +159,7 @@ normalize_link_text :: (fn(url: String) -> String)({
   (formatted : String) = format(&(parsed));
   // add '%' to exclude list because of https://github.com/markdown-it/markdown-it/issues/720
   (exclude : String) = (`${DECODE_DEFAULT_CHARS}` + `%`);
-  decode(formatted, exclude.as_str())
+  decode(formatted, str_view(exclude))
 });
 
-export validate_link, normalize_link, normalize_link_text;
+export(validate_link, normalize_link, normalize_link_text);

@@ -2,23 +2,24 @@
 //
 // Lists (bullet and ordered)
 
-open import "std/string";
-{ ArrayList } :: import "std/collections/array_list";
-{ Token, StringPair, TokenType, MapRange } :: import "../token.yo";
-{StateBlock, BlockTokenizeFn, block_push_token, PARENT_LIST, PARENT_PARAGRAPH} :: import "./state_block.yo";
-{ is_space, byte_substring, byte_str_slice } :: import "../common/utils.yo";
-{ fence } :: import "./fence.yo";
-{ hr } :: import "./hr.yo";
+pragma(Pragma.AllowUnsafe);
+import("std/string");
+{ ArrayList } :: import("std/collections/array_list");
+{ Token, StringPair, TokenType, MapRange } :: import("../token.yo");
+{StateBlock, BlockTokenizeFn, block_push_token, PARENT_LIST, PARENT_PARAGRAPH} :: import("./state_block.yo");
+{ is_space, byte_substring, byte_str_slice } :: import("../common/utils.yo");
+{ fence } :: import("./fence.yo");
+{ hr } :: import("./hr.yo");
 
 // Inline blockquote-start check to avoid circular import with blockquote.yo.
 // Replicates blockquote() in silent mode.
 _is_blockquote_start :: (fn(state: *(StateBlock), line: i32) -> bool)({
   if(((state.*.s_count(usize(line)) - state.*.blk_indent) >= i32(4)), {
-    return false;
+    return(false);
   });
   (pos : i32) = (state.*.b_marks(usize(line)) + state.*.t_shift(usize(line)));
   (max : i32) = state.*.e_marks(usize(line));
-  if((pos >= max), { return false; });
+  if((pos >= max), { return(false); });
   (i32(state.*._src_bytes.bytes(usize(pos))) == i32(0x3E))
 });
 
@@ -27,20 +28,20 @@ skip_bullet_list_marker :: (fn(state: *(StateBlock), start_line: i32) -> i32)({
   (max : i32) = state.*.e_marks(usize(start_line));
   (pos : i32) = (state.*.b_marks(usize(start_line)) + state.*.t_shift(usize(start_line)));
 
-  if((pos >= max), { return i32(-1); });
+  if((pos >= max), { return(i32(-1)); });
 
   (marker : i32) = i32(state.*._src_bytes.bytes(usize(pos)));
   pos = (pos + i32(1));
 
   // Check bullet: *, -, +
   if((((marker != i32(0x2A)) && (marker != i32(0x2D))) && (marker != i32(0x2B))), {
-    return i32(-1);
+    return(i32(-1));
   });
 
   if((pos < max), {
     (ch : i32) = i32(state.*._src_bytes.bytes(usize(pos)));
     if(!(is_space(ch)), {
-      return i32(-1);
+      return(i32(-1));
     });
   });
 
@@ -54,33 +55,33 @@ skip_ordered_list_marker :: (fn(state: *(StateBlock), start_line: i32) -> i32)({
   (pos : i32) = start;
 
   // List marker should have at least 2 chars (digit + dot)
-  if(((pos + i32(1)) >= max), { return i32(-1); });
+  if(((pos + i32(1)) >= max), { return(i32(-1)); });
 
   (ch : i32) = i32(state.*._src_bytes.bytes(usize(pos)));
   pos = (pos + i32(1));
 
-  if(((ch < i32(0x30)) || (ch > i32(0x39))), { return i32(-1); });
+  if(((ch < i32(0x30)) || (ch > i32(0x39))), { return(i32(-1)); });
 
   (found_end : bool) = false;
-  while !(found_end), {
-    if((pos >= max), { return i32(-1); });
+  while(!(found_end), {
+    if((pos >= max), { return(i32(-1)); });
 
     ch = i32(state.*._src_bytes.bytes(usize(pos)));
     pos = (pos + i32(1));
 
     if(((ch >= i32(0x30)) && (ch <= i32(0x39))), {
       // List marker should have no more than 9 digits
-      if(((pos - start) >= i32(10)), { return i32(-1); });
+      if(((pos - start) >= i32(10)), { return(i32(-1)); });
     }, if(((ch == i32(0x29)) || (ch == i32(0x2E))), {
       found_end = true;
     }, {
-      return i32(-1);
+      return(i32(-1));
     }));
-  };
+  });
 
   if((pos < max), {
     ch = i32(state.*._src_bytes.bytes(usize(pos)));
-    if(!(is_space(ch)), { return i32(-1); });
+    if(!(is_space(ch)), { return(i32(-1)); });
   });
 
   pos
@@ -92,7 +93,7 @@ mark_tight_paragraphs :: (fn(state: *(StateBlock), idx: usize) -> unit)({
   (i : i32) = (i32(idx) + i32(2));
   (l : i32) = (i32(state.*.tokens.len()) - i32(2));
 
-  while (i < l), {
+  while((i < l), {
     (tok : *(Token)) = &(state.*.tokens(usize(i)));
     if(((tok.*.level == level) && (tok.*.type_name == .TT_PARAGRAPH_OPEN)), {
       tok.*.hidden = true;
@@ -103,18 +104,18 @@ mark_tight_paragraphs :: (fn(state: *(StateBlock), idx: usize) -> unit)({
       i = (i + i32(2));
     });
     i = (i + i32(1));
-  };
+  });
 });
 
 // Parse ordered list start value from source bytes.
 parse_ordered_value :: (fn(state: *(StateBlock), start: i32, end: i32) -> i32)({
   (marker_value : i32) = i32(0);
   (parse_pos : i32) = start;
-  while (parse_pos < end), {
+  while((parse_pos < end), {
     (digit : i32) = (i32(state.*._src_bytes.bytes(usize(parse_pos))) - i32(0x30));
     marker_value = ((marker_value * i32(10)) + digit);
     parse_pos = (parse_pos + i32(1));
-  };
+  });
   marker_value
 });
 
@@ -124,7 +125,7 @@ list :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: bool) 
 
   // If indented more than 3 spaces, it should be a code block
   if(((state.*.s_count(usize(next_line)) - state.*.blk_indent) >= i32(4)), {
-    return false;
+    return(false);
   });
 
   // Special case:
@@ -134,7 +135,7 @@ list :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: bool) 
   //     - item 4
   //      - this one is a paragraph continuation
   if(((state.*.list_indent >= i32(0)) && (((state.*.s_count(usize(next_line)) - state.*.list_indent) >= i32(4)) && (state.*.s_count(usize(next_line)) < state.*.blk_indent))), {
-    return false;
+    return(false);
   });
 
   (is_terminating_paragraph : bool) = false;
@@ -159,23 +160,23 @@ list :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: bool) 
 
     // If we're starting a new ordered list right after a paragraph, it should start with 1.
     if((is_terminating_paragraph && (marker_value != i32(1))), {
-      return false;
+      return(false);
     });
   }, {
     pos_after_marker = skip_bullet_list_marker(state, next_line);
-    if((pos_after_marker < i32(0)), { return false; });
+    if((pos_after_marker < i32(0)), { return(false); });
   });
 
   // If we're starting a new unordered list right after a paragraph,
   // first line should not be empty.
   if(is_terminating_paragraph, {
     if((state.*.skip_spaces(pos_after_marker) >= state.*.e_marks(usize(next_line))), {
-      return false;
+      return(false);
     });
   });
 
   // For validation mode we can terminate immediately
-  if(silent, { return true; });
+  if(silent, { return(true); });
 
   // We should terminate list on style change. Remember first one to compare.
   (marker_char_code : i32) = i32(state.*._src_bytes.bytes(usize((pos_after_marker - i32(1)))));
@@ -220,7 +221,7 @@ list :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: bool) 
   state.*.parent_type = PARENT_LIST;
 
   (list_done : bool) = false;
-  while ((next_line < end_line) && !(list_done)), {
+  while(((next_line < end_line) && !(list_done)), {
     (pos : i32) = pos_after_marker;
     (max : i32) = state.*.e_marks(usize(next_line));
 
@@ -229,7 +230,7 @@ list :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: bool) 
 
     // Skip whitespace after marker to find content start
     (ws_done : bool) = false;
-    while ((pos < max) && !(ws_done)), {
+    while(((pos < max) && !(ws_done)), {
       (ch : i32) = i32(state.*._src_bytes.bytes(usize(pos)));
       cond(
         (ch == i32(0x09)) => {
@@ -243,7 +244,7 @@ list :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: bool) 
         }
       );
       if(!(ws_done), { pos = (pos + i32(1)); });
-    };
+    });
 
     (content_start : i32) = pos;
     (indent_after_marker : i32) = cond(
@@ -374,7 +375,7 @@ list :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: bool) 
         list_done = true;
       });
     });
-  };
+  });
 
   // Close list
   (list_type_close : TokenType) = cond(is_ordered => .TT_ORDERED_LIST_CLOSE, true => .TT_BULLET_LIST_CLOSE);
@@ -401,4 +402,4 @@ list :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: bool) 
   true
 });
 
-export list;
+export(list);

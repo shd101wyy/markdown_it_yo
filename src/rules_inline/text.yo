@@ -3,16 +3,17 @@
 // Skip text characters for text token, place those to pending buffer
 // and increment current pos.
 
-{ ArrayList } :: import "std/collections/array_list";
-{ StateInline } :: import "./state_inline.yo";
+pragma(Pragma.AllowUnsafe);
+{ ArrayList } :: import("std/collections/array_list");
+{ StateInline } :: import("./state_inline.yo");
 
 _build_terminator_table :: (fn() -> ArrayList(u8))({
   (t : ArrayList(u8)) = ArrayList(u8).with_capacity(usize(256));
   (i : i32) = i32(0);
-  while (i < i32(256)), {
+  while((i < i32(256)), {
     _ := t.push(u8(0));
     i = (i + i32(1));
-  };
+  });
   &(t(usize(0x0A))).* = u8(1); // \n
   &(t(usize(0x21))).* = u8(1); // !
   &(t(usize(0x23))).* = u8(1); // #
@@ -50,12 +51,12 @@ is_terminator_char :: (fn(ch: i32) -> bool)(
 text :: (fn(state: *(StateInline), silent: bool) -> bool)({
   (pos : i32) = state.*.pos;
 
-  while ((pos < state.*.pos_max) && !(is_terminator_char(i32(state.*._src_bytes.bytes(usize(pos)))))), {
+  while(((pos < state.*.pos_max) && !(is_terminator_char(i32(state.*._src_bytes.bytes(usize(pos)))))), {
     pos = (pos + i32(1));
-  };
+  });
 
   if((pos == state.*.pos), {
-    return false;
+    return(false);
   });
 
   if(!(silent), {
@@ -68,4 +69,4 @@ text :: (fn(state: *(StateInline), silent: bool) -> bool)({
   true
 });
 
-export text, is_terminator_char;
+export(text, is_terminator_char);

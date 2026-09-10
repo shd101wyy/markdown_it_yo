@@ -10,23 +10,25 @@
 //     4. text_join — merge text tokens
 //   → Renderer.render(tokens) → HTML
 
-open import "std/string";
-{ ArrayList } :: import "std/collections/array_list";
-{ Token, TokenType } :: import "./token.yo";
-{ Options, default_options } :: import "./options.yo";
-{ StateCore, new_state_core } :: import "./rules_core/state_core.yo";
-{ ParserBlock, new_parser_block } :: import "./parser_block.yo";
-{ ParserInline, new_parser_inline } :: import "./parser_inline.yo";
-{ Env, new_env } :: import "./env.yo";
+pragma(Pragma.AllowUnsafe);
+{ String } :: import("std/string");
+{ ArrayList } :: import("std/collections/array_list");
+{ Token, TokenType } :: import("./token.yo");
+{ Options, default_options } :: import("./options.yo");
+{ StateCore, new_state_core } :: import("./rules_core/state_core.yo");
+{ ParserBlock, new_parser_block } :: import("./parser_block.yo");
+{ ParserInline, new_parser_inline } :: import("./parser_inline.yo");
+{ Env, new_env } :: import("./env.yo");
 
 // Core rules
-{ normalize } :: import "./rules_core/normalize.yo";
-{ text_join } :: import "./rules_core/text_join.yo";
-{ replacements } :: import "./rules_core/replacements.yo";
-{ smartquotes } :: import "./rules_core/smartquotes.yo";
+{ normalize } :: import("./rules_core/normalize.yo");
+{ text_join } :: import("./rules_core/text_join.yo");
+{ replacements } :: import("./rules_core/replacements.yo");
+{ smartquotes } :: import("./rules_core/smartquotes.yo");
 
 // Renderer
-{ render } :: import "./renderer.yo";
+{ render } :: import("./renderer.yo");
+{ str_view } :: import("./common/utils.yo");
 
 // MarkdownIt — the main parser/renderer class
 MarkdownIt :: struct(
@@ -62,7 +64,7 @@ _core_block :: (fn(state: *(StateCore), block_parser: ParserBlock, html_enabled:
   if((state.*.inline_mode), {
     // In inline mode, wrap entire source as a single inline token
     (token : Token) = Token.new(.TT_INLINE, "", i32(0));
-    token.content = state.*.src.as_str();
+    token.content = str_view(state.*.src);
     token._content_owned = .Some(state.*.src);
     _ := state.*.tokens.push(token);
   }, {
@@ -76,7 +78,7 @@ _core_inline :: (fn(state: *(StateCore), inline_parser: ParserInline, html_enabl
   (len : i32) = i32(state.*.tokens.len());
   (i : i32) = i32(0);
 
-  while (i < len), {
+  while((i < len), {
     (token : *(Token)) = &(state.*.tokens(usize(i)));
     if((token.*.type_name == .TT_INLINE), {
       // Estimate ~1 inline token per 5 bytes of content
@@ -87,7 +89,7 @@ _core_inline :: (fn(state: *(StateCore), inline_parser: ParserInline, html_enabl
       token.*.children = .Some(children);
     });
     i = (i + i32(1));
-  };
+  });
 });
 
 impl(MarkdownIt,
@@ -119,10 +121,10 @@ impl(MarkdownIt,
 
   // Render markdown source to HTML string.
   render_src : (fn(self: Self, src: String) -> String)({
-    (src_len : usize) = src.bytes_len();
+    (src_len : usize) = src.len();
     (tokens : ArrayList(Token)) = self.parse(src);
     render(tokens, (&self.options), src_len)
   })
 );
 
-export MarkdownIt, new_markdown_it, new_markdown_it_with_options;
+export(MarkdownIt, new_markdown_it, new_markdown_it_with_options);
