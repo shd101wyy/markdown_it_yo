@@ -3,11 +3,12 @@
 // Clean up tokens after emphasis and strikethrough postprocessing:
 // merge adjacent text nodes into one and re-calculate all token levels.
 
-open import "std/string";
-{ ArrayList } :: import "std/collections/array_list";
-{ Token, TokenType } :: import "../token.yo";
-{ byte_substring } :: import "../common/utils.yo";
-{ StateInline } :: import "./state_inline.yo";
+pragma(Pragma.AllowUnsafe);
+{ String } :: import("std/string");
+{ ArrayList } :: import("std/collections/array_list");
+{ Token, TokenType } :: import("../token.yo");
+{ byte_substring, str_view } :: import("../common/utils.yo");
+{ StateInline } :: import("./state_inline.yo");
 
 fragments_join :: (fn(state: *(StateInline)) -> unit)({
   (level : i32) = i32(0);
@@ -17,7 +18,7 @@ fragments_join :: (fn(state: *(StateInline)) -> unit)({
   (curr : i32) = i32(0);
   (last : i32) = i32(0);
 
-  while (curr < max), {
+  while((curr < max), {
     (tok : *(Token)) = &(tokens(usize(curr)));
 
     // re-calculate levels
@@ -34,8 +35,8 @@ fragments_join :: (fn(state: *(StateInline)) -> unit)({
       if((next_tok.*.type_name == .TT_TEXT), {
         // collapse two adjacent text nodes: next.content = tok.content + next.content
         (combined : String) = byte_substring(tok.*.content, i32(0), i32(tok.*.content.len()));
-        (&combined).push_str(next_tok.*.content);
-        next_tok.*.content = combined.as_str();
+        combined.push_str(next_tok.*.content);
+        next_tok.*.content = str_view(combined);
         next_tok.*._content_owned = .Some(combined);
       }, {
         if((curr != last), {
@@ -51,14 +52,14 @@ fragments_join :: (fn(state: *(StateInline)) -> unit)({
     });
 
     curr = (curr + i32(1));
-  };
+  });
 
   // Truncate tokens to `last` length
   if((curr != last), {
-    while (i32(tokens.len()) > last), {
+    while((i32(tokens.len()) > last), {
       _ := tokens.pop();
-    };
+    });
   });
 });
 
-export fragments_join;
+export(fragments_join);

@@ -2,9 +2,9 @@
 //
 // Parse link destination from markdown source.
 
-open import "std/string";
-{ ArrayList } :: import "std/collections/array_list";
-{ unescape_all, byte_substring } :: import "../common/utils.yo";
+{ String } :: import("std/string");
+{ ArrayList } :: import("std/collections/array_list");
+{ unescape_all, byte_substring } :: import("../common/utils.yo");
 
 // Result of parsing a link destination
 LinkDestResult :: struct(
@@ -24,7 +24,7 @@ parse_link_destination :: (fn(input: str, start: i32, max: i32) -> LinkDestResul
     (result : LinkDestResult) = LinkDestResult(ok: false, pos: i32(0), str: String.new());
 
     if((pos >= max), {
-      return result;
+      return(result);
     });
 
     (code : u8) = input.bytes(usize(pos));
@@ -32,16 +32,16 @@ parse_link_destination :: (fn(input: str, start: i32, max: i32) -> LinkDestResul
     // Parse <url> form
     if((code == u8(0x3C)), {
       pos = (pos + i32(1));
-      while (pos < max), {
+      while((pos < max), {
         code = input.bytes(usize(pos));
         cond(
           // \n - not allowed inside <...>
           (code == u8(0x0A)) => {
-            return result;
+            return(result);
           },
           // < - not allowed inside <...>
           (code == u8(0x3C)) => {
-            return result;
+            return(result);
           },
           // > - closing angle bracket
           (code == u8(0x3E)) => {
@@ -50,7 +50,7 @@ parse_link_destination :: (fn(input: str, start: i32, max: i32) -> LinkDestResul
               pos: (pos + i32(1)),
               str: unescape_all(byte_substring(input, (start + i32(1)), pos))
             );
-            return result;
+            return(result);
           },
           // backslash escape
           ((code == u8(0x5C)) && ((pos + i32(1)) < max)) => {
@@ -60,16 +60,16 @@ parse_link_destination :: (fn(input: str, start: i32, max: i32) -> LinkDestResul
             pos = (pos + i32(1));
           }
         );
-      };
+      });
 
       // no closing '>'
-      return result;
+      return(result);
     });
 
     // Parse bare url form
     (level : i32) = i32(0);
     (done : bool) = false;
-    while ((pos < max) && !(done)), {
+    while(((pos < max) && !(done)), {
       code = input.bytes(usize(pos));
 
       cond(
@@ -93,7 +93,7 @@ parse_link_destination :: (fn(input: str, start: i32, max: i32) -> LinkDestResul
         (code == u8(0x28)) => {
           level = (level + i32(1));
           if((level > i32(32)), {
-            return result;
+            return(result);
           });
           pos = (pos + i32(1));
         },
@@ -110,13 +110,13 @@ parse_link_destination :: (fn(input: str, start: i32, max: i32) -> LinkDestResul
           pos = (pos + i32(1));
         }
       );
-    };
+    });
 
     if((start == pos), {
-      return result;
+      return(result);
     });
     if((level != i32(0)), {
-      return result;
+      return(result);
     });
 
     result = LinkDestResult(
@@ -128,4 +128,4 @@ parse_link_destination :: (fn(input: str, start: i32, max: i32) -> LinkDestResul
   }
 );
 
-export LinkDestResult, parse_link_destination;
+export(LinkDestResult, parse_link_destination);

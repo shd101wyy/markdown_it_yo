@@ -2,11 +2,12 @@
 //
 // ATX headings (#, ##, ...)
 
-open import "std/string";
-{ ArrayList } :: import "std/collections/array_list";
-{ Token, TokenType, MapRange } :: import "../token.yo";
-{ StateBlock, block_push_token } :: import "./state_block.yo";
-{ is_space, byte_str_slice } :: import "../common/utils.yo";
+pragma(Pragma.AllowUnsafe);
+import("std/string");
+{ ArrayList } :: import("std/collections/array_list");
+{ Token, TokenType, MapRange } :: import("../token.yo");
+{ StateBlock, block_push_token } :: import("./state_block.yo");
+{ is_space, byte_str_slice } :: import("../common/utils.yo");
 
 // ATX heading rule
 heading :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: bool) -> bool)({
@@ -15,13 +16,13 @@ heading :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: boo
 
   // if it's indented more than 3 spaces, it should be a code block
   if(((state.*.s_count(usize(start_line)) - state.*.blk_indent) >= i32(4)), {
-    return false;
+    return(false);
   });
 
   (ch : i32) = i32(state.*._src_bytes.bytes(usize(pos)));
 
   if(((ch != i32(0x23)) || (pos >= max)), {
-    return false;
+    return(false);
   });
 
   // count heading level
@@ -30,20 +31,20 @@ heading :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: boo
   if((pos < max), {
     ch = i32(state.*._src_bytes.bytes(usize(pos)));
   });
-  while (((ch == i32(0x23)) && (pos < max)) && (level <= i32(6))), {
+  while((((ch == i32(0x23)) && (pos < max)) && (level <= i32(6))), {
     level = (level + i32(1));
     pos = (pos + i32(1));
     if((pos < max), {
       ch = i32(state.*._src_bytes.bytes(usize(pos)));
     });
-  };
+  });
 
   if(((level > i32(6)) || ((pos < max) && (!(is_space(ch))))), {
-    return false;
+    return(false);
   });
 
   if(silent, {
-    return true;
+    return(true);
   });
 
   // Let's cut tails like '    ###  ' from the end of string
@@ -78,12 +79,12 @@ heading :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: boo
   block_push_token(state, token_o);
 
   // inline content - skip leading/trailing whitespace to avoid trim() allocation
-  while (((pos < max) && is_space(i32(state.*._src_bytes.bytes(usize(pos)))))), {
+  while((((pos < max) && is_space(i32(state.*._src_bytes.bytes(usize(pos)))))), {
     pos = (pos + i32(1));
-  };
-  while (((max > pos) && is_space(i32(state.*._src_bytes.bytes(usize((max - i32(1)))))))), {
+  });
+  while((((max > pos) && is_space(i32(state.*._src_bytes.bytes(usize((max - i32(1)))))))), {
     max = (max - i32(1));
-  };
+  });
   (content_str : str) = byte_str_slice(state.*._src_bytes, pos, max);
 
   (token_i : Token) = Token.new(.TT_INLINE, "", i32(0));
@@ -101,4 +102,4 @@ heading :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: boo
   true
 });
 
-export heading;
+export(heading);

@@ -2,17 +2,18 @@
 //
 // Process ![image](src "title")
 
-open import "std/string";
-{ ArrayList } :: import "std/collections/array_list";
-{ Token, StringPair, TokenType } :: import "../token.yo";
-{ StateInline, new_state_inline } :: import "./state_inline.yo";
-{ state_push } :: import "./inline_helpers.yo";
-{ is_space, normalize_reference, byte_substring } :: import "../common/utils.yo";
-{ validate_link, normalize_link } :: import "../common/link_utils.yo";
-{ parse_link_label } :: import "../helpers/parse_link_label.yo";
-{ LinkDestResult, parse_link_destination } :: import "../helpers/parse_link_destination.yo";
-{ LinkTitleResult, parse_link_title } :: import "../helpers/parse_link_title.yo";
-{ Reference, Env } :: import "../env.yo";
+pragma(Pragma.AllowUnsafe);
+{ String } :: import("std/string");
+{ ArrayList } :: import("std/collections/array_list");
+{ Token, StringPair, TokenType } :: import("../token.yo");
+{ StateInline, new_state_inline } :: import("./state_inline.yo");
+{ state_push } :: import("./inline_helpers.yo");
+{ is_space, normalize_reference, byte_substring, str_view } :: import("../common/utils.yo");
+{ validate_link, normalize_link } :: import("../common/link_utils.yo");
+{ parse_link_label } :: import("../helpers/parse_link_label.yo");
+{ LinkDestResult, parse_link_destination } :: import("../helpers/parse_link_destination.yo");
+{ LinkTitleResult, parse_link_title } :: import("../helpers/parse_link_title.yo");
+{ Reference, Env } :: import("../env.yo");
 
 image_rule :: (fn(state: *(StateInline), silent: bool) -> bool)({
   (pos : i32) = state.*.pos;
@@ -20,18 +21,18 @@ image_rule :: (fn(state: *(StateInline), silent: bool) -> bool)({
 
   // Must start with '!'
   if((i32(state.*._src_bytes.bytes(usize(pos))) != i32(0x21)), {
-    return false;
+    return(false);
   });
   // Followed by '['
-  if(((pos + i32(1)) >= max), { return false; });
+  if(((pos + i32(1)) >= max), { return(false); });
   if((i32(state.*._src_bytes.bytes(usize((pos + i32(1))))) != i32(0x5B)), {
-    return false;
+    return(false);
   });
 
   (label_start : i32) = (pos + i32(2));
   (label_end : i32) = parse_link_label(state.*._src_bytes, (pos + i32(1)), max, false);
 
-  if((label_end < i32(0)), { return false; });
+  if((label_end < i32(0)), { return(false); });
 
   (href : String) = String.new();
   (title : String) = String.new();
@@ -45,10 +46,10 @@ image_rule :: (fn(state: *(StateInline), silent: bool) -> bool)({
     pos = (pos + i32(1));
 
     // Skip spaces
-    while (((pos < max) && (is_space(i32(state.*._src_bytes.bytes(usize(pos)))) || (i32(state.*._src_bytes.bytes(usize(pos))) == i32(0x0A))))), {
+    while((((pos < max) && (is_space(i32(state.*._src_bytes.bytes(usize(pos)))) || (i32(state.*._src_bytes.bytes(usize(pos))) == i32(0x0A))))), {
       pos = (pos + i32(1));
-    };
-    if((pos >= max), { return false; });
+    });
+    if((pos >= max), { return(false); });
 
     // Parse link destination
     (start : i32) = pos;
@@ -63,9 +64,9 @@ image_rule :: (fn(state: *(StateInline), silent: bool) -> bool)({
 
     // Skip spaces
     start = pos;
-    while (((pos < max) && (is_space(i32(state.*._src_bytes.bytes(usize(pos)))) || (i32(state.*._src_bytes.bytes(usize(pos))) == i32(0x0A))))), {
+    while((((pos < max) && (is_space(i32(state.*._src_bytes.bytes(usize(pos)))) || (i32(state.*._src_bytes.bytes(usize(pos))) == i32(0x0A))))), {
       pos = (pos + i32(1));
-    };
+    });
 
     // Parse title
     (title_result : LinkTitleResult) = parse_link_title(state.*.src, pos, max, .None);
@@ -73,9 +74,9 @@ image_rule :: (fn(state: *(StateInline), silent: bool) -> bool)({
       title = title_result.str;
       pos = title_result.pos;
 
-      while (((pos < max) && (is_space(i32(state.*._src_bytes.bytes(usize(pos)))) || (i32(state.*._src_bytes.bytes(usize(pos))) == i32(0x0A))))), {
+      while((((pos < max) && (is_space(i32(state.*._src_bytes.bytes(usize(pos)))) || (i32(state.*._src_bytes.bytes(usize(pos))) == i32(0x0A))))), {
         pos = (pos + i32(1));
-      };
+      });
     });
 
     if(((pos >= max) || (i32(state.*._src_bytes.bytes(usize(pos))) != i32(0x29))), {
@@ -110,7 +111,7 @@ image_rule :: (fn(state: *(StateInline), silent: bool) -> bool)({
     });
 
     (label : String) = normalize_reference(ref_label);
-    if((label.len() == usize(0)), { return false; });
+    if((label.len() == usize(0)), { return(false); });
 
     (env : *(Env)) = state.*.env;
     (ref_opt : Option(Reference)) = env.*.references.get(label);
@@ -120,7 +121,7 @@ image_rule :: (fn(state: *(StateInline), silent: bool) -> bool)({
         title = r.title;
       },
       .None => {
-        return false;
+        return(false);
       }
     );
   });
@@ -130,7 +131,7 @@ image_rule :: (fn(state: *(StateInline), silent: bool) -> bool)({
 
     // Parse alt text content through the full inline parser to get child tokens
     (children_tokens : ArrayList(Token)) = ArrayList(Token).new();
-    (sub_state : StateInline) = new_state_inline(content.as_str(), state.*.env, children_tokens, state.*.html_enabled, state.*.enable_strikethrough, state.*._tokenize_fn, state.*._parse_fn);
+    (sub_state : StateInline) = new_state_inline(str_view(content), state.*.env, children_tokens, state.*.html_enabled, state.*.enable_strikethrough, state.*._tokenize_fn, state.*._parse_fn);
     state.*._parse_fn((&sub_state));
 
     (token : Token) = state_push(state, .TT_IMAGE, "img", i32(0));
@@ -142,7 +143,7 @@ image_rule :: (fn(state: *(StateInline), silent: bool) -> bool)({
     });
     token.attrs = .Some(attrs);
     token.children = .Some(children_tokens);
-    token.content = content.as_str();
+    token.content = str_view(content);
     token._content_owned = .Some(content);
     &(state.*.tokens(usize((i32(state.*.tokens.len()) - i32(1))))).* = token;
   });
@@ -152,4 +153,4 @@ image_rule :: (fn(state: *(StateInline), silent: bool) -> bool)({
   true
 });
 
-export image_rule;
+export(image_rule);

@@ -2,20 +2,21 @@
 //
 // Parse backticks — inline code spans
 
-open import "std/string";
-{ ArrayList } :: import "std/collections/array_list";
-{ HashMap } :: import "std/collections/hash_map";
-{ Token, TokenType } :: import "../token.yo";
-{ StateInline } :: import "./state_inline.yo";
-{ flush_pending, inline_push_token } :: import "./inline_helpers.yo";
-{ byte_substring, byte_str_slice } :: import "../common/utils.yo";
+pragma(Pragma.AllowUnsafe);
+{ String } :: import("std/string");
+{ ArrayList } :: import("std/collections/array_list");
+{ HashMap } :: import("std/collections/hash_map");
+{ Token, TokenType } :: import("../token.yo");
+{ StateInline } :: import("./state_inline.yo");
+{ flush_pending, inline_push_token } :: import("./inline_helpers.yo");
+{ byte_substring, byte_str_slice, str_view } :: import("../common/utils.yo");
 
 backtick :: (fn(state: *(StateInline), silent: bool) -> bool)({
   (pos : i32) = state.*.pos;
   (ch : i32) = i32(state.*._src_bytes.bytes(usize(pos)));
 
   if((ch != i32(0x60)), {
-    return false;
+    return(false);
   });
 
   (start : i32) = pos;
@@ -23,9 +24,9 @@ backtick :: (fn(state: *(StateInline), silent: bool) -> bool)({
   (max : i32) = state.*.pos_max;
 
   // scan marker length
-  while (((pos < max) && (i32(state.*._src_bytes.bytes(usize(pos))) == i32(0x60)))), {
+  while((((pos < max) && (i32(state.*._src_bytes.bytes(usize(pos))) == i32(0x60)))), {
     pos = (pos + i32(1));
-  };
+  });
 
   (marker : str) = byte_str_slice(state.*._src_bytes, start, pos);
   (opener_length : i32) = (pos - start);
@@ -46,7 +47,7 @@ backtick :: (fn(state: *(StateInline), silent: bool) -> bool)({
             });
           });
           state.*.pos = (state.*.pos + opener_length);
-          return true;
+          return(true);
         });
       },
       .None => {
@@ -59,17 +60,17 @@ backtick :: (fn(state: *(StateInline), silent: bool) -> bool)({
   (found : bool) = false;
 
   // Scan until the end of the line (or until matching closer is found)
-  while ((found == false)), {
+  while(((found == false)), {
     // Find next backtick
     (match_start : i32) = i32(-1);
     (scan : i32) = match_end;
-    while (((scan < max) && (match_start == i32(-1)))), {
+    while((((scan < max) && (match_start == i32(-1)))), {
       if((i32(state.*._src_bytes.bytes(usize(scan))) == i32(0x60)), {
         match_start = scan;
       }, {
         scan = (scan + i32(1));
       });
-    };
+    });
 
     if((match_start == i32(-1)), {
       // No more backticks found
@@ -78,9 +79,9 @@ backtick :: (fn(state: *(StateInline), silent: bool) -> bool)({
       match_end = (match_start + i32(1));
 
       // scan closer length
-      while (((match_end < max) && (i32(state.*._src_bytes.bytes(usize(match_end))) == i32(0x60)))), {
+      while((((match_end < max) && (i32(state.*._src_bytes.bytes(usize(match_end))) == i32(0x60)))), {
         match_end = (match_end + i32(1));
-      };
+      });
 
       (closer_length : i32) = (match_end - match_start);
 
@@ -108,7 +109,7 @@ backtick :: (fn(state: *(StateInline), silent: bool) -> bool)({
             attrs: .None,
             map: .None,
             children: .None,
-            content: content.as_str(),
+            content: str_view(content),
             _content_owned: .Some(content),
             markup: marker,
             info: "",
@@ -119,22 +120,22 @@ backtick :: (fn(state: *(StateInline), silent: bool) -> bool)({
           inline_push_token(state, token);
         });
         state.*.pos = match_end;
-        return true;
+        return(true);
       });
 
       // Different length found, cache it as upper limit
       match(state.*.backticks,
         .Some(bt) => {
-          _ := bt.set(closer_length, match_start);
+          _ := bt.insert(closer_length, match_start);
         },
         .None => {
           (bt : HashMap(i32, i32)) = HashMap(i32, i32).new();
-          _ := bt.set(closer_length, match_start);
+          _ := bt.insert(closer_length, match_start);
           state.*.backticks = .Some(bt);
         }
       );
     });
-  };
+  });
 
   // Scanned through the end, didn't find anything
   state.*.backticks_scanned = true;
@@ -148,4 +149,4 @@ backtick :: (fn(state: *(StateInline), silent: bool) -> bool)({
   true
 });
 
-export backtick;
+export(backtick);

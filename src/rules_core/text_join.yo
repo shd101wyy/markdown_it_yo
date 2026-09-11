@@ -4,18 +4,19 @@
 // This is set as a separate rule to provide an opportunity for plugins
 // to run text replacements after text join, but before escape join.
 
-open import "std/string";
-{ ArrayList } :: import "std/collections/array_list";
-{ Token, TokenType } :: import "../token.yo";
-{ byte_substring } :: import "../common/utils.yo";
-{ StateCore } :: import "./state_core.yo";
+pragma(Pragma.AllowUnsafe);
+{ String } :: import("std/string");
+{ ArrayList } :: import("std/collections/array_list");
+{ Token, TokenType } :: import("../token.yo");
+{ byte_substring, str_view } :: import("../common/utils.yo");
+{ StateCore } :: import("./state_core.yo");
 
 text_join :: (fn(state: *(StateCore)) -> unit)({
   (block_tokens : ArrayList(Token)) = state.*.tokens;
   (l : i32) = i32(block_tokens.len());
 
   (j : i32) = i32(0);
-  while (j < l), {
+  while((j < l), {
     (block_tok : *(Token)) = &(block_tokens(usize(j)));
 
     if((block_tok.*.type_name == .TT_INLINE), {
@@ -25,26 +26,26 @@ text_join :: (fn(state: *(StateCore)) -> unit)({
 
           // First pass: rename text_special → text
           (curr : i32) = i32(0);
-          while (curr < max), {
+          while((curr < max), {
             (tok : *(Token)) = &(tokens(usize(curr)));
             if((tok.*.type_name == .TT_TEXT_SPECIAL), {
               tok.*.type_name = .TT_TEXT;
             });
             curr = (curr + i32(1));
-          };
+          });
 
           // Second pass: merge adjacent text tokens
           curr = i32(0);
           (last : i32) = i32(0);
-          while (curr < max), {
+          while((curr < max), {
             (tok : *(Token)) = &(tokens(usize(curr)));
             if((((tok.*.type_name == .TT_TEXT) && ((curr + i32(1)) < max))
                 && (&(tokens(usize((curr + i32(1))))).*.type_name == .TT_TEXT)), {
               // Collapse two adjacent text nodes
               (next_tok : *(Token)) = &(tokens(usize((curr + i32(1)))));
               (merged : String) = byte_substring(tok.*.content, i32(0), i32(tok.*.content.len()));
-              (&merged).push_str(next_tok.*.content);
-              next_tok.*.content = merged.as_str();
+              merged.push_str(next_tok.*.content);
+              next_tok.*.content = str_view(merged);
               next_tok.*._content_owned = .Some(merged);
             }, {
               if((curr != last), {
@@ -53,13 +54,13 @@ text_join :: (fn(state: *(StateCore)) -> unit)({
               last = (last + i32(1));
             });
             curr = (curr + i32(1));
-          };
+          });
 
           // Truncate to 'last' length
           if((curr != last), {
-            while (i32(tokens.len()) > last), {
+            while((i32(tokens.len()) > last), {
               _ := tokens.pop();
-            };
+            });
           });
         },
         .None => ()
@@ -67,7 +68,7 @@ text_join :: (fn(state: *(StateCore)) -> unit)({
     });
 
     j = (j + i32(1));
-  };
+  });
 });
 
-export text_join;
+export(text_join);

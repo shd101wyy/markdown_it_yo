@@ -2,8 +2,9 @@
 //
 // Decode percent-encoded sequences in a URL string.
 
-open import "std/string";
-{ ArrayList } :: import "std/collections/array_list";
+pragma(Pragma.AllowUnsafe);
+{ String } :: import("std/string");
+{ ArrayList } :: import("std/collections/array_list");
 
 // Characters to keep encoded in decode_uri (default):
 DECODE_DEFAULT_CHARS :: ";/?:@&=+$,#";
@@ -32,10 +33,10 @@ _to_hex_upper :: (fn(n: u8) -> u8)(
 // Check if a character code should stay percent-encoded (is in exclude list)
 _should_keep_encoded :: (fn(code: u8, exclude: str) -> bool)({
   (j : usize) = usize(0);
-  while (j < exclude.len()), {
-    if((exclude.bytes(j) == code), { return true; });
+  while((j < exclude.len()), {
+    if((exclude.bytes(j) == code), { return(true); });
     j = (j + usize(1));
-  };
+  });
   false
 });
 
@@ -80,11 +81,11 @@ _append_replacement :: (fn(result: *(ArrayList(u8))) -> unit)({
 // Try to read the next byte from a %XX sequence at position i in bytes.
 // Returns the decoded byte value, or -1 if not a valid %XX.
 _read_percent_byte :: (fn(bytes: *(ArrayList(u8)), i: usize, len: usize) -> i32)({
-  if(!(((i + usize(2)) < len)), { return i32(-1); });
-  if(!((bytes.*(i) == u8(0x25))), { return i32(-1); });
+  if(!(((i + usize(2)) < len)), { return(i32(-1)); });
+  if(!((bytes.*(i) == u8(0x25))), { return(i32(-1)); });
   (h1 : i32) = _hex_val(bytes.*((i + usize(1))));
   (h2 : i32) = _hex_val(bytes.*((i + usize(2))));
-  if(((h1 < i32(0)) || (h2 < i32(0))), { return i32(-1); });
+  if(((h1 < i32(0)) || (h2 < i32(0))), { return(i32(-1)); });
   ((h1 << i32(4)) | h2)
 });
 
@@ -98,7 +99,7 @@ decode :: (fn(input: String, exclude: str) -> String)({
   (i : usize) = usize(0);
   (len : usize) = bytes.len();
 
-  while (i < len), {
+  while((i < len), {
     (b : u8) = bytes(i);
 
     if(!((b == u8(0x25))), {
@@ -182,7 +183,7 @@ decode :: (fn(input: String, exclude: str) -> String)({
         i = (i + usize(3));
       })))));
     });
-  };
+  });
 
   String.from_bytes(result)
 });
@@ -192,4 +193,4 @@ decode_default :: (fn(input: String) -> String)(
   decode(input, DECODE_DEFAULT_CHARS)
 );
 
-export decode, decode_default, DECODE_DEFAULT_CHARS, DECODE_COMPONENT_CHARS;
+export(decode, decode_default, DECODE_DEFAULT_CHARS, DECODE_COMPONENT_CHARS);

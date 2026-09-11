@@ -1,3 +1,3 @@
 // Re-exports from std/encoding/html
-_m :: import "std/encoding/html";
-export ...(_m);
+_m :: import("std/encoding/html");
+export(...(_m));

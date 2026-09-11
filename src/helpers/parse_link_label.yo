@@ -3,16 +3,16 @@
 // Parse link label — finds matching ']' for a '[' at position start.
 // Returns the position of ']', or -1 if not found.
 
-open import "std/string";
+import("std/string");
 
 // Count consecutive backtick characters starting at pos.
 _count_backticks :: (fn(src_bytes: str, pos: i32, max: i32) -> i32)({
   (count : i32) = i32(0);
   (p : i32) = pos;
-  while (((p < max) && (i32(src_bytes.bytes(usize(p))) == i32(0x60)))), {
+  while((((p < max) && (i32(src_bytes.bytes(usize(p))) == i32(0x60)))), {
     count = (count + i32(1));
     p = (p + i32(1));
-  };
+  });
   count
 });
 
@@ -20,23 +20,23 @@ _count_backticks :: (fn(src_bytes: str, pos: i32, max: i32) -> i32)({
 // Returns the position after '>', or -1 if not a valid <...> construct.
 _skip_angle_bracket :: (fn(src_bytes: str, pos: i32, max: i32) -> i32)({
   (p : i32) = (pos + i32(1));
-  while (p < max), {
+  while((p < max), {
     (ch : i32) = i32(src_bytes.bytes(usize(p)));
     cond(
       (ch == i32(0x3E)) => {
-        return (p + i32(1));
+        return(p + i32(1));
       },
       (ch == i32(0x3C)) => {
-        return i32(-1);
+        return(i32(-1));
       },
       ((ch == i32(0x0A)) || (ch == i32(0x0D))) => {
-        return i32(-1);
+        return(i32(-1));
       },
       true => {
         p = (p + i32(1));
       }
     );
-  };
+  });
   i32(-1)
 });
 
@@ -45,7 +45,7 @@ _skip_code_span :: (fn(src_bytes: str, pos: i32, max: i32) -> i32)({
   (open_count : i32) = _count_backticks(src_bytes, pos, max);
   (scan_pos : i32) = (pos + open_count);
   (found_close : bool) = false;
-  while (((scan_pos < max) && !(found_close))), {
+  while((((scan_pos < max) && !(found_close))), {
     if((i32(src_bytes.bytes(usize(scan_pos))) == i32(0x60)), {
       (close_count : i32) = _count_backticks(src_bytes, scan_pos, max);
       if((close_count == open_count), {
@@ -57,7 +57,7 @@ _skip_code_span :: (fn(src_bytes: str, pos: i32, max: i32) -> i32)({
     }, {
       scan_pos = (scan_pos + i32(1));
     });
-  };
+  });
   scan_pos
 });
 
@@ -72,10 +72,10 @@ parse_link_label :: (fn(src_bytes: str, start: i32, pos_max: i32, disable_nested
 
   // RFC 5765 limit: label length must be <= 999 chars
   if(((max - pos) > i32(999)), {
-    return i32(-1);
+    return(i32(-1));
   });
 
-  while (pos < max), {
+  while((pos < max), {
     (marker : i32) = i32(src_bytes.bytes(usize(pos)));
 
     cond(
@@ -87,7 +87,7 @@ parse_link_label :: (fn(src_bytes: str, start: i32, pos_max: i32, disable_nested
       (marker == i32(0x5D)) => {
         level = (level - i32(1));
         if((level == i32(0)), {
-          return pos;
+          return(pos);
         });
         pos = (pos + i32(1));
       },
@@ -104,7 +104,7 @@ parse_link_label :: (fn(src_bytes: str, start: i32, pos_max: i32, disable_nested
               if((next_ch == i32(0x28)), {
                 (p : i32) = (after + i32(1));
                 (depth : i32) = i32(1);
-                while (((p < max) && (depth > i32(0)))), {
+                while((((p < max) && (depth > i32(0)))), {
                   (ch : i32) = i32(src_bytes.bytes(usize(p)));
                   cond(
                     (ch == i32(0x5C)) => { p = (p + i32(2)); },
@@ -112,10 +112,10 @@ parse_link_label :: (fn(src_bytes: str, start: i32, pos_max: i32, disable_nested
                     (ch == i32(0x29)) => { depth = (depth - i32(1)); p = (p + i32(1)); },
                     true => { p = (p + i32(1)); }
                   );
-                };
+                });
                 if((depth == i32(0)), {
                   // Found complete [text](url) — nested link, disallow
-                  return i32(-1);
+                  return(i32(-1));
                 });
               });
               // Check if followed by '[' (reference link)
@@ -123,7 +123,7 @@ parse_link_label :: (fn(src_bytes: str, start: i32, pos_max: i32, disable_nested
                 (ref_end : i32) = recur(src_bytes, after, max, false);
                 if((ref_end >= i32(0)), {
                   // Found complete [text][ref] — nested link, disallow
-                  return i32(-1);
+                  return(i32(-1));
                 });
               });
             });
@@ -161,7 +161,7 @@ parse_link_label :: (fn(src_bytes: str, start: i32, pos_max: i32, disable_nested
               if((next_ch == i32(0x28)), {
                 (p : i32) = (after + i32(1));
                 (depth : i32) = i32(1);
-                while (((p < max) && (depth > i32(0)))), {
+                while((((p < max) && (depth > i32(0)))), {
                   (ch : i32) = i32(src_bytes.bytes(usize(p)));
                   cond(
                     (ch == i32(0x5C)) => { p = (p + i32(2)); },
@@ -169,7 +169,7 @@ parse_link_label :: (fn(src_bytes: str, start: i32, pos_max: i32, disable_nested
                     (ch == i32(0x29)) => { depth = (depth - i32(1)); p = (p + i32(1)); },
                     true => { p = (p + i32(1)); }
                   );
-                };
+                });
                 if((depth == i32(0)), {
                   pos = p;
                   skipped = true;
@@ -201,9 +201,9 @@ parse_link_label :: (fn(src_bytes: str, start: i32, pos_max: i32, disable_nested
         pos = (pos + i32(1));
       }
     );
-  };
+  });
 
   i32(-1)
 });
 
-export parse_link_label;
+export(parse_link_label);

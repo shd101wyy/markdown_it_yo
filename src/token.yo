@@ -2,8 +2,9 @@
 //
 // Token class — represents a single parsed markdown element.
 
-open import "std/string";
-{ ArrayList } :: import "std/collections/array_list";
+pragma(Pragma.AllowUnsafe);
+{ String } :: import("std/string");
+{ ArrayList } :: import("std/collections/array_list");
 
 // HTML attribute pair: [name, value]
 StringPair :: struct(
@@ -155,13 +156,13 @@ impl(Token,
         (i : i32) = i32(0);
         (len : i32) = i32(attrs.len());
         (result : i32) = i32(-1);
-        while ((i < len) && (result == i32(-1))), {
+        while(((i < len) && (result == i32(-1))), {
           (pair : StringPair) = attrs(usize(i));
           if((pair.name == name), {
             result = i;
           });
           i = (i + i32(1));
-        };
+        });
         result
       }
     )
@@ -243,5 +244,4 @@ impl(Token,
   })
 );
 
-export Token, TokenType,
-  StringPair, MapRange;
+export(Token, TokenType, StringPair, MapRange);

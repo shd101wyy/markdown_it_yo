@@ -2,13 +2,14 @@
 //
 // Inline parser state — tracks position, delimiter stacks, and produces tokens.
 
-open import "std/string";
-{ ArrayList } :: import "std/collections/array_list";
-{ HashMap } :: import "std/collections/hash_map";
-{ Token, TokenType } :: import "../token.yo";
-{ is_white_space, is_punct_char, is_md_ascii_punct, byte_str_slice } :: import "../common/utils.yo";
-{ is_valid_entity_code, from_code_point } :: import "../common/char_utils.yo";
-{ Env } :: import "../env.yo";
+pragma(Pragma.AllowUnsafe);
+import("std/string");
+{ ArrayList } :: import("std/collections/array_list");
+{ HashMap } :: import("std/collections/hash_map");
+{ Token, TokenType } :: import("../token.yo");
+{ is_white_space, is_punct_char, is_md_ascii_punct, byte_str_slice } :: import("../common/utils.yo");
+{ is_valid_entity_code, from_code_point } :: import("../common/char_utils.yo");
+{ Env } :: import("../env.yo");
 
 // Emphasis-like delimiter
 Delimiter :: struct(
@@ -187,9 +188,9 @@ impl(StateInline,
     );
 
     (pos : i32) = start;
-    while ((pos < max) && (i32(self._src_bytes.bytes(usize(pos))) == marker)), {
+    while(((pos < max) && (i32(self._src_bytes.bytes(usize(pos))) == marker)), {
       pos = (pos + i32(1));
-    };
+    });
     (count : i32) = (pos - start);
 
     // Treat end of line as whitespace
@@ -214,4 +215,4 @@ impl(StateInline,
   })
 );
 
-export StateInline, new_state_inline, Delimiter, TokenMeta, ScanDelimsResult;
+export(StateInline, new_state_inline, Delimiter, TokenMeta, ScanDelimsResult);

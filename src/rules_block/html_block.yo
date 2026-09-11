@@ -2,14 +2,15 @@
 //
 // HTML block
 
-open import "std/string";
-{ ArrayList } :: import "std/collections/array_list";
-{ Regex } :: import "std/regex";
-{ Token, TokenType, MapRange } :: import "../token.yo";
-{ StateBlock, block_push_token } :: import "./state_block.yo";
-{ html_blocks } :: import "../common/html_blocks.yo";
-{ html_re, HtmlRegexPatterns } :: import "../common/html_re.yo";
-{ byte_substring } :: import "../common/utils.yo";
+pragma(Pragma.AllowUnsafe);
+{ String } :: import("std/string");
+{ ArrayList } :: import("std/collections/array_list");
+{ Regex } :: import("std/regex");
+{ Token, TokenType, MapRange } :: import("../token.yo");
+{ StateBlock, block_push_token } :: import("./state_block.yo");
+{ html_blocks } :: import("../common/html_blocks.yo");
+{ html_re, HtmlRegexPatterns } :: import("../common/html_re.yo");
+{ byte_substring, str_view } :: import("../common/utils.yo");
 
 // HTML sequence: opening regex, closing regex, can_terminate_paragraph
 HtmlSequence :: struct(
@@ -25,36 +26,36 @@ _build_html_sequences :: (fn() -> ArrayList(HtmlSequence))({
 
   // Sequence 0: <script|pre|style|textarea ...>
   _ := seqs.push(HtmlSequence(
-    open_re: Regex.new(`^<(script|pre|style|textarea)(\\s|>|$)`, `i`).unwrap(),
-    close_re: Regex.new(`</(script|pre|style|textarea)>`, `i`).unwrap(),
+    open_re: Regex.new_with_flags(`^<(script|pre|style|textarea)(\\s|>|$)`, `i`).unwrap(),
+    close_re: Regex.new_with_flags(`</(script|pre|style|textarea)>`, `i`).unwrap(),
     can_terminate: true
   ));
 
   // Sequence 1: <!-- (comment)
   _ := seqs.push(HtmlSequence(
-    open_re: Regex.new(`^<!--`, ``).unwrap(),
-    close_re: Regex.new(`-->`, ``).unwrap(),
+    open_re: Regex.new(`^<!--`).unwrap(),
+    close_re: Regex.new(`-->`).unwrap(),
     can_terminate: true
   ));
 
   // Sequence 2: <? (processing instruction)
   _ := seqs.push(HtmlSequence(
-    open_re: Regex.new(`^<\\?`, ``).unwrap(),
-    close_re: Regex.new(`\\?>`, ``).unwrap(),
+    open_re: Regex.new(`^<\\?`).unwrap(),
+    close_re: Regex.new(`\\?>`).unwrap(),
     can_terminate: true
   ));
 
   // Sequence 3: <![A-Z] (declaration)
   _ := seqs.push(HtmlSequence(
-    open_re: Regex.new(`^<![A-Z]`, ``).unwrap(),
-    close_re: Regex.new(`>`, ``).unwrap(),
+    open_re: Regex.new(`^<![A-Z]`).unwrap(),
+    close_re: Regex.new(`>`).unwrap(),
     can_terminate: true
   ));
 
   // Sequence 4: <![CDATA[ (CDATA)
   _ := seqs.push(HtmlSequence(
-    open_re: Regex.new(`^<!\\[CDATA\\[`, ``).unwrap(),
-    close_re: Regex.new(`\\]\\]>`, ``).unwrap(),
+    open_re: Regex.new(`^<!\\[CDATA\\[`).unwrap(),
+    close_re: Regex.new(`\\]\\]>`).unwrap(),
     can_terminate: true
   ));
 
@@ -85,25 +86,25 @@ _build_html_sequences :: (fn() -> ArrayList(HtmlSequence))({
 
   (block_names_pattern : String) = String.new();
   (bi : usize) = usize(0);
-  while (bi < blocks.len()), {
+  while((bi < blocks.len()), {
     if((bi > usize(0)), {
       block_names_pattern = `${block_names_pattern}|`;
     });
     block_names_pattern = `${block_names_pattern}${blocks.get(bi).unwrap()}`;
     bi = (bi + usize(1));
-  };
+  });
 
   _ := seqs.push(HtmlSequence(
-    open_re: Regex.new(`^</?(${block_names_pattern})(\\s|/?>|$)`, `i`).unwrap(),
-    close_re: Regex.new(`^$`, ``).unwrap(),
+    open_re: Regex.new_with_flags(`^</?(${block_names_pattern})(\\s|/?>|$)`, `i`).unwrap(),
+    close_re: Regex.new(`^$`).unwrap(),
     can_terminate: true
   ));
 
   // Sequence 6: generic open/close tag followed by whitespace/end
   (patterns : HtmlRegexPatterns) = html_re();
   _ := seqs.push(HtmlSequence(
-    open_re: Regex.new(`${patterns.HTML_OPEN_CLOSE_TAG_RE_STR}\\s*$`, ``).unwrap(),
-    close_re: Regex.new(`^$`, ``).unwrap(),
+    open_re: Regex.new(`${patterns.HTML_OPEN_CLOSE_TAG_RE_STR}\\s*$`).unwrap(),
+    close_re: Regex.new(`^$`).unwrap(),
     can_terminate: false
   ));
 
@@ -120,16 +121,16 @@ html_block :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: 
 
   // if it's indented more than 3 spaces, it should be a code block
   if(((state.*.s_count(usize(start_line)) - state.*.blk_indent) >= i32(4)), {
-    return false;
+    return(false);
   });
 
   // HTML option must be enabled
   if(!(state.*.html_enabled), {
-    return false;
+    return(false);
   });
 
   if((i32(state.*._src_bytes.bytes(usize(pos))) != i32(0x3C)), {
-    return false;
+    return(false);
   });
 
   // Extract line text from pos to max
@@ -141,23 +142,23 @@ html_block :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: 
   // Find matching sequence
   (seq_idx : i32) = i32(0);
   (found : bool) = false;
-  while ((seq_idx < i32(seqs.*.len())) && (!(found))), {
+  while(((seq_idx < i32(seqs.*.len())) && (!(found))), {
     (seq : HtmlSequence) = seqs.*(usize(seq_idx));
-    if(seq.open_re.test(line_text), {
+    if(seq.open_re.is_match(line_text), {
       found = true;
     }, {
       seq_idx = (seq_idx + i32(1));
     });
-  };
+  });
 
   if(!(found), {
-    return false;
+    return(false);
   });
 
   if(silent, {
     // true if this sequence can be a terminator, false otherwise
     (seq : HtmlSequence) = seqs.*(usize(seq_idx));
-    return seq.can_terminate;
+    return(seq.can_terminate);
   });
 
   (next_line : i32) = (start_line + i32(1));
@@ -165,9 +166,9 @@ html_block :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: 
   // If we are here - we detected HTML block.
   // Let's roll down till block end.
   (matched_seq : HtmlSequence) = seqs.*(usize(seq_idx));
-  if(!(matched_seq.close_re.test(line_text)), {
+  if(!(matched_seq.close_re.is_match(line_text)), {
     (scanning : bool) = true;
-    while ((next_line < end_line) && scanning), {
+    while(((next_line < end_line) && scanning), {
       if((state.*.s_count(usize(next_line)) < state.*.blk_indent), {
         scanning = false;
       }, {
@@ -175,7 +176,7 @@ html_block :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: 
         (m : i32) = state.*.e_marks(usize(next_line));
         (lt : String) = byte_substring(state.*._src_bytes, p, m);
 
-        if(matched_seq.close_re.test(lt), {
+        if(matched_seq.close_re.is_match(lt), {
           if((lt.len() != usize(0)), {
             next_line = (next_line + i32(1));
           });
@@ -184,7 +185,7 @@ html_block :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: 
           next_line = (next_line + i32(1));
         });
       });
-    };
+    });
   });
 
   state.*.line = next_line;
@@ -192,7 +193,7 @@ html_block :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: 
   (token : Token) = Token.new(.TT_HTML_BLOCK, "", i32(0));
   token.block = true;
   (lines : String) = state.*.get_lines(start_line, next_line, state.*.blk_indent, true);
-  token.content = lines.as_str();
+  token.content = str_view(lines);
   token._content_owned = .Some(lines);
   token.map = .Some(MapRange(begin: start_line, end: next_line));
   block_push_token(state, token);
@@ -200,4 +201,4 @@ html_block :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: 
   true
 });
 
-export html_block, HtmlSequence;
+export(html_block, HtmlSequence);

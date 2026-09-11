@@ -2,7 +2,7 @@
 //
 // Regexps to match html elements
 
-open import "std/string";
+{ String } :: import("std/string");
 
 // HTML regex pattern components.
 // Base patterns (compile-time strings):
@@ -47,4 +47,4 @@ html_re :: (fn() -> HtmlRegexPatterns)(
   }
 );
 
-export html_re, HtmlRegexPatterns;
+export(html_re, HtmlRegexPatterns);

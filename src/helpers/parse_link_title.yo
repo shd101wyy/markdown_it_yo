@@ -3,9 +3,9 @@
 // Parse link title from markdown source.
 // Supports multi-line titles for reference links via prev_state continuation.
 
-open import "std/string";
-{ ArrayList } :: import "std/collections/array_list";
-{ unescape_all, byte_substring } :: import "../common/utils.yo";
+{ String } :: import("std/string");
+{ ArrayList } :: import("std/collections/array_list");
+{ unescape_all, byte_substring } :: import("../common/utils.yo");
 
 // Result of parsing a link title
 LinkTitleResult :: struct(
@@ -42,7 +42,7 @@ parse_link_title :: (fn(input: str, start_param: i32, max: i32, prev_state: Opti
       },
       .None => {
         if((pos >= max), {
-          return state;
+          return(state);
         });
 
         (marker_byte : u8) = input.bytes(usize(pos));
@@ -50,7 +50,7 @@ parse_link_title :: (fn(input: str, start_param: i32, max: i32, prev_state: Opti
 
         // Must start with ", ', or (
         if(((marker != i32(0x22)) && ((marker != i32(0x27)) && (marker != i32(0x28)))), {
-          return state;
+          return(state);
         });
 
         start = (start + i32(1));
@@ -71,7 +71,7 @@ parse_link_title :: (fn(input: str, start_param: i32, max: i32, prev_state: Opti
       }
     );
 
-    while (pos < max), {
+    while((pos < max), {
       (code : u8) = input.bytes(usize(pos));
 
       cond(
@@ -85,11 +85,11 @@ parse_link_title :: (fn(input: str, start_param: i32, max: i32, prev_state: Opti
             str: `${state.str}${unescape_all(slice_str)}`,
             marker: state.marker
           );
-          return state;
+          return(state);
         },
         // ( inside ) pair — not allowed
         ((code == u8(0x28)) && (state.marker == i32(0x29))) => {
-          return state;
+          return(state);
         },
         // Backslash escape
         ((code == u8(0x5C)) && ((pos + i32(1)) < max)) => {
@@ -99,7 +99,7 @@ parse_link_title :: (fn(input: str, start_param: i32, max: i32, prev_state: Opti
           pos = (pos + i32(1));
         }
       );
-    };
+    });
 
     // No closing marker found, but this title may continue on next line (for references)
     (slice_str : String) = byte_substring(input, start, pos);
@@ -114,4 +114,4 @@ parse_link_title :: (fn(input: str, start_param: i32, max: i32, prev_state: Opti
   }
 );
 
-export LinkTitleResult, parse_link_title;
+export(LinkTitleResult, parse_link_title);

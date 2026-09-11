@@ -2,12 +2,13 @@
 //
 // Utility functions for markdown processing.
 
-open import "std/string";
-{ ArrayList } :: import "std/collections/array_list";
-{ Regex, RegexMatch } :: import "std/regex";
-{ is_valid_entity_code, from_code_point } :: import "./char_utils.yo";
-{ decode_html } :: import "./entities.yo";
-{ unicode_to_lowercase, unicode_to_uppercase } :: import "./unicode_casefold.yo";
+pragma(Pragma.AllowUnsafe);
+{ String } :: import("std/string");
+{ ArrayList } :: import("std/collections/array_list");
+{ Regex, RegexMatch } :: import("std/regex");
+{ is_valid_entity_code, from_code_point } :: import("./char_utils.yo");
+{ html_decode } :: import("./entities.yo");
+{ to_lower_code_point, to_upper_code_point } :: import("./unicode_casefold.yo");
 
 // ============================================================================
 // escape_html
@@ -20,25 +21,25 @@ escape_html :: (fn(input: String) -> String)(
     (i : usize) = usize(0);
     (len : usize) = bytes.len();
 
-    if((len == usize(0)), { return input; });
+    if((len == usize(0)), { return(input); });
 
     // Quick test — if no special chars, return as-is
     (has_special : bool) = false;
     match(bytes.ptr(),
       .Some(p) => {
-        while ((i < len) && (!(has_special))), {
-          (ch : u8) = (p &+ i).*;
+        while(((i < len) && (!(has_special))), {
+          (ch : u8) = (p.add(i)).*;
           if(((ch == u8(0x26)) || ((ch == u8(0x3C)) || ((ch == u8(0x3E)) || (ch == u8(0x22))))), {
             has_special = true;
           });
           i = (i + usize(1));
-        };
+        });
       },
       .None => ()
     );
 
     if(!(has_special), {
-      return input;
+      return(input);
     });
 
     // Run-based approach: copy non-special runs via extend_from_ptr
@@ -47,33 +48,33 @@ escape_html :: (fn(input: String) -> String)(
     (run_start : usize) = usize(0);
     match(bytes.ptr(),
       .Some(src_ptr) => {
-        while (i < len), {
-          (ch : u8) = (src_ptr &+ i).*;
+        while((i < len), {
+          (ch : u8) = (src_ptr.add(i)).*;
           cond(
             (ch == u8(0x26)) => {
               if((i > run_start), {
-                out.extend_from_ptr((src_ptr &+ run_start), (i - run_start));
+                out.extend_from_ptr((src_ptr.add(run_start)), (i - run_start));
               });
               out.extend_from_ptr(*(u8)("&amp;"), usize(5));
               run_start = (i + usize(1));
             },
             (ch == u8(0x3C)) => {
               if((i > run_start), {
-                out.extend_from_ptr((src_ptr &+ run_start), (i - run_start));
+                out.extend_from_ptr((src_ptr.add(run_start)), (i - run_start));
               });
               out.extend_from_ptr(*(u8)("&lt;"), usize(4));
               run_start = (i + usize(1));
             },
             (ch == u8(0x3E)) => {
               if((i > run_start), {
-                out.extend_from_ptr((src_ptr &+ run_start), (i - run_start));
+                out.extend_from_ptr((src_ptr.add(run_start)), (i - run_start));
               });
               out.extend_from_ptr(*(u8)("&gt;"), usize(4));
               run_start = (i + usize(1));
             },
             (ch == u8(0x22)) => {
               if((i > run_start), {
-                out.extend_from_ptr((src_ptr &+ run_start), (i - run_start));
+                out.extend_from_ptr((src_ptr.add(run_start)), (i - run_start));
               });
               out.extend_from_ptr(*(u8)("&quot;"), usize(6));
               run_start = (i + usize(1));
@@ -81,10 +82,10 @@ escape_html :: (fn(input: String) -> String)(
             true => ()
           );
           i = (i + usize(1));
-        };
+        });
         // Flush remaining
         if((len > run_start), {
-          out.extend_from_ptr((src_ptr &+ run_start), (len - run_start));
+          out.extend_from_ptr((src_ptr.add(run_start)), (len - run_start));
         });
       },
       .None => ()
@@ -100,21 +101,21 @@ escape_html_to :: (fn(result: *(String), input: str) -> unit)(
     (len : usize) = input.len();
 
     if((len == usize(0)), {
-      return ();
+      return(());
     });
 
-    (src_ptr : *(u8)) = &(input.bytes(usize(0)));
+    (src_ptr : *(u8)) = input.ptr();
 
     // Single-pass: find first special char position
     // Special chars: " (0x22), & (0x26), < (0x3C), > (0x3E) — all in [0x22, 0x3E].
     // Most text bytes (a-z 0x61+, A-Z 0x41+, space 0x20, newline 0x0A) are outside
     // this range, so the range pre-check skips them with 2 comparisons instead of 4.
     (first : usize) = usize(0);
-    while (first < len), {
-      (ch : u8) = (src_ptr &+ first).*;
+    while((first < len), {
+      (ch : u8) = (src_ptr.add(first)).*;
       if((((ch >= u8(0x22)) && (ch <= u8(0x3E))) && ((ch == u8(0x26)) || ((ch == u8(0x3C)) || ((ch == u8(0x3E)) || (ch == u8(0x22)))))), {
         // Found special char — break to escape loop
-        result.reserve((len + (len / usize(8))));
+        result.*.reserve((len + (len / usize(8))));
         (result_al : ArrayList(u8)) = result.*._bytes.unwrap();
         // Append text before first special char
         if((first > usize(0)), {
@@ -130,34 +131,34 @@ escape_html_to :: (fn(result: *(String), input: str) -> unit)(
         // Continue escaping remaining bytes
         (i : usize) = (first + usize(1));
         (run_start : usize) = i;
-        while (i < len), {
-          (ch2 : u8) = (src_ptr &+ i).*;
+        while((i < len), {
+          (ch2 : u8) = (src_ptr.add(i)).*;
           if(((ch2 >= u8(0x22)) && (ch2 <= u8(0x3E))), {
             cond(
               (ch2 == u8(0x26)) => {
                 if((i > run_start), {
-                  result_al.extend_from_ptr((src_ptr &+ run_start), (i - run_start));
+                  result_al.extend_from_ptr((src_ptr.add(run_start)), (i - run_start));
                 });
                 result_al.extend_from_ptr(*(u8)("&amp;"), usize(5));
                 run_start = (i + usize(1));
               },
               (ch2 == u8(0x3C)) => {
                 if((i > run_start), {
-                  result_al.extend_from_ptr((src_ptr &+ run_start), (i - run_start));
+                  result_al.extend_from_ptr((src_ptr.add(run_start)), (i - run_start));
                 });
                 result_al.extend_from_ptr(*(u8)("&lt;"), usize(4));
                 run_start = (i + usize(1));
               },
               (ch2 == u8(0x3E)) => {
                 if((i > run_start), {
-                  result_al.extend_from_ptr((src_ptr &+ run_start), (i - run_start));
+                  result_al.extend_from_ptr((src_ptr.add(run_start)), (i - run_start));
                 });
                 result_al.extend_from_ptr(*(u8)("&gt;"), usize(4));
                 run_start = (i + usize(1));
               },
               (ch2 == u8(0x22)) => {
                 if((i > run_start), {
-                  result_al.extend_from_ptr((src_ptr &+ run_start), (i - run_start));
+                  result_al.extend_from_ptr((src_ptr.add(run_start)), (i - run_start));
                 });
                 result_al.extend_from_ptr(*(u8)("&quot;"), usize(6));
                 run_start = (i + usize(1));
@@ -166,17 +167,17 @@ escape_html_to :: (fn(result: *(String), input: str) -> unit)(
             );
           });
           i = (i + usize(1));
-        };
-        if((len > run_start), {
-          result_al.extend_from_ptr((src_ptr &+ run_start), (len - run_start));
         });
-        return ();
+        if((len > run_start), {
+          result_al.extend_from_ptr((src_ptr.add(run_start)), (len - run_start));
+        });
+        return(());
       });
       first = (first + usize(1));
-    };
+    });
 
     // No special chars found — append as-is
-    result.push_str(input);
+    result.*.push_str(input);
   }
 );
 
@@ -237,14 +238,14 @@ is_md_ascii_punct :: (fn(ch: i32) -> bool)(
 // ============================================================================
 
 // Cached regex patterns
-_unescape_md_re := Regex.new(String.from("\\\\([!\"#$%&'()*+,\\-./:;<=>?@[\\\\\\]^_`{|}~])"), ``).unwrap();
-_normalize_ref_re := Regex.new(`\\s+`, `g`).unwrap();
+_unescape_md_re := Regex.new(String.from("\\\\([!\"#$%&'()*+,\\-./:;<=>?@[\\\\\\]^_`{|}~])")).unwrap();
+_normalize_ref_re := Regex.new_with_flags(`\\s+`, `g`).unwrap();
 
 // Remove backslash escapes from markdown: \* → *
 unescape_md :: (fn(input: String) -> String)(
   {
     if(!(input.contains(String.from("\\"))), {
-      return input;
+      return(input);
     });
 
     _unescape_md_re.replace(input, String.from("$1"))
@@ -262,7 +263,7 @@ normalize_reference :: (fn(input: String) -> String)(
   {
     (trimmed : String) = input.trim();
     (collapsed : String) = _normalize_ref_re.replace_all(trimmed, ` `);
-    unicode_to_uppercase(unicode_to_lowercase(collapsed))
+    collapsed.to_lowercase().to_uppercase()
   }
 );
 
@@ -271,29 +272,29 @@ normalize_reference :: (fn(input: String) -> String)(
 // ============================================================================
 
 // Remove element from array at `pos` and insert `new_elements` at that position.
-array_replace_at :: (fn(forall(T : Type), src: ArrayList(T), pos: i32, new_elements: ArrayList(T)) -> ArrayList(T))(
+array_replace_at :: (fn(generic(T : Type), src: ArrayList(T), pos: i32, new_elements: ArrayList(T)) -> ArrayList(T))(
   {
     (result : ArrayList(T)) = ArrayList(T).new();
 
     (i : i32) = i32(0);
-    while (i < pos), {
+    while((i < pos), {
       result.push(src(usize(i)));
       i = (i + i32(1));
-    };
+    });
 
     (j : i32) = i32(0);
     (new_len : i32) = i32(new_elements.len());
-    while (j < new_len), {
+    while((j < new_len), {
       result.push(new_elements(usize(j)));
       j = (j + i32(1));
-    };
+    });
 
     (k : i32) = (pos + i32(1));
     (src_len : i32) = i32(src.len());
-    while (k < src_len), {
+    while((k < src_len), {
       result.push(src(usize(k)));
       k = (k + i32(1));
-    };
+    });
 
     result
   }
@@ -424,25 +425,25 @@ unescape_all :: (fn(input: String) -> String)(
     (bytes : ArrayList(u8)) = input.as_bytes();
     (len : usize) = bytes.len();
 
-    if((len == usize(0)), { return input; });
+    if((len == usize(0)), { return(input); });
 
     // Fast path: scan for backslash or ampersand using raw pointer
     (has_special : bool) = false;
     match(bytes.ptr(),
       .Some(p) => {
         (si : usize) = usize(0);
-        while ((si < len) && !(has_special)), {
-          (b : u8) = (p &+ si).*;
+        while(((si < len) && !(has_special)), {
+          (b : u8) = (p.add(si)).*;
           if(((b == u8(0x5C)) || (b == u8(0x26))), {
             has_special = true;
           });
           si = (si + usize(1));
-        };
+        });
       },
       .None => ()
     );
 
-    if(!(has_special), { return input; });
+    if(!(has_special), { return(input); });
 
     // Build result using ArrayList(u8) with run-based flushing
     (out : ArrayList(u8)) = ArrayList(u8).with_capacity(len);
@@ -451,16 +452,16 @@ unescape_all :: (fn(input: String) -> String)(
 
     match(bytes.ptr(),
       .Some(src_ptr) => {
-        while (i < len), {
-          (ch : u8) = (src_ptr &+ i).*;
+        while((i < len), {
+          (ch : u8) = (src_ptr.add(i)).*;
 
           cond(
             ((ch == u8(0x5C)) && ((i + usize(1)) < len)) => {
-              (next : u8) = (src_ptr &+ (i + usize(1))).*;
+              (next : u8) = (src_ptr.add((i + usize(1)))).*;
               if(_is_md_punct_char(next), {
                 // Flush run before backslash
                 if((i > run_start), {
-                  out.extend_from_ptr((src_ptr &+ run_start), (i - run_start));
+                  out.extend_from_ptr((src_ptr.add(run_start)), (i - run_start));
                 });
                 // Emit the unescaped character (single ASCII byte)
                 out.push(next);
@@ -480,21 +481,21 @@ unescape_all :: (fn(input: String) -> String)(
                 true => len
               );
 
-              while ((j < max_entity) && !(found_semi)), {
-                if(((src_ptr &+ j).* == u8(0x3B)), {
+              while(((j < max_entity) && !(found_semi)), {
+                if(((src_ptr.add(j)).* == u8(0x3B)), {
                   found_semi = true;
                 }, {
                   j = (j + usize(1));
                 });
-              };
+              });
 
               if(found_semi, {
                 (entity_str : String) = input.substring(i, (j + usize(1)));
-                (decoded : String) = decode_html(entity_str);
+                (decoded : String) = html_decode(entity_str);
                 if(!(decoded == entity_str), {
                   // Flush run before entity
                   if((i > run_start), {
-                    out.extend_from_ptr((src_ptr &+ run_start), (i - run_start));
+                    out.extend_from_ptr((src_ptr.add(run_start)), (i - run_start));
                   });
                   // Emit decoded entity bytes
                   (dec_bytes : ArrayList(u8)) = decoded.as_bytes();
@@ -516,10 +517,10 @@ unescape_all :: (fn(input: String) -> String)(
               i = (i + usize(1));
             }
           );
-        };
+        });
         // Flush remaining bytes
         if((len > run_start), {
-          out.extend_from_ptr((src_ptr &+ run_start), (len - run_start));
+          out.extend_from_ptr((src_ptr.add(run_start)), (len - run_start));
         });
       },
       .None => ()
@@ -534,20 +535,37 @@ unescape_all :: (fn(input: String) -> String)(
 // character positions, but our parser works with byte positions.
 byte_substring :: (fn(bytes: str, start: i32, end: i32) -> String)({
   (count : usize) = usize((end - start));
-  if((count == usize(0)), { return String.new(); });
+  // Clamp to the view's extent: callers pass end == len + 1 to include a line
+  // terminator that does not exist at EOF, which reads the NUL past the buffer.
+  (avail_sub : usize) = (bytes.len() - usize(start));
+  if((avail_sub < count), { count = avail_sub; });
+  if((count == usize(0)), { return(String.new()); });
   (out : ArrayList(u8)) = ArrayList(u8).with_capacity(count);
-  out.extend_from_ptr(&(bytes.bytes(usize(start))), count);
+  out.extend_from_ptr(bytes.ptr().add(usize(start)), count);
   String.from_bytes(out)
 });
 
 // Zero-copy byte slice: returns a str view into the source bytes.
 // The returned str borrows from the source — caller must ensure `bytes` outlives the result.
+
+// A `str` view into a String's heap bytes. `as_str()` was removed
+// (SLICE_REWORK: `str` is the static-string view only), but this port's
+// parser threads non-owning views of the source text through its states;
+// the file set is pragma'd and the views never outlive the backing String
+// (tokens keep `_content_owned` alive). SAFETY: caller guarantees the
+// String outlives every use of the returned view and is not mutated while
+// views exist.
+str_view :: (fn(s : String) -> str)(
+  str.from_raw_parts(s.raw_bytes().ptr, s.raw_bytes().len)
+);
+
 byte_str_slice :: (fn(bytes: str, start: i32, end: i32) -> str)({
   (count : usize) = usize((end - start));
-  if((count == usize(0)), { return ""; });
-  str.from_raw_parts(&(bytes.bytes(usize(start))), count)
+  // Same clamp as byte_substring: never read past the source view.
+  (avail_slice : usize) = (bytes.len() - usize(start));
+  if((avail_slice < count), { count = avail_slice; });
+  if((count == usize(0)), { return(str.from_raw_parts((*u8)(""), usize(0))); });
+  str.from_raw_parts(bytes.ptr().add(usize(start)), count)
 });
 
-export is_valid_entity_code, from_code_point, escape_html, escape_html_to, is_space, is_white_space,
-       is_md_ascii_punct, is_punct_char, unescape_md, unescape_all, normalize_reference,
-       array_replace_at, byte_substring, byte_str_slice;
+export(str_view, is_valid_entity_code, from_code_point, escape_html, escape_html_to, is_space, is_white_space, is_md_ascii_punct, is_punct_char, unescape_md, unescape_all, normalize_reference, array_replace_at, byte_substring, byte_str_slice);

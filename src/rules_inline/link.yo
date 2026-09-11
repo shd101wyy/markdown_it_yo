@@ -2,17 +2,18 @@
 //
 // Process [link](url "title") and [link][ref]
 
-open import "std/string";
-{ ArrayList } :: import "std/collections/array_list";
-{ Token, StringPair, TokenType } :: import "../token.yo";
-{ StateInline } :: import "./state_inline.yo";
-{ state_push, flush_pending } :: import "./inline_helpers.yo";
-{ is_space, normalize_reference, byte_substring } :: import "../common/utils.yo";
-{ validate_link, normalize_link } :: import "../common/link_utils.yo";
-{ parse_link_label } :: import "../helpers/parse_link_label.yo";
-{ LinkDestResult, parse_link_destination } :: import "../helpers/parse_link_destination.yo";
-{ LinkTitleResult, parse_link_title } :: import "../helpers/parse_link_title.yo";
-{ Reference, Env } :: import "../env.yo";
+pragma(Pragma.AllowUnsafe);
+{ String } :: import("std/string");
+{ ArrayList } :: import("std/collections/array_list");
+{ Token, StringPair, TokenType } :: import("../token.yo");
+{ StateInline } :: import("./state_inline.yo");
+{ state_push, flush_pending } :: import("./inline_helpers.yo");
+{ is_space, normalize_reference, byte_substring } :: import("../common/utils.yo");
+{ validate_link, normalize_link } :: import("../common/link_utils.yo");
+{ parse_link_label } :: import("../helpers/parse_link_label.yo");
+{ LinkDestResult, parse_link_destination } :: import("../helpers/parse_link_destination.yo");
+{ LinkTitleResult, parse_link_title } :: import("../helpers/parse_link_title.yo");
+{ Reference, Env } :: import("../env.yo");
 
 link_rule :: (fn(state: *(StateInline), silent: bool) -> bool)({
   (pos : i32) = state.*.pos;
@@ -20,14 +21,14 @@ link_rule :: (fn(state: *(StateInline), silent: bool) -> bool)({
 
   // Must start with '['
   if((i32(state.*._src_bytes.bytes(usize(pos))) != i32(0x5B)), {
-    return false;
+    return(false);
   });
 
   (label_start : i32) = (pos + i32(1));
   (label_end : i32) = parse_link_label(state.*._src_bytes, pos, max, true);
 
   // Parser failed to find ']', not a valid link
-  if((label_end < i32(0)), { return false; });
+  if((label_end < i32(0)), { return(false); });
 
   (href : String) = String.new();
   (title : String) = String.new();
@@ -40,10 +41,10 @@ link_rule :: (fn(state: *(StateInline), silent: bool) -> bool)({
     parse_reference = false;
     // Skip spaces after '('
     pos = (pos + i32(1));
-    while (((pos < max) && (is_space(i32(state.*._src_bytes.bytes(usize(pos)))) || (i32(state.*._src_bytes.bytes(usize(pos))) == i32(0x0A))))), {
+    while((((pos < max) && (is_space(i32(state.*._src_bytes.bytes(usize(pos)))) || (i32(state.*._src_bytes.bytes(usize(pos))) == i32(0x0A))))), {
       pos = (pos + i32(1));
-    };
-    if((pos >= max), { return false; });
+    });
+    if((pos >= max), { return(false); });
 
     // Parse link destination
     (start : i32) = pos;
@@ -57,9 +58,9 @@ link_rule :: (fn(state: *(StateInline), silent: bool) -> bool)({
 
       // Skip spaces after destination
       start = pos;
-      while (((pos < max) && (is_space(i32(state.*._src_bytes.bytes(usize(pos)))) || (i32(state.*._src_bytes.bytes(usize(pos))) == i32(0x0A))))), {
+      while((((pos < max) && (is_space(i32(state.*._src_bytes.bytes(usize(pos)))) || (i32(state.*._src_bytes.bytes(usize(pos))) == i32(0x0A))))), {
         pos = (pos + i32(1));
-      };
+      });
 
       // Parse link title
       (title_result : LinkTitleResult) = parse_link_title(state.*.src, pos, max, .None);
@@ -68,9 +69,9 @@ link_rule :: (fn(state: *(StateInline), silent: bool) -> bool)({
         pos = title_result.pos;
 
         // Skip spaces after title
-        while (((pos < max) && (is_space(i32(state.*._src_bytes.bytes(usize(pos)))) || (i32(state.*._src_bytes.bytes(usize(pos))) == i32(0x0A))))), {
+        while((((pos < max) && (is_space(i32(state.*._src_bytes.bytes(usize(pos)))) || (i32(state.*._src_bytes.bytes(usize(pos))) == i32(0x0A))))), {
           pos = (pos + i32(1));
-        };
+        });
       });
     });
 
@@ -107,7 +108,7 @@ link_rule :: (fn(state: *(StateInline), silent: bool) -> bool)({
     });
 
     (label : String) = normalize_reference(ref_label);
-    if((label.len() == usize(0)), { return false; });
+    if((label.len() == usize(0)), { return(false); });
 
     (env : *(Env)) = state.*.env;
     (ref_opt : Option(Reference)) = env.*.references.get(label);
@@ -117,7 +118,7 @@ link_rule :: (fn(state: *(StateInline), silent: bool) -> bool)({
         title = r.title;
       },
       .None => {
-        return false;
+        return(false);
       }
     );
   });
@@ -155,4 +156,4 @@ link_rule :: (fn(state: *(StateInline), silent: bool) -> bool)({
   true
 });
 
-export link_rule;
+export(link_rule);

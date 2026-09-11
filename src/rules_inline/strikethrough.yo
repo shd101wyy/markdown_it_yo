@@ -2,11 +2,13 @@
 //
 // ~~strike through~~
 
-open import "std/string";
-{ ArrayList } :: import "std/collections/array_list";
-{ Token, TokenType } :: import "../token.yo";
-{ StateInline, Delimiter, TokenMeta, ScanDelimsResult } :: import "./state_inline.yo";
-{ flush_pending, inline_push_token } :: import "./inline_helpers.yo";
+pragma(Pragma.AllowUnsafe);
+{ String } :: import("std/string");
+{ ArrayList } :: import("std/collections/array_list");
+{ Token, TokenType } :: import("../token.yo");
+{ StateInline, Delimiter, TokenMeta, ScanDelimsResult } :: import("./state_inline.yo");
+{ flush_pending, inline_push_token } :: import("./inline_helpers.yo");
+{ str_view } :: import("../common/utils.yo");
 
 // Cached marker strings
 _TILDE := String.from("~");
@@ -18,24 +20,24 @@ strikethrough_tokenize :: (fn(state: *(StateInline), silent: bool) -> bool)({
   (marker : i32) = i32(state.*._src_bytes.bytes(usize(start)));
 
   if(silent, {
-    return false;
+    return(false);
   });
 
   if((marker != i32(0x7E)), {
-    return false;
+    return(false);
   });
 
   (scanned : ScanDelimsResult) = state.*.scan_delims(state.*.pos, true);
   (len : i32) = scanned.length;
 
   if((len < i32(2)), {
-    return false;
+    return(false);
   });
 
   // If odd count, push one single marker text token and reduce len
   if(((len % i32(2)) != i32(0)), {
     (token : Token) = Token.new(.TT_TEXT, "", i32(0));
-    token.content = _TILDE.as_str();
+    token.content = str_view(_TILDE);
     token._content_owned = .Some(_TILDE);
     token.level = state.*.level;
     inline_push_token(state, token);
@@ -44,9 +46,9 @@ strikethrough_tokenize :: (fn(state: *(StateInline), silent: bool) -> bool)({
 
   // Push pairs of markers as text tokens + delimiters
   (i : i32) = i32(0);
-  while (i < len), {
+  while((i < len), {
     (token : Token) = Token.new(.TT_TEXT, "", i32(0));
-    token.content = _DOUBLE_TILDE.as_str();
+    token.content = str_view(_DOUBLE_TILDE);
     token._content_owned = .Some(_DOUBLE_TILDE);
     token.level = state.*.level;
     inline_push_token(state, token);
@@ -62,7 +64,7 @@ strikethrough_tokenize :: (fn(state: *(StateInline), silent: bool) -> bool)({
     _ := state.*.delimiters.push(delim);
 
     i = (i + i32(2));
-  };
+  });
 
   state.*.pos = (state.*.pos + scanned.length);
   true
@@ -74,7 +76,7 @@ _post_process_strikethrough :: (fn(tokens: ArrayList(Token), delimiters: ArrayLi
   (max : i32) = i32(delimiters.len());
 
   (i : i32) = i32(0);
-  while (i < max), {
+  while((i < max), {
     (start_delim : Delimiter) = delimiters(usize(i));
 
     if(((start_delim.marker == i32(0x7E)) && (start_delim.end != i32(-1))), {
@@ -107,15 +109,15 @@ _post_process_strikethrough :: (fn(tokens: ArrayList(Token), delimiters: ArrayLi
     });
 
     i = (i + i32(1));
-  };
+  });
 
   // Move lone markers after subsequent s_close tags
-  while (lone_markers.len() > usize(0)), {
+  while((lone_markers.len() > usize(0)), {
     (idx : i32) = lone_markers.pop().unwrap();
     (j : i32) = (idx + i32(1));
-    while (((j < i32(tokens.len())) && (&(tokens(usize(j))).*.type_name == .TT_S_CLOSE))), {
+    while((((j < i32(tokens.len())) && (&(tokens(usize(j))).*.type_name == .TT_S_CLOSE))), {
       j = (j + i32(1));
-    };
+    });
     j = (j - i32(1));
     if((idx != j), {
       (tok_j : *(Token)) = &(tokens(usize(j)));
@@ -124,7 +126,7 @@ _post_process_strikethrough :: (fn(tokens: ArrayList(Token), delimiters: ArrayLi
       tok_j.* = tok_i.*;
       tok_i.* = temp;
     });
-  };
+  });
 });
 
 strikethrough_post_process :: (fn(state: *(StateInline)) -> unit)({
@@ -134,13 +136,13 @@ strikethrough_post_process :: (fn(state: *(StateInline)) -> unit)({
   (max : i32) = i32(tokens_meta.len());
 
   (curr : i32) = i32(0);
-  while (curr < max), {
+  while((curr < max), {
     match(tokens_meta(usize(curr)),
       .Some(tm) => _post_process_strikethrough(state.*.tokens, tm.delimiters),
       .None => ()
     );
     curr = (curr + i32(1));
-  };
+  });
 });
 
-export strikethrough_tokenize, strikethrough_post_process;
+export(strikethrough_tokenize, strikethrough_post_process);

@@ -2,14 +2,15 @@
 //
 // For each opening emphasis-like marker find a matching closing one
 
-open import "std/string";
-{ ArrayList } :: import "std/collections/array_list";
-{ StateInline, Delimiter, TokenMeta } :: import "./state_inline.yo";
+pragma(Pragma.AllowUnsafe);
+import("std/string");
+{ ArrayList } :: import("std/collections/array_list");
+{ StateInline, Delimiter, TokenMeta } :: import("./state_inline.yo");
 
 process_delimiters :: (fn(delimiters: ArrayList(Delimiter)) -> unit)({
   (max : i32) = i32(delimiters.len());
   if((max == i32(0)), {
-    return ();
+    return(());
   });
 
   // openers_bottom: for each marker, stores 6 lower bounds
@@ -25,7 +26,7 @@ process_delimiters :: (fn(delimiters: ArrayList(Delimiter)) -> unit)({
   (jumps : ArrayList(i32)) = ArrayList(i32).with_capacity(usize(max));
 
   (closer_idx : i32) = i32(0);
-  while (closer_idx < max), {
+  while((closer_idx < max), {
     (closer : Delimiter) = delimiters(usize(closer_idx));
     _ := jumps.push(i32(0));
 
@@ -43,14 +44,14 @@ process_delimiters :: (fn(delimiters: ArrayList(Delimiter)) -> unit)({
       {
         (si : i32) = i32(0);
         (smax : i32) = i32(ob_markers.len());
-        while (si < smax), {
+        while((si < smax), {
           if((ob_markers(usize(si)) == closer.marker), {
             marker_slot = si;
             si = smax;
           }, {
             si = (si + i32(1));
           });
-        };
+        });
       };
       if((marker_slot == i32(-1)), {
         marker_slot = i32(ob_markers.len());
@@ -74,7 +75,7 @@ process_delimiters :: (fn(delimiters: ArrayList(Delimiter)) -> unit)({
       (new_min_opener_idx : i32) = opener_idx;
       (found_match : bool) = false;
 
-      while (((opener_idx > min_opener_idx) && (found_match == false))), {
+      while((((opener_idx > min_opener_idx) && (found_match == false))), {
         (opener : Delimiter) = delimiters(usize(opener_idx));
 
         if(((opener.marker == closer.marker) && (opener.open && (opener.end < i32(0)))), {
@@ -121,7 +122,7 @@ process_delimiters :: (fn(delimiters: ArrayList(Delimiter)) -> unit)({
         if((found_match == false), {
           opener_idx = ((opener_idx - jumps(usize(opener_idx))) - i32(1));
         });
-      };
+      });
 
       if((new_min_opener_idx != i32(-1)), {
         &(ob_bottoms(flat_idx)).* = new_min_opener_idx;
@@ -129,7 +130,7 @@ process_delimiters :: (fn(delimiters: ArrayList(Delimiter)) -> unit)({
     });
 
     closer_idx = (closer_idx + i32(1));
-  };
+  });
 });
 
 link_pairs :: (fn(state: *(StateInline)) -> unit)({
@@ -139,13 +140,13 @@ link_pairs :: (fn(state: *(StateInline)) -> unit)({
   process_delimiters(state.*.delimiters);
 
   (curr : i32) = i32(0);
-  while (curr < max), {
+  while((curr < max), {
     match(tokens_meta(usize(curr)),
       .Some(tm) => process_delimiters(tm.delimiters),
       .None => ()
     );
     curr = (curr + i32(1));
-  };
+  });
 });
 
-export process_delimiters, link_pairs;
+export(process_delimiters, link_pairs);

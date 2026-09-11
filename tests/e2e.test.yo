@@ -1,11 +1,12 @@
 // End-to-end test for the markdown-it pipeline
 
-open import "std/string";
-open import "std/fmt";
-{ ArrayList } :: import "std/collections/array_list";
-{ Token } :: import "../src/token.yo";
-{ MarkdownIt, new_markdown_it, new_markdown_it_with_options } :: import "../src/markdown_it.yo";
-{ Options, default_options } :: import "../src/options.yo";
+{ String } :: import("std/string");
+{ assert } :: import("std/assert");
+{ println } :: import("std/fmt");
+{ ArrayList } :: import("std/collections/array_list");
+{ Token } :: import("../src/token.yo");
+{ MarkdownIt, new_markdown_it, new_markdown_it_with_options } :: import("../src/markdown_it.yo");
+{ Options, default_options } :: import("../src/options.yo");
 
 main :: (fn() -> unit)({
   println(`=== markdown_it_yo end-to-end tests ===`);
@@ -742,4 +743,4 @@ main :: (fn() -> unit)({
   println(`=== All tests passed ===`);
 });
 
-export main;
+export(main);

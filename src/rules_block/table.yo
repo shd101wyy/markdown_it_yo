@@ -2,13 +2,14 @@
 //
 // GFM table, https://github.github.com/gfm/#tables-extension-
 
-open import "std/string";
-{ ArrayList } :: import "std/collections/array_list";
-{ Token, StringPair, TokenType, MapRange } :: import "../token.yo";
-{StateBlock, block_push_token, PARENT_TABLE} :: import "./state_block.yo";
-{ BlockRuleFn } :: import "./lheading.yo";
-{ is_space } :: import "../common/utils.yo";
-{ table_get_line, escaped_split } :: import "./table_helpers.yo";
+pragma(Pragma.AllowUnsafe);
+{ String } :: import("std/string");
+{ ArrayList } :: import("std/collections/array_list");
+{ Token, StringPair, TokenType, MapRange } :: import("../token.yo");
+{StateBlock, block_push_token, PARENT_TABLE} :: import("./state_block.yo");
+{ BlockRuleFn } :: import("./lheading.yo");
+{ is_space, str_view } :: import("../common/utils.yo");
+{ table_get_line, escaped_split } :: import("./table_helpers.yo");
 
 // Type alias to work around Yo evaluator cache bug with fn type aliases in generic params
 RuleList :: ArrayList(BlockRuleFn);
@@ -21,18 +22,18 @@ MAX_AUTOCOMPLETED_CELLS :: i32(0x10000);
 table :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: bool, terminator_rules: *(RuleList)) -> bool)({
   // should have at least two lines
   if(((start_line + i32(2)) > end_line), {
-    return false;
+    return(false);
   });
 
   (next_line : i32) = (start_line + i32(1));
 
   if((state.*.s_count(usize(next_line)) < state.*.blk_indent), {
-    return false;
+    return(false);
   });
 
   // if it's indented more than 3 spaces, it should be a code block
   if(((state.*.s_count(usize(next_line)) - state.*.blk_indent) >= i32(4)), {
-    return false;
+    return(false);
   });
 
   // first character of the second line should be '|', '-', ':',
@@ -40,43 +41,43 @@ table :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: bool,
   // basically, this is the equivalent of /^[-:|][-:|\s]*$/
   (pos : i32) = (state.*.b_marks(usize(next_line)) + state.*.t_shift(usize(next_line)));
   if((pos >= state.*.e_marks(usize(next_line))), {
-    return false;
+    return(false);
   });
 
   (first_ch : i32) = i32(state.*._src_bytes.bytes(usize(pos)));
   pos = (pos + i32(1));
   if((((first_ch != i32(0x7C)) && (first_ch != i32(0x2D))) && (first_ch != i32(0x3A))), {
-    return false;
+    return(false);
   });
 
   if((pos >= state.*.e_marks(usize(next_line))), {
-    return false;
+    return(false);
   });
 
   (second_ch : i32) = i32(state.*._src_bytes.bytes(usize(pos)));
   pos = (pos + i32(1));
   if(((((second_ch != i32(0x7C)) && (second_ch != i32(0x2D))) && (second_ch != i32(0x3A))) && !(is_space(second_ch))), {
-    return false;
+    return(false);
   });
 
   // if first character is '-', then second character must not be a space
   if(((first_ch == i32(0x2D)) && is_space(second_ch)), {
-    return false;
+    return(false);
   });
 
   // check remaining chars on separator line
   (check_pos : i32) = pos;
   (sep_valid : bool) = true;
-  while ((check_pos < state.*.e_marks(usize(next_line))) && sep_valid), {
+  while(((check_pos < state.*.e_marks(usize(next_line))) && sep_valid), {
     (ch : i32) = i32(state.*._src_bytes.bytes(usize(check_pos)));
     if(((((ch != i32(0x7C)) && (ch != i32(0x2D))) && (ch != i32(0x3A))) && !(is_space(ch))), {
       sep_valid = false;
     }, {
       check_pos = (check_pos + i32(1));
     });
-  };
+  });
   if(!(sep_valid), {
-    return false;
+    return(false);
   });
 
   // Parse alignment info from separator line
@@ -86,7 +87,7 @@ table :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: bool,
 
   (ci : i32) = i32(0);
   (col_valid : bool) = true;
-  while ((ci < i32(columns.len())) && col_valid), {
+  while(((ci < i32(columns.len())) && col_valid), {
     (t : String) = columns(usize(ci)).trim();
     if((t.len() == usize(0)), {
       // allow empty columns before and after table, but not in between
@@ -106,7 +107,7 @@ table :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: bool,
       });
       (has_dash : bool) = false;
       (pattern_ok : bool) = true;
-      while ((ti < t_len) && pattern_ok), {
+      while(((ti < t_len) && pattern_ok), {
         (tc : i32) = i32(t_bytes(usize(ti)));
         if((tc == i32(0x2D)), {
           has_dash = true;
@@ -118,7 +119,7 @@ table :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: bool,
             pattern_ok = false;
           });
         });
-      };
+      });
       if((!(pattern_ok) || !(has_dash)), {
         col_valid = false;
       }, {
@@ -139,18 +140,18 @@ table :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: bool,
         ci = (ci + i32(1));
       });
     });
-  };
+  });
   if(!(col_valid), {
-    return false;
+    return(false);
   });
 
   // Parse header row
   (header_text : String) = table_get_line((&state.*), start_line).trim();
   if(header_text.index_of(`|`).is_none(), {
-    return false;
+    return(false);
   });
   if(((state.*.s_count(usize(start_line)) - state.*.blk_indent) >= i32(4)), {
-    return false;
+    return(false);
   });
 
   (header_columns : ArrayList(String)) = escaped_split(header_text);
@@ -165,11 +166,11 @@ table :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: bool,
 
   (column_count : i32) = i32(header_columns.len());
   if(((column_count == i32(0)) || (column_count != i32(aligns.len()))), {
-    return false;
+    return(false);
   });
 
   if(silent, {
-    return true;
+    return(true);
   });
 
   (old_parent_type : i32) = state.*.parent_type;
@@ -192,7 +193,7 @@ table :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: bool,
 
   // header cells
   (hi : i32) = i32(0);
-  while (hi < i32(header_columns.len())), {
+  while((hi < i32(header_columns.len())), {
     (token_ho : Token) = Token.new(.TT_TH_OPEN, "th", i32(1));
     (align_val : String) = aligns(usize(hi));
     if((align_val.len() > usize(0)), {
@@ -202,13 +203,13 @@ table :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: bool,
 
     (token_il : Token) = Token.new(.TT_INLINE, "", i32(0));
     (hdr_content : String) = header_columns(usize(hi)).trim();
-    token_il.content = hdr_content.as_str();
+    token_il.content = str_view(hdr_content);
     token_il._content_owned = .Some(hdr_content);
     block_push_token(state, token_il);
 
     block_push_token(state, Token.new(.TT_TH_CLOSE, "th", i32(-1)));
     hi = (hi + i32(1));
-  };
+  });
 
   block_push_token(state, Token.new(.TT_TR_CLOSE, "tr", i32(-1)));
   block_push_token(state, Token.new(.TT_THEAD_CLOSE, "thead", i32(-1)));
@@ -220,14 +221,14 @@ table :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: bool,
 
   next_line = (start_line + i32(2));
   (body_done : bool) = false;
-  while ((next_line < end_line) && !(body_done)), {
+  while(((next_line < end_line) && !(body_done)), {
     if((state.*.s_count(usize(next_line)) < state.*.blk_indent), {
       body_done = true;
     }, {
       // check terminator rules
       (terminate : bool) = false;
       (ti : i32) = i32(0);
-      while ((ti < i32(terminator_rules.*.len())) && !(terminate)), {
+      while(((ti < i32(terminator_rules.*.len())) && !(terminate)), {
         // Workaround: separate .unwrap() from call to avoid evaluator chained-call bug
         (rule_fn : BlockRuleFn) = terminator_rules.*(usize(ti));
         if(rule_fn((&state.*), next_line, end_line, true), {
@@ -235,7 +236,7 @@ table :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: bool,
         }, {
           ti = (ti + i32(1));
         });
-      };
+      });
       if(terminate, {
         body_done = true;
       }, {
@@ -270,7 +271,7 @@ table :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: bool,
               block_push_token(state, token_tro);
 
               (ri : i32) = i32(0);
-              while (ri < column_count), {
+              while((ri < column_count), {
                 (token_tdo : Token) = Token.new(.TT_TD_OPEN, "td", i32(1));
                 (a_val : String) = aligns(usize(ri));
                 if((a_val.len() > usize(0)), {
@@ -281,7 +282,7 @@ table :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: bool,
                 (token_il : Token) = Token.new(.TT_INLINE, "", i32(0));
                 if((ri < i32(row_columns.len())), {
                   (cell_content : String) = row_columns(usize(ri)).trim();
-                  token_il.content = cell_content.as_str();
+                  token_il.content = str_view(cell_content);
                   token_il._content_owned = .Some(cell_content);
                 }, {
                   token_il.content = "";
@@ -290,7 +291,7 @@ table :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: bool,
 
                 block_push_token(state, Token.new(.TT_TD_CLOSE, "td", i32(-1)));
                 ri = (ri + i32(1));
-              };
+              });
 
               block_push_token(state, Token.new(.TT_TR_CLOSE, "tr", i32(-1)));
               next_line = (next_line + i32(1));
@@ -299,7 +300,7 @@ table :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: bool,
         });
       });
     });
-  };
+  });
 
   if(tbody_opened, {
     block_push_token(state, Token.new(.TT_TBODY_CLOSE, "tbody", i32(-1)));
@@ -315,4 +316,4 @@ table :: (fn(state: *(StateBlock), start_line: i32, end_line: i32, silent: bool,
   true
 });
 
-export table;
+export(table);
