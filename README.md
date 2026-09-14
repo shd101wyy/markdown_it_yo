@@ -24,7 +24,46 @@ yo build run      # Build and run (reads from stdin)
 yo build wasm     # Build WASM target (requires emscripten)
 ```
 
-## Usage
+## Use as a library
+
+`markdown_it_yo` is a Yo package, so add it and import it by name — no paths:
+
+```bash
+yo add shd101wyy/markdown_it_yo
+```
+
+```rust
+{ new_markdown_it } :: import("markdown_it_yo");
+{ println } :: import("std/fmt");
+
+main :: (fn() -> unit)({
+  md := new_markdown_it();
+  println(md.render_src(`# Hello\n\nSome **bold** text.`));
+});
+
+export(main);
+```
+
+Prints:
+
+```html
+<h1>Hello</h1>
+<p>Some <strong>bold</strong> text.</p>
+```
+
+For non-default behaviour, build the `Options` first — the same options the CLI
+flags below set:
+
+```rust
+{ new_markdown_it_with_options, default_options, commonmark_options, Options } :: import("markdown_it_yo");
+
+(opts : Options) = default_options();
+opts.html = true;
+opts.typographer = true;
+md := new_markdown_it_with_options(opts);
+```
+
+## Usage (CLI)
 
 ```bash
 # Read from stdin
